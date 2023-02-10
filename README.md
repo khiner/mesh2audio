@@ -69,10 +69,11 @@ There's actaully a ton of work needed on the client side, so maybe that would be
   - Fortran?
   - ... (Ben)
 - App: UI/UX/mesh/audio generation & editing
-  - [ImGui](https://github.com/ocornut/imgui): Render the UI to many backends.
+  - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX, supporting many environments & backends.
   - [GLTF 2.0](https://github.com/KhronosGroup/glTF): Main mesh+material format. Transmit and load 3D scenes and models efficiently.
     Minimize the size of 3D assets, and their unpack runtime.
   - [Filament](https://github.com/google/filament): Real-time physically based rendering library.
     GLTF loader/viewer/editor.
   - [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
   - [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
+  - [ImPlot](https://github.com/epezent/implot/): For plotting

@@ -1,0 +1,10 @@
+[submodule "app/lib/imgui"]
+	path = app/lib/imgui
+	url = git@github.com:ocornut/imgui.git
+	branch = docking
+[submodule "app/lib/SDL"]
+	path = app/lib/SDL
+	url = git@github.com:libsdl-org/SDL.git
+[submodule "app/lib/implot"]
+	path = app/lib/implot
+	url = git@github.com:epezent/implot.git
