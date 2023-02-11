@@ -1,13 +1,15 @@
 struct State {
-    struct WindowState {
+    struct Window {
         const char *Name{""};
         bool Visible{true};
     };
 
     struct WindowsState {
-        WindowState Main{"Main"};
-        WindowState ImGuiDemo{"Dear ImGui Demo"};
-        WindowState ImPlotDemo{"ImPlot Demo"};
+        Window Main{"Main"};
+        Window MeshControls{"Mesh Controls"};
+        Window Mesh{"Mesh"};
+        Window ImGuiDemo{"Dear ImGui Demo"};
+        Window ImPlotDemo{"ImPlot Demo"};
     };
 
     WindowsState Windows{};

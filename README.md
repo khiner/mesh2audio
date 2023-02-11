@@ -46,7 +46,7 @@ There's actaully a ton of work needed on the client side, so maybe that would be
 
 - Ben:
   - **Render an input volumetric mesh to mass/stiffness eigenvectors & eigenvalues.** (Everything in the "Vega FEM" box above.)
-  - Given volumetric mesh (in [GLTF 2.0 format](https://github.com/KhronosGroup/glTF)) & material properties, produce:
+  - Given volumetric mesh (as an `.obj` file) & material properties (as `.mtl` file? GLTF? custom data structure?), produce:
     - Tetrahedral mesh -> (Mass/stiffness matrices) -> Eigen solver -> (Eigenvectors, Eigenvalues)
 - Karl:
   - **Generate FEM inputs (mesh, materials), and render the FEM outputs to a modal physical audio model.** (Everything outside of the "Vega FEM" box.)
@@ -63,6 +63,11 @@ There's actaully a ton of work needed on the client side, so maybe that would be
       - Measure performance improvement from skipping Faust compilation.
         Goal is real-time editing.
 
+What if the interface for generating/manipulating meshes only handled one specific kind of operation - editing a 2D profile, and revolving it around an axis to create a 3D volumetric mesh.
+
+The FEM and modal modeling would still all be more general, but I'm thinking of ways to focus/scope the UI editing part.
+Could even just support parametrically generating bell meshes (mesh2faust references T. D. Rossing and R. Perrin, “Vibrations of Bells).
+
 ## Stack
 
 - FEM:
@@ -70,7 +75,7 @@ There's actaully a ton of work needed on the client side, so maybe that would be
   - ... (Ben)
 - App: UI/UX/mesh/audio generation & editing
   - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX, supporting many environments & backends.
-  - [GLTF 2.0](https://github.com/KhronosGroup/glTF): Main mesh+material format. Transmit and load 3D scenes and models efficiently.
+  - [GLTF 2.0](https://github.com/KhronosGroup/glTF): Mesh+material(+much more) format. Transmit and load 3D scenes and models efficiently.
     Minimize the size of 3D assets, and their unpack runtime.
   - [Filament](https://github.com/google/filament): Real-time physically based rendering library.
     GLTF loader/viewer/editor.

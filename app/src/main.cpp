@@ -1,3 +1,5 @@
+#include <GL/glew.h>
+#include <iostream>
 #include <stdio.h>
 
 #include "imgui.h"
@@ -9,13 +11,141 @@
 #include <SDL_opengl.h>
 
 #include "State.h"
+#include "mesh.h"
+#include "shaders.h"
+#include "transform.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
+using std::string;
+
+static gl::Mesh mesh;
+static GLuint projectionPos, modelviewPos;
+static float fovy = 90.0f;
+static float zNear = 0.1f, zFar = 99.0f;
+static int amountinit = 5, amount;
+static vec3 eyeinit(0.0, 0.0, 5.0), upinit(0.0, 1.0, 0.0), center(0.0, 0.0, 0.0);
+static vec3 eye, up;
+
+// Lighting details
+const int numLights = 5;
+static GLfloat lightposn[4 * numLights], lightcolor[4 * numLights], lightransf[4 * numLights];
+
+// Variables to set uniform params for lighting fragment shader
+static GLuint lightcol, lightpos, numusedcol, enablelighting,
+    ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
+
+// Callback and reshape globals
+static int keyboard_mode = 0, mouse_mode = 1;
+static int render_mode;
+static int previous_x_position = 0, previous_y_position = 0;
+
+static GLuint vertexshader, fragmentshader, shaderprogram;
+static mat4 projection, modelview;
+
+static enum { view,
+              translate,
+              scale } transop;
+static float sx, sy;
+static float tx, ty;
+
+void scroll_callback(double xoffset, double yoffset) {
+    sx += yoffset * 0.01;
+    sy += yoffset * 0.01;
+}
+
+void initialise_shader_and_mesh() {
+    // Initialize shaders
+    gl::Shader shader;
+    vertexshader = shader.init_shaders(GL_VERTEX_SHADER, "../res/shaders/vertex.glsl");
+    fragmentshader = shader.init_shaders(GL_FRAGMENT_SHADER, "../res/shaders/fragment.glsl");
+    shaderprogram = shader.init_program(vertexshader, fragmentshader);
+
+    // Get uniform locations
+    lightpos = glGetUniformLocation(shaderprogram, "light_posn");
+    lightcol = glGetUniformLocation(shaderprogram, "light_col");
+    ambientcol = glGetUniformLocation(shaderprogram, "ambient");
+    diffusecol = glGetUniformLocation(shaderprogram, "diffuse");
+    specularcol = glGetUniformLocation(shaderprogram, "specular");
+    emissioncol = glGetUniformLocation(shaderprogram, "emission");
+    shininesscol = glGetUniformLocation(shaderprogram, "shininess");
+    projectionPos = glGetUniformLocation(shaderprogram, "projection");
+    modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
+
+    // Initialize global mesh
+    mesh.generate_buffers();
+    mesh.parse_and_bind();
+}
+
+void display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
+    modelview = glm::lookAt(eye, center, up);
+    glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelview[0][0]);
+
+    glUniform4fv(lightpos, numLights, &light_position);
+    glUniform4fv(lightcol, numLights, &light_color);
+
+    // Transformations for objects, involving translation and scaling
+    mat4 sc(1.0), tr(1.0), transf(1.0);
+    sc = gl::Transform::scale(sx, sy, 1.0);
+    tr = gl::Transform::translate(tx, ty, 0.0);
+    modelview = tr * sc * modelview;
+
+    if (!custom_color) {
+        *(&ambient_slider + 1) = ambient_slider;
+        *(&ambient_slider + 2) = ambient_slider;
+
+        *(&diffuse_slider + 1) = diffuse_slider;
+        *(&diffuse_slider + 2) = diffuse_slider;
+
+        *(&specular_slider + 1) = specular_slider;
+        *(&specular_slider + 2) = specular_slider;
+    }
+
+    glUniform4fv(ambientcol, 1, &ambient_slider);
+    glUniform4fv(diffusecol, 1, &diffuse_slider);
+    glUniform4fv(specularcol, 1, &specular_slider);
+    glUniform1f(shininesscol, shininess_slider);
+
+    glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(modelview * glm::scale(mat4(1.0f), vec3(2, 2, 2)))[0][0]);
+    mesh.bind();
+    if (render_mode == 0) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+    }
+    if (render_mode == 1) {
+        glLineWidth(1);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+    }
+    if (render_mode == 2) {
+        glPointSize(2.5);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+    }
+    if (render_mode == 3) {
+        const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glUniform4fv(diffusecol, 1, black);
+        glUniform4fv(specularcol, 1, white);
+
+        glPointSize(2.5);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+
+        glLineWidth(2.5);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+    }
+    glBindVertexArray(0);
+}
+
 int main(int, char **) {
+    mesh.object_path = "../data/bunny.obj";
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMEPAD) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -52,13 +182,17 @@ int main(int, char **) {
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
+    if (glewInit() != GLEW_OK) {
+        std::cout << "Error initializing `glew`.\n";
+        return -1;
+    }
+
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImPlot::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
@@ -100,7 +234,31 @@ int main(int, char **) {
     // IM_ASSERT(font != NULL);
 
     State s{}; // Main application state
-    ImVec4 clear_color{0.45f, 0.55f, 0.6f, 1.f};
+
+    // Initialise all variable initial values
+    initialise_shader_and_mesh();
+    eye = (eyeinit);
+    up = (upinit);
+    amount = amountinit;
+    sx = sy = 1.0;
+    tx = ty = 0.0;
+
+    glEnable(GL_DEPTH_TEST);
+
+    float ambient[4] = {0.05, 0.05, 0.05, 1};
+    float diffusion[4] = {0.2, 0.2, 0.2, 1};
+    float specular[4] = {0.5, 0.5, 0.5, 1};
+    float light_positions[20] = {0.0f};
+    float light_colors[20] = {0.0f};
+    float shininess = 10;
+    bool custom_color = false;
+
+    light_positions[1] = 6.5f;
+    light_colors[0] = 1.0f;
+    light_colors[1] = 1.0f;
+    light_colors[2] = 1.0f;
+
+    render_mode = 3;
 
     // Main loop
     bool done = false;
@@ -134,15 +292,21 @@ int main(int, char **) {
 
         auto dockspace_id = ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
         if (ImGui::GetFrameCount() == 1) {
-            auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.5f, nullptr, &dockspace_id);
+            auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.Main.Name, dockspace_id);
+            auto mesh_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.75f, nullptr, &dockspace_id);
+            auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
+            ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
+            ImGui::DockBuilderDockWindow(s.Windows.Mesh.Name, mesh_node_id);
         }
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Windows")) {
                 ImGui::MenuItem(s.Windows.Main.Name, nullptr, &s.Windows.Main.Visible);
+                ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
+                ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
                 ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
                 ImGui::MenuItem(s.Windows.ImPlotDemo.Name, nullptr, &s.Windows.ImPlotDemo.Visible);
                 ImGui::EndMenu();
@@ -163,7 +327,6 @@ int main(int, char **) {
             ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
 
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
 
             if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
                 counter++;
@@ -174,12 +337,121 @@ int main(int, char **) {
             ImGui::End();
         }
 
+        if (s.Windows.MeshControls.Visible) {
+            ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
+
+            ImGui::Separator();
+            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Render Mode");
+            ImGui::Separator();
+            // ImGui::Text("Primitive object "); ImGui::SameLine();
+            ImGui::RadioButton("Smooth", &render_mode, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("Lines", &render_mode, 1);
+            ImGui::SameLine();
+            ImGui::RadioButton("Point Cloud", &render_mode, 2);
+            ImGui::SameLine();
+            ImGui::RadioButton("Mesh", &render_mode, 3);
+
+            ImGui::Separator();
+            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Object Properties");
+            ImGui::Separator();
+            ImGui::TextWrapped(
+                "These set of boxes and sliders change the way the object reacts with light giving us the impression of its material."
+                "The initial sliders assume the object stays white, and 'Custom Colors' allows changing the associated colors"
+            );
+            ImGui::Separator();
+
+            ImGui::Checkbox("Custom Colors", &custom_color);
+            if (custom_color) {
+                ImGui::SliderFloat3("Ambient R, G, B", &ambient[0], 0.0f, 1.0f);
+                ImGui::SliderFloat3("Diffusion R, G, B", &diffusion[0], 0.0f, 1.0f);
+                ImGui::SliderFloat3("Specular R, G, B", &specular[0], 0.0f, 1.0f);
+                ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+            } else {
+                ImGui::SliderFloat("Ambient", &ambient[0], 0.0f, 1.0f);
+                ImGui::SliderFloat("Diffusion", &diffusion[0], 0.0f, 1.0f);
+                ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
+                ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+            }
+            ImGui::Text(" ");
+
+            ImGui::Separator();
+            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Input Devices");
+            ImGui::Separator();
+            ImGui::TextWrapped("Decide which input device associates to which transformation."
+                               "By default the scroll wheel is associated with scaling");
+            ImGui::Separator();
+
+            ImGui::Text("Use mouse to ");
+            ImGui::SameLine();
+            ImGui::RadioButton("translate", &mouse_mode, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("rotate", &mouse_mode, 1);
+
+            ImGui::Text("Using keyboard to");
+            ImGui::SameLine();
+            ImGui::RadioButton("translate ", &keyboard_mode, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("rotate ", &keyboard_mode, 1);
+
+            keyboard_mode = !(mouse_mode);
+
+            ImGui::Text(" ");
+
+            ImGui::Separator();
+            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Camera");
+            ImGui::Separator();
+            ImGui::SliderFloat("Field of view", &fovy, 0.0f, 180.0f);
+            ImGui::SliderFloat("Frustum near plane", &zNear, 0.0f, 15.0f);
+            ImGui::SliderFloat("Frustum far plane", &zFar, 0.0f, 150.0f);
+            ImGui::Text(" ");
+            ImGui::SliderFloat3("Camera position ", &eye[0], -10.0f, 10.0f);
+
+            ImGui::Separator();
+            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Lighting");
+            ImGui::Separator();
+            ImGui::TextWrapped("Most lights are switched off by default, and the below"
+                               "sliders can play with the light positions and color intensities");
+
+            for (int i = 0; i < numLights; i++) {
+                const string light_name = string("Light ") + std::to_string(i + 1);
+                ImGui::Separator();
+                ImGui::Text("Light");
+                ImGui::Separator();
+                ImGui::SliderFloat3((light_name + " positions").c_str(), &light_positions[4 * i], -25.0f, 25.0f);
+                ImGui::SliderFloat3((light_name + " colors").c_str(), &light_colors[4 * i], 0.0f, 1.0f);
+
+                light_positions[(4 * i) + 3] = 1.0f;
+                light_colors[(4 * i) + 3] = 1.0f;
+            }
+
+            ImGui::End();
+        }
+
+        static float mesh_vp_x, mesh_vp_y, mesh_vp_w, mesh_vp_h;
+        if (s.Windows.Mesh.Visible) {
+            ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
+            mesh_vp_x = ImGui::GetCursorPosX();
+            mesh_vp_y = ImGui::GetCursorPosY();
+            mesh_vp_w = ImGui::GetContentRegionAvail().x;
+            mesh_vp_h = ImGui::GetContentRegionAvail().y;
+            ImGui::End();
+        } else {
+            mesh_vp_x = mesh_vp_y = mesh_vp_w = mesh_vp_h = 0;
+        }
+
         // Rendering
         ImGui::Render();
-        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        projection = glm::perspective(glm::radians(fovy), mesh_vp_w / mesh_vp_h, zNear, zFar);
+        glViewport(mesh_vp_x, io.DisplaySize.y - mesh_vp_y, mesh_vp_w, mesh_vp_h);
+        glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
+        display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
         // Update and Render additional Platform Windows
         // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
@@ -198,6 +470,7 @@ int main(int, char **) {
     EMSCRIPTEN_MAINLOOP_END;
 #endif
 
+    mesh.destroy_buffers();
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
