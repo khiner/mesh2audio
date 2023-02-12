@@ -1,14 +1,8 @@
-#include <string>
+#include <filesystem>
 
-namespace gl {
-class Shader {
-public:
-    std::string read_text_file(const char *filename);
+namespace fs = std::filesystem;
 
-    void program_errors(const GLint program);
-    void shader_errors(const GLint shader);
-
-    GLuint init_shaders(GLenum type, const char *filename);
-    GLuint init_program(GLuint vertexshader, GLuint fragmentshader);
+struct Shader {
+    static GLuint init_shaders(GLenum type, const fs::path);
+    static GLuint init_program(GLuint vertexshader, GLuint fragmentshader);
 };
-} // namespace gl

@@ -1,4 +1,5 @@
 #include <GL/glew.h>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <stdio.h>
 
@@ -21,6 +22,7 @@
 #endif
 
 using std::string;
+using glm::vec3;
 
 static gl::Mesh mesh;
 static GLuint projectionPos, modelviewPos;
@@ -59,10 +61,9 @@ void scroll_callback(double xoffset, double yoffset) {
 
 void initialise_shader_and_mesh() {
     // Initialize shaders
-    gl::Shader shader;
-    vertexshader = shader.init_shaders(GL_VERTEX_SHADER, "../res/shaders/vertex.glsl");
-    fragmentshader = shader.init_shaders(GL_FRAGMENT_SHADER, "../res/shaders/fragment.glsl");
-    shaderprogram = shader.init_program(vertexshader, fragmentshader);
+    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, "../res/shaders/vertex.glsl");
+    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, "../res/shaders/fragment.glsl");
+    shaderprogram = Shader::init_program(vertexshader, fragmentshader);
 
     // Get uniform locations
     lightpos = glGetUniformLocation(shaderprogram, "light_posn");
@@ -76,6 +77,7 @@ void initialise_shader_and_mesh() {
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
     // Initialize global mesh
+    mesh.object_path = "../data/bunny.obj";
     mesh.generate_buffers();
     mesh.parse_and_bind();
 }
@@ -89,8 +91,8 @@ void display(float &ambient_slider, float &diffuse_slider, float &specular_slide
 
     // Transformations for objects, involving translation and scaling
     mat4 sc(1.0), tr(1.0), transf(1.0);
-    sc = gl::Transform::scale(sx, sy, 1.0);
-    tr = gl::Transform::translate(tx, ty, 0.0);
+    sc = Transform::scale(sx, sy, 1.0);
+    tr = Transform::translate(tx, ty, 0.0);
     modelview = tr * sc * modelview;
 
     if (!custom_color) {
@@ -113,39 +115,38 @@ void display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     mesh.bind();
     if (render_mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 1) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 2) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 3) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
         glUniform4fv(diffusecol, 1, black);
         glUniform4fv(specularcol, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
 
         glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.objectIndices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
 }
 
 int main(int, char **) {
-    mesh.object_path = "../data/bunny.obj";
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMEPAD) != 0) {
         printf("Error: %s\n", SDL_GetError());

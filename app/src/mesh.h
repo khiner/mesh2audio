@@ -1,28 +1,22 @@
 #include <GL/glew.h>
-
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
-#include <fstream>
-#include <iostream>
-#include <sstream>
+#include <string>
 #include <vector>
 
 namespace gl {
-class Mesh {
-private:
-    GLuint vertex_array, vertex_buffer, normal_buffer, index_buffer;
-
-public:
-    std::string object_path;
-
-    std::vector<glm::vec3> objectVertices;
-    std::vector<glm::vec3> objectNormals;
-    std::vector<unsigned int> objectIndices;
-
+struct Mesh {
     void generate_buffers();
     void destroy_buffers();
     void parse_and_bind();
     inline void bind() { glBindVertexArray(vertex_array); }
+
+    std::string object_path;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> normals;
+    std::vector<unsigned int> indices;
+
+private:
+    GLuint vertex_array, vertex_buffer, normal_buffer, index_buffer;
 };
 } // namespace gl
