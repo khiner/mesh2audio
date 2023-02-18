@@ -1,0 +1,23 @@
+{
+  "files.associations": {
+    "core": "cpp",
+    "superlusupport": "cpp",
+    "adolcforward": "cpp",
+    "alignedvector3": "cpp",
+    "autodiff": "cpp",
+    "bvh": "cpp",
+    "eulerangles": "cpp",
+    "fft": "cpp",
+    "kroneckerproduct": "cpp",
+    "mprealsupport": "cpp",
+    "numericaldiff": "cpp",
+    "openglsupport": "cpp",
+    "specialfunctions": "cpp",
+    "splines": "cpp",
+    "dense": "cpp",
+    "iosfwd": "cpp",
+    "vector": "cpp",
+    "numbers": "cpp",
+    "iostream": "cpp"
+  }
+}

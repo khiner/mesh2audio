@@ -21,8 +21,8 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-using std::string;
 using glm::vec3;
+using std::string;
 
 static gl::Mesh mesh;
 static GLuint projectionPos, modelviewPos;
@@ -61,8 +61,9 @@ void scroll_callback(double xoffset, double yoffset) {
 
 void initialise_shader_and_mesh() {
     // Initialize shaders
-    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, "../res/shaders/vertex.glsl");
-    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, "../res/shaders/fragment.glsl");
+    // todo fix `build/res` not being populated with `shaders/**.*` and remove `../` prefixes.
+    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, fs::path("..") / "res" / "shaders" / "vertex.glsl");
+    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, fs::path("..") / "res" / "shaders" / "fragment.glsl");
     shaderprogram = Shader::init_program(vertexshader, fragmentshader);
 
     // Get uniform locations

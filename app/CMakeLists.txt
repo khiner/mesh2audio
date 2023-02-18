@@ -4,6 +4,7 @@ set(CMAKE_C_STANDARD 17)
 
 project(mesh2audio LANGUAGES C CXX OBJC)
 add_subdirectory(lib)
+add_subdirectory(res)
 
 file(
     GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp
@@ -16,6 +17,7 @@ include_directories(lib/implot lib/glm)
 
 find_package(GLEW REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW)
+target_sources(${PROJECT_NAME} PRIVATE ${res_shader_files})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -DIMGUI_IMPL_OPENGL_LOADER_GLEW)
