@@ -1,8 +1,11 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
+#include <filesystem>
 #include <string>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 namespace gl {
 struct Mesh {
@@ -11,7 +14,7 @@ struct Mesh {
     void parse_and_bind();
     inline void bind() { glBindVertexArray(vertex_array); }
 
-    std::string object_path;
+    fs::path object_path;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<unsigned int> indices;

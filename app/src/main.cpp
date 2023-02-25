@@ -62,8 +62,8 @@ void scroll_callback(double xoffset, double yoffset) {
 void initialise_shader_and_mesh() {
     // Initialize shaders
     // todo fix `build/res` not being populated with `shaders/**.*` and remove `../` prefixes.
-    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, fs::path("..") / "res" / "shaders" / "vertex.glsl");
-    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, fs::path("..") / "res" / "shaders" / "fragment.glsl");
+    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
+    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
     shaderprogram = Shader::init_program(vertexshader, fragmentshader);
 
     // Get uniform locations
@@ -78,7 +78,7 @@ void initialise_shader_and_mesh() {
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
     // Initialize global mesh
-    mesh.object_path = "../data/bunny.obj";
+    mesh.object_path = fs::path("res") / "obj" / "bunny.obj";
     mesh.generate_buffers();
     mesh.parse_and_bind();
 }
