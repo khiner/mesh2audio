@@ -1,0 +1,10 @@
+#!/bin/sh
+
+rm -rf build-debug/*.f90
+
+# gfortran -c src/p_main.f90
+# gfortran -c src/m_global_parameters.f90
+# gfortran -c src/m_data_input_output.f90
+
+
+gfortran src/precmod.f90 src/stringmod.f90 src/p_main.f90 src/m_global_parameters.f90 src/m_data_input_output.f90 -o build-debug/fem
