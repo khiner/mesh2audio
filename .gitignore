@@ -1,1 +1,7 @@
 build/
+
+fem/src/*.mod
+fem/src/*.o
+fem/test.mesh
+fem/lamp.obj
+fem/p
