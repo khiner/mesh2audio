@@ -21,7 +21,6 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-using glm::vec3;
 using std::string;
 
 static gl::Mesh mesh;
@@ -34,34 +33,20 @@ static vec3 eye, up;
 
 // Lighting details
 const int numLights = 5;
-static GLfloat lightposn[4 * numLights], lightcolor[4 * numLights], lightransf[4 * numLights];
 
 // Variables to set uniform params for lighting fragment shader
-static GLuint lightcol, lightpos, numusedcol, enablelighting,
-    ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
+static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
 // Callback and reshape globals
-static int keyboard_mode = 0, mouse_mode = 1;
-static int render_mode;
-static int previous_x_position = 0, previous_y_position = 0;
+static int keyboard_mode = 0, mouse_mode = 1, render_mode = 0;
 
 static GLuint vertexshader, fragmentshader, shaderprogram;
-static mat4 projection, modelview;
 
-static enum { view,
-              translate,
-              scale } transop;
 static float sx, sy;
 static float tx, ty;
 
-void scroll_callback(double xoffset, double yoffset) {
-    sx += yoffset * 0.01;
-    sy += yoffset * 0.01;
-}
-
 void initialise_shader_and_mesh() {
     // Initialize shaders
-    // todo fix `build/res` not being populated with `shaders/**.*` and remove `../` prefixes.
     vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
     fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
     shaderprogram = Shader::init_program(vertexshader, fragmentshader);
@@ -84,6 +69,7 @@ void initialise_shader_and_mesh() {
 }
 
 void display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
+    static mat4 modelview;
     modelview = glm::lookAt(eye, center, up);
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelview[0][0]);
 
@@ -91,9 +77,8 @@ void display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     glUniform4fv(lightcol, numLights, &light_color);
 
     // Transformations for objects, involving translation and scaling
-    mat4 sc(1.0), tr(1.0), transf(1.0);
-    sc = Transform::scale(sx, sy, 1.0);
-    tr = Transform::translate(tx, ty, 0.0);
+    mat4 sc = Transform::scale(sx, sy, 1.0);
+    mat4 tr = Transform::translate(tx, ty, 0.0);
     modelview = tr * sc * modelview;
 
     if (!custom_color) {
@@ -113,7 +98,7 @@ void display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     glUniform1f(shininesscol, shininess_slider);
 
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(modelview * glm::scale(mat4(1.0f), vec3(2, 2, 2)))[0][0]);
-    mesh.bind();
+    glBindVertexArray(mesh.vertex_array);
     if (render_mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
@@ -430,16 +415,9 @@ int main(int, char **) {
             ImGui::End();
         }
 
-        static float mesh_vp_x, mesh_vp_y, mesh_vp_w, mesh_vp_h;
         if (s.Windows.Mesh.Visible) {
             ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
-            mesh_vp_x = ImGui::GetCursorPosX();
-            mesh_vp_y = ImGui::GetCursorPosY();
-            mesh_vp_w = ImGui::GetContentRegionAvail().x;
-            mesh_vp_h = ImGui::GetContentRegionAvail().y;
             ImGui::End();
-        } else {
-            mesh_vp_x = mesh_vp_y = mesh_vp_w = mesh_vp_h = 0;
         }
 
         // Rendering
@@ -450,8 +428,9 @@ int main(int, char **) {
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        projection = glm::perspective(glm::radians(fovy), mesh_vp_w / mesh_vp_h, zNear, zFar);
-        glViewport(mesh_vp_x, io.DisplaySize.y - mesh_vp_y, mesh_vp_w, mesh_vp_h);
+        static mat4 projection;
+        projection = glm::perspective(glm::radians(fovy), io.DisplaySize.x / io.DisplaySize.y, zNear, zFar);
+        // glViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y);
         glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
         display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 

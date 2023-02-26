@@ -1,9 +1,9 @@
 #include "mesh.h"
 #include "transform.h"
 
+#include <GL/glew.h>
 #include <iostream>
 
-using glm::vec3;
 
 namespace gl {
 void Mesh::generate_buffers() {
