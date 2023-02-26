@@ -1,3 +1,2 @@
 *.mod
-bunny.obj
-test.mesh
+fem/test.mesh
