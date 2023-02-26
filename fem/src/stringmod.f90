@@ -1,6 +1,6 @@
 module stringmod
 
-use precision
+use precmod
 
 private :: value_dr,value_sr,value_di,value_si
 private :: write_dr,write_sr,write_di,write_si

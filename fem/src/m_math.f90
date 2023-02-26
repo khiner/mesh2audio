@@ -11,7 +11,7 @@ module m_math
         integer :: m, n !< matrix/vector dimensions
         real(kind(0d0)), dimension(m, n) :: A !< matrix
         real(kind(0d0)), dimension(n) :: b    !< vector
-        real(kind(0d0)), dimension(n), intent(IN):: c    !< output
+        real(kind(0d0)), dimension(n) :: c    !< output
 
         integer :: i, j, k !< iterators
 
