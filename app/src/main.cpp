@@ -285,8 +285,7 @@ int main(int, char **) {
             auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.Main.Name, dockspace_id);
-            auto mesh_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.75f, nullptr, &dockspace_id);
+            auto mesh_node_id = dockspace_id;
             auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.Mesh.Name, mesh_node_id);
@@ -294,7 +293,6 @@ int main(int, char **) {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("Windows")) {
-                ImGui::MenuItem(s.Windows.Main.Name, nullptr, &s.Windows.Main.Visible);
                 ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
                 ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
                 ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
@@ -308,25 +306,6 @@ int main(int, char **) {
             ImGui::ShowDemoWindow(&s.Windows.ImGuiDemo.Visible);
         if (s.Windows.ImPlotDemo.Visible)
             ImPlot::ShowDemoWindow(&s.Windows.ImPlotDemo.Visible);
-        if (s.Windows.Main.Visible) {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin(s.Windows.Main.Name, &s.Windows.Main.Visible);
-
-            ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-
-            if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
         if (s.Windows.MeshControls.Visible) {
             ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
 
