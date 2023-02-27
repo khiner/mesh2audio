@@ -39,12 +39,9 @@ const int numLights = 5;
 static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
 // Callback and reshape globals
-static int keyboard_mode = 0, mouse_mode = 1, render_mode = 0;
+static int render_mode = 0;
 
 static GLuint vertexshader, fragmentshader, shaderprogram;
-
-static float sx, sy;
-static float tx, ty;
 
 float ambient[4] = {0.05, 0.05, 0.05, 1};
 float diffusion[4] = {0.2, 0.2, 0.2, 1};
@@ -83,11 +80,6 @@ void display(float &ambient_slider, float &diffuse_slider, float &specular_slide
 
     glUniform4fv(lightpos, numLights, &light_position);
     glUniform4fv(lightcol, numLights, &light_color);
-
-    // Transformations for objects, involving translation and scaling
-    mat4 sc = Transform::scale(sx, sy, 1.0);
-    mat4 tr = Transform::translate(tx, ty, 0.0);
-    modelview = tr * sc * modelview;
 
     if (!custom_color) {
         *(&ambient_slider + 1) = ambient_slider;
@@ -238,8 +230,6 @@ int main(int, char **) {
     eye = (eyeinit);
     up = (upinit);
     amount = amountinit;
-    sx = sy = 1.0;
-    tx = ty = 0.0;
 
     glEnable(GL_DEPTH_TEST);
 
@@ -309,10 +299,7 @@ int main(int, char **) {
         if (s.Windows.MeshControls.Visible) {
             ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
 
-            ImGui::Separator();
-            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Render Mode");
-            ImGui::Separator();
-            // ImGui::Text("Primitive object "); ImGui::SameLine();
+            ImGui::SeparatorText("Render Mode");
             ImGui::RadioButton("Smooth", &render_mode, 0);
             ImGui::SameLine();
             ImGui::RadioButton("Lines", &render_mode, 1);
@@ -321,15 +308,7 @@ int main(int, char **) {
             ImGui::SameLine();
             ImGui::RadioButton("Mesh", &render_mode, 3);
 
-            ImGui::Separator();
-            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Object Properties");
-            ImGui::Separator();
-            ImGui::TextWrapped(
-                "These set of boxes and sliders change the way the object reacts with light giving us the impression of its material."
-                "The initial sliders assume the object stays white, and 'Custom Colors' allows changing the associated colors"
-            );
-            ImGui::Separator();
-
+            ImGui::SeparatorText("Colors");
             ImGui::Checkbox("Custom Colors", &custom_color);
             if (custom_color) {
                 ImGui::SliderFloat3("Ambient R, G, B", &ambient[0], 0.0f, 1.0f);
@@ -342,53 +321,22 @@ int main(int, char **) {
                 ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
                 ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
             }
-            ImGui::Text(" ");
 
-            ImGui::Separator();
-            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Input Devices");
-            ImGui::Separator();
-            ImGui::TextWrapped("Decide which input device associates to which transformation."
-                               "By default the scroll wheel is associated with scaling");
-            ImGui::Separator();
-
-            ImGui::Text("Use mouse to ");
-            ImGui::SameLine();
-            ImGui::RadioButton("translate", &mouse_mode, 0);
-            ImGui::SameLine();
-            ImGui::RadioButton("rotate", &mouse_mode, 1);
-
-            ImGui::Text("Using keyboard to");
-            ImGui::SameLine();
-            ImGui::RadioButton("translate ", &keyboard_mode, 0);
-            ImGui::SameLine();
-            ImGui::RadioButton("rotate ", &keyboard_mode, 1);
-
-            keyboard_mode = !(mouse_mode);
-
-            ImGui::Text(" ");
-
-            ImGui::Separator();
-            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Camera");
-            ImGui::Separator();
+            ImGui::SeparatorText("Camera");
             ImGui::SliderFloat("Field of view", &fovy, 0.0f, 180.0f);
             ImGui::SliderFloat("Frustum near plane", &zNear, 0.0f, 15.0f);
             ImGui::SliderFloat("Frustum far plane", &zFar, 0.0f, 150.0f);
             ImGui::Text(" ");
             ImGui::SliderFloat3("Camera position ", &eye[0], -10.0f, 10.0f);
 
-            ImGui::Separator();
-            ImGui::TextColored({0.0f, 1.0f, 1.0f, 1.0f}, "Lighting");
-            ImGui::Separator();
-            ImGui::TextWrapped("Most lights are switched off by default, and the below"
-                               "sliders can play with the light positions and color intensities");
-
+            ImGui::SeparatorText("Lighting");
             for (int i = 0; i < numLights; i++) {
-                const string light_name = string("Light ") + std::to_string(i + 1);
                 ImGui::Separator();
-                ImGui::Text("Light");
-                ImGui::Separator();
-                ImGui::SliderFloat3((light_name + " positions").c_str(), &light_positions[4 * i], -25.0f, 25.0f);
-                ImGui::SliderFloat3((light_name + " colors").c_str(), &light_colors[4 * i], 0.0f, 1.0f);
+                ImGui::PushID(i);
+                ImGui::Text("Light %d", i + 1);
+                ImGui::SliderFloat3("Positions", &light_positions[4 * i], -25.0f, 25.0f);
+                ImGui::ColorEdit3("Color", &light_colors[4 * i]);
+                ImGui::PopID();
 
                 light_positions[(4 * i) + 3] = 1.0f;
                 light_colors[(4 * i) + 3] = 1.0f;
