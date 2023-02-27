@@ -11,10 +11,11 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#include "GlCanvas.h"
+#include "Mesh.h"
+#include "Shader.h"
 #include "State.h"
-#include "mesh.h"
-#include "shaders.h"
-#include "transform.h"
+#include "Transform.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
@@ -45,11 +46,19 @@ static GLuint vertexshader, fragmentshader, shaderprogram;
 static float sx, sy;
 static float tx, ty;
 
+float ambient[4] = {0.05, 0.05, 0.05, 1};
+float diffusion[4] = {0.2, 0.2, 0.2, 1};
+float specular[4] = {0.5, 0.5, 0.5, 1};
+float light_positions[20] = {0.0f};
+float light_colors[20] = {0.0f};
+float shininess = 10;
+bool custom_color = false;
+
 void initialise_shader_and_mesh() {
     // Initialize shaders
-    vertexshader = Shader::init_shaders(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
-    fragmentshader = Shader::init_shaders(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
-    shaderprogram = Shader::init_program(vertexshader, fragmentshader);
+    vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
+    fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
+    shaderprogram = Shader::InitProgram(vertexshader, fragmentshader);
 
     // Get uniform locations
     lightpos = glGetUniformLocation(shaderprogram, "light_posn");
@@ -63,9 +72,8 @@ void initialise_shader_and_mesh() {
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
     // Initialize global mesh
-    mesh.object_path = fs::path("res") / "obj" / "bunny.obj";
-    mesh.generate_buffers();
-    mesh.parse_and_bind();
+    mesh.Init();
+    mesh.Load(fs::path("res") / "obj" / "bunny.obj");
 }
 
 void display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
@@ -224,6 +232,9 @@ int main(int, char **) {
 
     // Initialise all variable initial values
     initialise_shader_and_mesh();
+
+    static GlCanvas gl_canvas;
+
     eye = (eyeinit);
     up = (upinit);
     amount = amountinit;
@@ -231,14 +242,6 @@ int main(int, char **) {
     tx = ty = 0.0;
 
     glEnable(GL_DEPTH_TEST);
-
-    float ambient[4] = {0.05, 0.05, 0.05, 1};
-    float diffusion[4] = {0.2, 0.2, 0.2, 1};
-    float specular[4] = {0.5, 0.5, 0.5, 1};
-    float light_positions[20] = {0.0f};
-    float light_colors[20] = {0.0f};
-    float shininess = 10;
-    bool custom_color = false;
 
     light_positions[1] = 6.5f;
     light_colors[0] = 1.0f;
@@ -417,22 +420,23 @@ int main(int, char **) {
 
         if (s.Windows.Mesh.Visible) {
             ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
+            if (gl_canvas.SetupRender()) {
+                static mat4 projection;
+                projection = glm::perspective(glm::radians(fovy), gl_canvas.Width / gl_canvas.Height, zNear, zFar);
+                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
+                display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
+
+                gl_canvas.Render();
+            }
             ImGui::End();
         }
 
         // Rendering
         ImGui::Render();
-        // glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        static mat4 projection;
-        projection = glm::perspective(glm::radians(fovy), io.DisplaySize.x / io.DisplaySize.y, zNear, zFar);
-        // glViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-        glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
-        display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
         // Update and Render additional Platform Windows
         // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
@@ -451,12 +455,14 @@ int main(int, char **) {
     EMSCRIPTEN_MAINLOOP_END;
 #endif
 
-    mesh.destroy_buffers();
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
+
+    mesh.Destroy();
+    gl_canvas.Destroy();
 
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);

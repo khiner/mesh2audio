@@ -1,3 +1,5 @@
+#pragma once
+
 struct State {
     struct Window {
         const char *Name{""};

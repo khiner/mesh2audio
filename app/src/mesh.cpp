@@ -1,32 +1,28 @@
-#include "mesh.h"
+#include "Mesh.h"
 #include "transform.h"
 
 #include <GL/glew.h>
-#include <iostream>
-
+#include <stdexcept>
 
 namespace gl {
-void Mesh::generate_buffers() {
+void Mesh::Init() {
     glGenVertexArrays(1, &vertex_array);
     glGenBuffers(1, &vertex_buffer);
     glGenBuffers(1, &normal_buffer);
     glGenBuffers(1, &index_buffer);
 }
 
-void Mesh::destroy_buffers() {
+void Mesh::Destroy() {
     glDeleteVertexArrays(1, &vertex_array);
     glDeleteBuffers(1, &vertex_buffer);
     glDeleteBuffers(1, &normal_buffer);
     glDeleteBuffers(1, &index_buffer);
 }
 
-void Mesh::parse_and_bind() {
+void Mesh::Load(fs::path object_path) {
     FILE *fp;
     fp = fopen(object_path.c_str(), "rb");
-    if (fp == nullptr) {
-        std::cerr << "Error loading file: " << object_path << std::endl;
-        exit(-1);
-    }
+    if (fp == nullptr) throw std::runtime_error("Error loading file: " + object_path.string());
 
     float x, y, z;
     int fx, fy, fz, ignore;

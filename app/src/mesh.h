@@ -1,3 +1,5 @@
+#pragma once
+
 #include <glm/glm.hpp>
 
 #include <filesystem>
@@ -9,11 +11,10 @@ namespace fs = std::filesystem;
 
 namespace gl {
 struct Mesh {
-    void generate_buffers();
-    void destroy_buffers();
-    void parse_and_bind();
+    void Init();
+    void Destroy();
+    void Load(fs::path object_path);
 
-    fs::path object_path;
     std::vector<vec3> vertices, normals;
     std::vector<unsigned int> indices;
 

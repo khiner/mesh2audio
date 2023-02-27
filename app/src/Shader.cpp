@@ -1,10 +1,8 @@
+#include "Shader.h"
+
 #include <fstream>
 #include <iostream>
 #include <string>
-
-#include <GL/glew.h>
-
-#include "shaders.h"
 
 // From https://stackoverflow.com/a/40903508/780425
 static std::string read_file(const fs::path path) {
@@ -39,7 +37,7 @@ static void program_errors(const GLint program) {
     delete[] log;
 }
 
-GLuint Shader::init_shaders(GLenum type, const fs::path path) {
+GLuint Shader::InitShader(GLenum type, const fs::path path) {
     GLuint shader = glCreateShader(type);
 
     std::string str = read_file(path);
@@ -57,7 +55,7 @@ GLuint Shader::init_shaders(GLenum type, const fs::path path) {
     return shader;
 }
 
-GLuint Shader::init_program(GLuint vertexshader, GLuint fragmentshader) {
+GLuint Shader::InitProgram(GLuint vertexshader, GLuint fragmentshader) {
     GLuint program = glCreateProgram();
     glAttachShader(program, vertexshader);
     glAttachShader(program, fragmentshader);
