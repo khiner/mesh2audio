@@ -1,4 +1,4 @@
-#include "transform.h"
+#include "Transform.h"
 
 mat4 Transform::scale(const float &x, const float &y, const float &z) {
     return glm::transpose(mat4(
