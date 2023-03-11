@@ -14,3 +14,6 @@
 [submodule "app/lib/nativefiledialog"]
 	path = app/lib/nativefiledialog
 	url = git@github.com:btzy/nativefiledialog-extended.git
+[submodule "app/lib/fmt"]
+	path = app/lib/fmt
+	url = git@github.com:fmtlib/fmt.git

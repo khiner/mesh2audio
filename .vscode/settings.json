@@ -6,6 +6,12 @@
     "iosfwd": "cpp",
     "vector": "cpp",
     "string": "cpp",
-    "stdexcept": "cpp"
+    "stdexcept": "cpp",
+    "__bit_reference": "cpp",
+    "bitset": "cpp",
+    "limits": "cpp",
+    "ratio": "cpp",
+    "tuple": "cpp",
+    "type_traits": "cpp"
   }
 }

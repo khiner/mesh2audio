@@ -1,5 +1,5 @@
 #include "Mesh.h"
-#include "transform.h"
+#include "Transform.h"
 
 #include <GL/glew.h>
 #include <stdexcept>
