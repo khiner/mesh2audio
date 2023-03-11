@@ -10,6 +10,7 @@
 #include "implot.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <nfd.h>
 
 #include "GlCanvas.h"
 #include "Mesh.h"
@@ -51,7 +52,7 @@ float light_colors[20] = {0.0f};
 float shininess = 10;
 bool custom_color = false;
 
-void initialise_shader_and_mesh() {
+void InitializeShaderAndMesh() {
     // Initialize shaders
     vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
     fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
@@ -69,11 +70,10 @@ void initialise_shader_and_mesh() {
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
     // Initialize global mesh
-    mesh.Init();
-    mesh.Load(fs::path("res") / "obj" / "bunny.obj");
+    mesh.Load(fs::path("res") / "obj" / "car.obj");
 }
 
-void display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
+void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
     static mat4 modelview;
     modelview = glm::lookAt(eye, center, up);
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelview[0][0]);
@@ -202,6 +202,9 @@ int main(int, char **) {
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    // Initialize file dialog.
+    NFD_Init();
+
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
@@ -222,7 +225,7 @@ int main(int, char **) {
     State s{}; // Main application state
 
     // Initialise all variable initial values
-    initialise_shader_and_mesh();
+    InitializeShaderAndMesh();
 
     static GlCanvas gl_canvas;
 
@@ -281,6 +284,21 @@ int main(int, char **) {
         }
 
         if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Load mesh", nullptr)) {
+                    nfdchar_t *obj_file_path;
+                    nfdfilteritem_t filter[] = {{"Mesh object", "obj"}};
+                    nfdresult_t result = NFD_OpenDialog(&obj_file_path, filter, 1, "res/obj/");
+                    if (result == NFD_OKAY) {
+                        // Load object file.
+                        mesh.Load(obj_file_path);
+                        NFD_FreePath(obj_file_path);
+                    } else if (result != NFD_CANCEL) {
+                        std::cerr << "Error: " << NFD_GetError() << '\n';
+                    }
+                }
+                ImGui::EndMenu();
+            }
             if (ImGui::BeginMenu("Windows")) {
                 ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
                 ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
@@ -350,7 +368,7 @@ int main(int, char **) {
                 static mat4 projection;
                 projection = glm::perspective(glm::radians(fovy), gl_canvas.Width / gl_canvas.Height, zNear, zFar);
                 glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
-                display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
+                Display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
                 gl_canvas.Render();
             }
@@ -389,6 +407,8 @@ int main(int, char **) {
 
     mesh.Destroy();
     gl_canvas.Destroy();
+
+    NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);

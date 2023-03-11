@@ -13,13 +13,20 @@ void Mesh::Init() {
 }
 
 void Mesh::Destroy() {
-    glDeleteVertexArrays(1, &vertex_array);
-    glDeleteBuffers(1, &vertex_buffer);
-    glDeleteBuffers(1, &normal_buffer);
     glDeleteBuffers(1, &index_buffer);
+    glDeleteBuffers(1, &normal_buffer);
+    glDeleteBuffers(1, &vertex_buffer);
+    glDeleteVertexArrays(1, &vertex_array);
+
+    vertices.clear();
+    normals.clear();
+    indices.clear();
 }
 
 void Mesh::Load(fs::path object_path) {
+    Destroy();
+    Init();
+
     FILE *fp;
     fp = fopen(object_path.c_str(), "rb");
     if (fp == nullptr) throw std::runtime_error("Error loading file: " + object_path.string());

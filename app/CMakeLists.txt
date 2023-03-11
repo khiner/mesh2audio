@@ -18,7 +18,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 include_directories(lib/implot lib/glm)
 
 find_package(GLEW REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW)
+target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -DIMGUI_IMPL_OPENGL_LOADER_GLEW)

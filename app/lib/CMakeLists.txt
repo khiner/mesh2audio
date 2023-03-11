@@ -32,3 +32,7 @@ target_include_directories(IMGUI
 
 find_package(OpenGL REQUIRED)
 target_link_libraries(IMGUI PUBLIC SDL3 OpenGL::GL)
+
+#=================== nativefiledialog ===================
+
+add_subdirectory(nativefiledialog)
