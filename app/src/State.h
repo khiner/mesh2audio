@@ -12,11 +12,19 @@ struct Window {
 };
 
 struct WindowsState {
+    Window AudioDevice{"Audio Device"};
     Window MeshControls{"Mesh Controls"};
     Window Mesh{"Mesh"};
     Window ImGuiDemo{"Dear ImGui Demo"};
     Window ImPlotDemo{"ImPlot Demo"};
 };
+
+struct Faust {
+    string Code;
+    string Error;
+};
+
+struct State;
 
 struct Audio {
     struct Device {
@@ -28,6 +36,7 @@ struct Audio {
 
         void Start() const;
         void Stop() const;
+        bool IsStarted() const;
 
         bool On = true;
         bool Muted = true;
@@ -37,14 +46,22 @@ struct Audio {
         u32 SampleRate;
     };
 
+    struct Graph {
+        void Init();
+        void Destroy();
+    };
+
     void Init();
-    void Update(); // Update device based on current settings.
+    void Update(State &s); // Update device based on current settings.
     void Destroy();
+    bool NeedsRestart() const;
 
     Device Device;
+    Graph Graph;
 };
 
 struct State {
     Audio Audio;
+    Faust Faust;
     WindowsState Windows{};
 };

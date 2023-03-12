@@ -17,10 +17,11 @@ file(COPY res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include)
+include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture)
 
 find_package(GLEW REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd)
+# `dynamiclib` is faust.
+target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)

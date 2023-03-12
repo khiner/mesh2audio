@@ -202,8 +202,10 @@ int main(int, char **) {
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    // Initialize file dialog.
+    State s{}; // Main application state
+    // Initialize file dialog & audio device.
     NFD_Init();
+    s.Audio.Init();
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -221,8 +223,6 @@ int main(int, char **) {
     // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     // ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     // IM_ASSERT(font != NULL);
-
-    State s{}; // Main application state
 
     // Initialise all variable initial values
     InitializeShaderAndMesh();
@@ -277,6 +277,8 @@ int main(int, char **) {
             auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
+            auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
+            ImGui::DockBuilderDockWindow(s.Windows.AudioDevice.Name, audio_node_id);
             auto mesh_node_id = dockspace_id;
             auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
@@ -300,6 +302,7 @@ int main(int, char **) {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Windows")) {
+                ImGui::MenuItem(s.Windows.AudioDevice.Name, nullptr, &s.Windows.AudioDevice.Visible);
                 ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
                 ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
                 ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
@@ -362,6 +365,12 @@ int main(int, char **) {
             ImGui::End();
         }
 
+        if (s.Windows.AudioDevice.Visible) {
+            ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
+            s.Audio.Device.Render();
+            ImGui::End();
+        }
+
         if (s.Windows.Mesh.Visible) {
             ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
             if (gl_canvas.SetupRender()) {
@@ -408,6 +417,7 @@ int main(int, char **) {
     mesh.Destroy();
     gl_canvas.Destroy();
 
+    s.Audio.Destroy();
     NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);
