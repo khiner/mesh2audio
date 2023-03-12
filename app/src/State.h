@@ -19,15 +19,16 @@ struct WindowsState {
     Window ImPlotDemo{"ImPlot Demo"};
 };
 
-struct Faust {
-    string Code;
-    string Error;
-};
-
 struct State;
 
 struct Audio {
-    struct Device {
+    struct FaustState {
+        string Code = R"(import("stdfaust.lib");
+process = ba.beat(240) : pm.djembe(60, 0.3, 0.4, 1);)";
+        string Error;
+    };
+
+    struct AudioDevice {
         void Init();
         void Update(); // Update device based on current settings.
         void Destroy();
@@ -47,21 +48,21 @@ struct Audio {
     };
 
     struct Graph {
-        void Init();
+        void Init(const AudioDevice &);
         void Destroy();
     };
 
     void Init();
-    void Update(State &s); // Update device based on current settings.
+    void Update();
     void Destroy();
     bool NeedsRestart() const;
 
-    Device Device;
+    AudioDevice Device;
     Graph Graph;
+    FaustState Faust;
 };
 
 struct State {
     Audio Audio;
-    Faust Faust;
     WindowsState Windows{};
 };

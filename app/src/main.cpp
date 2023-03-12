@@ -365,6 +365,7 @@ int main(int, char **) {
             ImGui::End();
         }
 
+        s.Audio.Update();
         if (s.Windows.AudioDevice.Visible) {
             ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
             s.Audio.Device.Render();
