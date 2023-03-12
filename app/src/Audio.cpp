@@ -98,6 +98,9 @@ static ma_device_info DeviceInfo;
 static ma_audio_buffer_ref InputBuffer;
 static ma_node_graph NodeGraph;
 static ma_node_graph_config NodeGraphConfig;
+static ma_node *OutputNode;
+static ma_node_base FaustNode{};
+static ma_data_source_node InputNode{};
 
 enum IO_ {
     IO_None = -1,
@@ -166,6 +169,7 @@ void Audio::Init() {
     Device.Start();
 
     NeedsRestart(); // xxx Updates cached values as side effect.
+    Update();
 }
 
 void Audio::Destroy() {
@@ -200,8 +204,11 @@ void Audio::Update() {
         Destroy();
         Init();
     }
-
-    Device.Update();
+    if (Device.IsStarted()) {
+        // Not working? Setting Faust node volume instead.
+        // ma_device_set_master_volume(&MaDevice, Volume);
+        ma_node_set_output_bus_volume(&FaustNode, 0, Device.Muted ? 0.0f : Device.Volume);
+    }
 }
 
 bool Audio::NeedsRestart() const {
@@ -257,10 +264,6 @@ void Audio::AudioDevice::Init() {
 
 bool Audio::AudioDevice::IsStarted() const { return ma_device_is_started(&MaDevice); }
 
-void Audio::AudioDevice::Update() {
-    if (IsStarted()) ma_device_set_master_volume(&MaDevice, Volume);
-}
-
 const string GetFormatName(const int format) {
     const bool is_native = std::find(NativeFormats.begin(), NativeFormats.end(), format) != NativeFormats.end();
     return fmt::format("{}{}", ma_get_format_name((ma_format)format), is_native ? "*" : "");
@@ -289,7 +292,9 @@ void Audio::AudioDevice::Render() {
     }
     Checkbox("Muted", &Muted);
     SameLine();
+    if (Muted) BeginDisabled();
     SliderFloat("Volume", &Volume, 0, 1, nullptr);
+    if (Muted) EndDisabled();
     if (BeginCombo("Sample rate", GetSampleRateName(SampleRate).c_str())) {
         for (u32 option : PrioritizedSampleRates) {
             const bool is_selected = option == SampleRate;
@@ -387,10 +392,6 @@ void Audio::AudioDevice::Stop() const {
     const int result = ma_device_stop(&MaDevice);
     if (result != MA_SUCCESS) throw std::runtime_error(format("Error stopping audio device: {}", result));
 }
-
-static ma_node *OutputNode;
-static ma_node_base FaustNode{};
-static ma_data_source_node InputNode{};
 
 void Audio::Graph::Init(const AudioDevice &device) {
     NodeGraphConfig = ma_node_graph_config_init(MaDevice.capture.channels);

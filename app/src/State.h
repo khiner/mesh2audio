@@ -30,7 +30,6 @@ process = ba.beat(240) : pm.djembe(60, 0.3, 0.4, 1);)";
 
     struct AudioDevice {
         void Init();
-        void Update(); // Update device based on current settings.
         void Destroy();
 
         void Render();
