@@ -89,6 +89,20 @@ static bool NeedsRestart(const Audio::FaustState &faust) {
     PreviousFaustCode = faust.Code;
     return needs_restart;
 }
+
+static void Update(Audio::FaustState &faust) {
+    // Faust setup is only dependent on the faust code.
+    const bool is_faust_initialized = !faust.Code.empty() && faust.Error.empty();
+    const bool faust_needs_restart = NeedsRestart(faust); // Don't inline! Must run during every update.
+    if (!Dsp && is_faust_initialized) {
+        Init(faust);
+    } else if (Dsp && !is_faust_initialized) {
+        Destroy();
+    } else if (faust_needs_restart) {
+        Destroy();
+        Init(faust);
+    }
+}
 } // namespace FaustContext
 
 static ma_context AudioContext;
@@ -164,7 +178,7 @@ void Audio::Init() {
     }
 
     Device.Init();
-    FaustContext::Init(Faust);
+    FaustContext::Update(Faust);
     Graph.Init(Device);
     Device.Start();
 
@@ -182,18 +196,7 @@ void Audio::Destroy() {
 }
 
 void Audio::Update() {
-    // Faust setup is only dependent on the faust code.
-    const bool is_faust_initialized = !Faust.Code.empty() && Faust.Error.empty();
-    const bool faust_needs_restart = FaustContext::NeedsRestart(Faust); // Don't inline! Must run during every update.
-    if (!FaustContext::Dsp && is_faust_initialized) {
-        FaustContext::Init(Faust);
-    } else if (FaustContext::Dsp && !is_faust_initialized) {
-        FaustContext::Destroy();
-    } else if (faust_needs_restart) {
-        FaustContext::Destroy();
-        FaustContext::Init(Faust);
-    }
-
+    FaustContext::Update(Faust);
     const bool is_initialized = Device.IsStarted();
     const bool needs_restart = NeedsRestart(); // Don't inline! Must run during every update.
     if (Device.On && !is_initialized) {
