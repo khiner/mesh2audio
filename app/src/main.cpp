@@ -7,6 +7,7 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
+#include "imgui_stdlib.h"
 #include "implot.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -203,6 +204,7 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     State s{}; // Main application state
+
     // Initialize file dialog & audio device.
     NFD_Init();
     s.Audio.Init();
@@ -274,11 +276,13 @@ int main(int, char **) {
 
         auto dockspace_id = ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
         if (ImGui::GetFrameCount() == 1) {
+            auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
+            auto faust_code_node_id = ImGui::DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
+            ImGui::DockBuilderDockWindow(s.Windows.AudioDevice.Name, audio_node_id);
+            ImGui::DockBuilderDockWindow(s.Windows.FaustCode.Name, faust_code_node_id);
             auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
-            auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
-            ImGui::DockBuilderDockWindow(s.Windows.AudioDevice.Name, audio_node_id);
             auto mesh_node_id = dockspace_id;
             auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
@@ -303,6 +307,7 @@ int main(int, char **) {
             }
             if (ImGui::BeginMenu("Windows")) {
                 ImGui::MenuItem(s.Windows.AudioDevice.Name, nullptr, &s.Windows.AudioDevice.Visible);
+                ImGui::MenuItem(s.Windows.FaustCode.Name, nullptr, &s.Windows.FaustCode.Visible);
                 ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
                 ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
                 ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
@@ -369,6 +374,11 @@ int main(int, char **) {
         if (s.Windows.AudioDevice.Visible) {
             ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
             s.Audio.Device.Render();
+            ImGui::End();
+        }
+        if (s.Windows.FaustCode.Visible) {
+            ImGui::Begin(s.Windows.FaustCode.Name, &s.Windows.FaustCode.Visible);
+            ImGui::InputTextMultiline("##Faust", &s.Audio.Faust.Code, ImGui::GetContentRegionAvail());
             ImGui::End();
         }
 

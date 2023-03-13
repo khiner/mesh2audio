@@ -13,6 +13,7 @@ struct Window {
 
 struct WindowsState {
     Window AudioDevice{"Audio Device"};
+    Window FaustCode{"Faust Code"};
     Window MeshControls{"Mesh Controls"};
     Window Mesh{"Mesh"};
     Window ImGuiDemo{"Dear ImGui Demo"};
@@ -47,7 +48,7 @@ process = ba.beat(240) : pm.djembe(60, 0.3, 0.4, 1);)";
     };
 
     struct Graph {
-        void Init(const AudioDevice &);
+        void Init();
         void Destroy();
     };
 

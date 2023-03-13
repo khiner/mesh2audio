@@ -32,7 +32,7 @@ static string Capitalize(string copy) {
 namespace FaustContext {
 static dsp *Dsp = nullptr;
 
-static void Init(Audio::FaustState &faust) {
+static void Init(Audio::FaustState &faust, u32 sample_rate) {
     createLibContext();
 
     int argc = 0;
@@ -56,9 +56,9 @@ static void Init(Audio::FaustState &faust) {
         Dsp = dsp_factory->createDSPInstance();
         if (!Dsp) error_msg = "Could not create Faust DSP.";
         else {
+            Dsp->init(sample_rate);
             // Ui = make_unique<FaustParams>();
             // Dsp->buildUserInterface(Ui.get());
-            // `Dsp->Init` happens in the Faust graph node.
         }
     }
 
@@ -90,17 +90,17 @@ static bool NeedsRestart(const Audio::FaustState &faust) {
     return needs_restart;
 }
 
-static void Update(Audio::FaustState &faust) {
+static void Update(Audio::FaustState &faust, u32 sample_rate) {
     // Faust setup is only dependent on the faust code.
     const bool is_faust_initialized = !faust.Code.empty() && faust.Error.empty();
     const bool faust_needs_restart = NeedsRestart(faust); // Don't inline! Must run during every update.
     if (!Dsp && is_faust_initialized) {
-        Init(faust);
+        Init(faust, sample_rate);
     } else if (Dsp && !is_faust_initialized) {
         Destroy();
     } else if (faust_needs_restart) {
         Destroy();
-        Init(faust);
+        Init(faust, sample_rate);
     }
 }
 } // namespace FaustContext
@@ -178,8 +178,8 @@ void Audio::Init() {
     }
 
     Device.Init();
-    FaustContext::Update(Faust);
-    Graph.Init(Device);
+    FaustContext::Update(Faust, Device.SampleRate);
+    Graph.Init();
     Device.Start();
 
     NeedsRestart(); // xxx Updates cached values as side effect.
@@ -196,7 +196,7 @@ void Audio::Destroy() {
 }
 
 void Audio::Update() {
-    FaustContext::Update(Faust);
+    FaustContext::Update(Faust, Device.SampleRate);
     const bool is_initialized = Device.IsStarted();
     const bool needs_restart = NeedsRestart(); // Don't inline! Must run during every update.
     if (Device.On && !is_initialized) {
@@ -396,7 +396,7 @@ void Audio::AudioDevice::Stop() const {
     if (result != MA_SUCCESS) throw std::runtime_error(format("Error stopping audio device: {}", result));
 }
 
-void Audio::Graph::Init(const AudioDevice &device) {
+void Audio::Graph::Init() {
     NodeGraphConfig = ma_node_graph_config_init(MaDevice.capture.channels);
     int result = ma_node_graph_init(&NodeGraphConfig, nullptr, &NodeGraph);
     if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize node graph: {}", result));
@@ -411,7 +411,6 @@ void Audio::Graph::Init(const AudioDevice &device) {
     if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize the input node: {}", result));
 
     if (FaustContext::Dsp) {
-        FaustContext::Dsp->init(device.SampleRate);
         const u32 in_channels = FaustContext::Dsp->getNumInputs();
         const u32 out_channels = FaustContext::Dsp->getNumOutputs();
         if (in_channels == 0 && out_channels == 0) return;
