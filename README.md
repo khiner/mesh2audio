@@ -19,6 +19,13 @@ $ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Proj
 
 (Only tested on Ubuntu.)
 
+Install LLVM/Clang
+
+```shell
+$ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+$ export PATH="$PATH:$(llvm-config-15 --bindir)"
+```
+
 Install GTK (for native file dialogs):
 
 ```shell
