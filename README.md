@@ -2,6 +2,56 @@
 
 Convert a volumetric mesh to a physical audio model. Based on [mesh2faust](https://hal.science/hal-03162901/document).
 
+## Build app
+
+### Install dependencies
+
+#### Mac
+
+Install glew:
+
+```shell
+$ brew install glew
+$ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
+```
+
+#### Linux
+
+(Only tested on Ubuntu.)
+
+Install LLVM/Clang
+
+```shell
+$ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+$ export PATH="$PATH:$(llvm-config-15 --bindir)"
+```
+
+Install GTK (for native file dialogs):
+
+```shell
+$ sudo apt-get install build-essential libgtk-3-dev
+```
+
+Install OpenGL (via glut) and glew:
+
+```shell
+$ sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev
+$ sudo apt-get install libglew-dev
+```
+
+### Clone and build
+
+```shell
+$ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
+$ cd mesh2audio/app
+$ ./BuildApp
+```
+
+By default, this will create a debug build in the `build-debug` directory.
+Run `./BuildApp --release` to create a release build in the `build` directory.
+
+VSCode settings are also provided to open the root `mesh2audio` directory as a project, and build the app in `app/build`.
+
 ## `mesh2faust` architecture
 
 ![](mesh2faust_impl_overview.png)
@@ -75,20 +125,6 @@ Could even just support parametrically generating bell meshes (mesh2faust refere
   - ... (Ben)
 - App: UI/UX/mesh/audio generation & editing
   - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX, supporting many environments & backends.
-  - [GLTF 2.0](https://github.com/KhronosGroup/glTF): Mesh+material(+much more) format. Transmit and load 3D scenes and models efficiently.
-    Minimize the size of 3D assets, and their unpack runtime.
-  - [Filament](https://github.com/google/filament): Real-time physically based rendering library.
-    GLTF loader/viewer/editor.
+  - [ImPlot](https://github.com/epezent/implot/): For plotting
   - [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
   - [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
-  - [ImPlot](https://github.com/epezent/implot/): For plotting
-
-## Build app
-
-### Build using script
-
-In the `app` directory, run `./BuildApp`.
-By default, this will create a debug build in the `build-debug` directory.
-Run `./BuildApp --release` to create a release build in the `build` directory.
-
-VSCode settings are also provided to open the root `mesh2audio` directory as a project, and build the app in `app/build`.

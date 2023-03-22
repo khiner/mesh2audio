@@ -17,3 +17,9 @@
 [submodule "app/lib/fmt"]
 	path = app/lib/fmt
 	url = git@github.com:fmtlib/fmt.git
+[submodule "app/lib/faust"]
+	path = app/lib/faust
+	url = git@github.com:grame-cncm/faust.git
+[submodule "app/lib/miniaudio"]
+	path = app/lib/miniaudio
+	url = git@github.com:mackron/miniaudio.git
