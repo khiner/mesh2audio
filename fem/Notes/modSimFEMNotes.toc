@@ -1,0 +1,5 @@
+\contentsline {section}{\numberline {1}Shape Functions}{2}{}%
+\contentsline {section}{\numberline {2}$x(s,t)$ and $y(s,t)$}{2}{}%
+\contentsline {section}{\numberline {3}$x(s,t)$ and $y(s,t)$ Derivatives}{2}{}%
+\contentsline {section}{\numberline {4}Jacobian}{2}{}%
+\contentsline {section}{\numberline {5}Jacobian Determinant}{2}{}%

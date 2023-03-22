@@ -1,0 +1,100 @@
+\documentclass[letterpaper]{article}
+\usepackage[
+backend=bibtex,
+style=numeric,
+]{biblatex}
+\addbibresource{sources.bib}
+\usepackage{enumerate}
+\usepackage{amsmath}
+\usepackage{scrextend}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{color} %red, green, blue, yellow, cyan, magenta, black, white
+\definecolor{mygreen}{RGB}{28,172,0} % color values Red, Green, Blue
+\definecolor{mylilas}{RGB}{170,55,241}
+\usepackage{xparse}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+
+\usepackage{xcolor}
+\newcommand{\spencer}[1]{\textcolor{purple}{[[Spencer says: #1]]}}
+
+\DeclareDocumentCommand{\diff}{O{} m}{
+	\frac{\mathrm{d} #1}{\mathrm{d}#2}
+}
+\DeclareDocumentCommand{\difftwo}{O{} m}{
+	\frac{\mathrm{d}^2 #1}{\mathrm{d}#2^2}
+}
+\DeclareDocumentCommand{\pdiff}{O{} m}{
+	\frac{\partial #1}{\partial #2}
+}
+\DeclareDocumentCommand{\pdifftwo}{O{} m}{
+	\frac{\partial^{2} #1}{\partial #2^{2}}
+}
+\DeclareDocumentCommand{\integral}{O{} O{} m O{x}}{
+	\int_{#1}^{#2} #3\ \mathrm{d}#4
+}
+\DeclareDocumentCommand{\sp}{}{
+	\qquad \qquad \qquad }{
+}
+\DeclareDocumentCommand{\bu}{}{
+	\bm{\mathrm{u}} }{
+}
+\newenvironment{sysmatrix}[1]
+{\left(\begin{array}{@{}#1@{}}}
+	{\end{array}\right)}
+\newcommand{\ro}[1]{%
+	\xrightarrow{\mathmakebox[\rowidth]{#1}}%
+}
+\newlength{\rowidth}% row operation width
+\AtBeginDocument{\setlength{\rowidth}{3em}}
+%\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{bm}
+%\pagestyle{fancy}
+\numberwithin{equation}{section}
+
+
+%opening
+\title{Project Notes}
+\author{Ben Wilfong}
+
+\begin{document}
+	
+	\maketitle
+	\tableofcontents \newpage
+	
+	\section{Shape Functions}
+	\begin{align*}
+		N_1 &= \frac{1}{4}(1+s)(1+t), \\
+		N_2 &= \frac{1}{4}(1-s)(1+t), \\
+		N_3' &= \frac{1}{2}(1-t)
+	\end{align*}
+	\section{$x(s,t)$ and $y(s,t)$}
+	\begin{align*}
+		x(s,t) &= \frac{1}{4}(1+s)(1+t)x_1 + \frac{1}{4}(1-s)(1+t)x_2 +  \frac{1}{2}(1-t)x_3, \\
+				&= \frac{1}{4}(1 + s + t + st)x_1 + \frac{1}{4}(1 - s + t - st)x_2 + \frac{1}{2}(1-t)x_3, \\
+				&= \frac{1}{4}(x_1 + x_2 + 2x_3) + \frac{1}{4}(x_1 - x_2)s + \frac{1}{4}(x_1 + x_2 - 2x_3)t + \frac{1}{4}(x_1 - x_2)st, \\
+		y(s,t) &= \frac{1}{4}(1+s)(1+t)y_1 + \frac{1}{4}(1-s)(1+t)y_2 +  \frac{1}{2}(1-t)y_3. \\
+				&= \frac{1}{4}(1 + s + t + st)y_1 + \frac{1}{4}(1 - s + t - st)y_2 + \frac{1}{2}(1-t)y_3, \\
+				&= \frac{1}{4}(y_1 + y_2 + 2y_3) + \frac{1}{4}(y_1 - y_2)s + \frac{1}{4}(y_1 + y_2 - 2y_3)t + \frac{1}{4}(y_1 - y_2)st
+	\end{align*}
+	\section{$x(s,t)$ and $y(s,t)$ Derivatives}
+	\begin{align*}
+		\pdiff[x]{s} &= \frac{1}{4}(1+t)x_1 - \frac{1}{4}(1+t)x_2, \\
+			&= \frac{1}{4}(x_1 - x_2) + \frac{1}{4}(x_1 - x_2)t, \\
+		\pdiff[x]{t} &= \frac{1}{4}(1+s)x_1 + \frac{1}{4}(1-s)x_2 - \frac{1}{2}x_3, \\
+			&= \frac{1}{4}(x_1 + x_2 - 2x_3) + \frac{1}{4}(x_1-x_2)s, \\
+		\pdiff[y]{s} &= \frac{1}{4}(1+t)y_1 - \frac{1}{4}(1+t)y_2, \\
+			&= \frac{1}{4}(y_1 - y_2) + \frac{1}{4}(y_1 - y_2)t, \\
+		\pdiff[y]{t} &= \frac{1}{4}(1+s)y _1 + \frac{1}{4}(1-s)y_2 - \frac{1}{2}y_3, \\
+			&= \frac{1}{4}(y_1 + y_2 - 2y_3) + \frac{1}{4}(y_1-y_2)s
+	\end{align*}
+	\section{Jacobian}
+	\[\bm{J} = \begin{bmatrix}  \frac{1}{4}(x_1 - x_2) + \frac{1}{4}(x_1 - x_2)t &   \frac{1}{4}(y_1 - y_2) + \frac{1}{4}(y_1 - y_2)t \\  \frac{1}{4}(x_1 + x_2 - 2x_3) + \frac{1}{4}(x_1-x_2)s &  \frac{1}{4}(y_1 + y_2 - 2y_3) + \frac{1}{4}(y_1-y_2)s \end{bmatrix}\]
+	\section{Jacobian Determinant}
+		\[\pdiff[x]{s}\pdiff[y]{t} - \pdiff[x]{t}\pdiff[y]{s} = \frac{1}{8}(1 + t)\left(x_3(y_1-y_2) + x_1(y_2-y_3) + x_2(y_3-y_1)\right)\]
+	
+\end{document}

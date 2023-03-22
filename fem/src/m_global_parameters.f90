@@ -7,19 +7,62 @@ module m_global_parameters
     integer :: elements
     integer :: edges
 
-    real(kind(0d0)), allocatable, dimension(:) :: dofs  !< degrees of freedom
+    integer, parameter :: debug = 1
+
+    real(kind(0d0)), allocatable, dimension(:,:) :: dofs  !< degrees of freedom
     real(kind(0d0)), allocatable, dimension(:, :) :: M  !< Mass matrix
     real(kind(0d0)), allocatable, dimension(:, :) :: S  !< Stiffness matrix
-    real(kind(0d0)), allocatable, dimension(:, :) :: ELC !< Element connectivity mnatrix
-    real(kind(0d0)), allocatable, dimension(:, :) :: EDC !< Edge connectivity mnatrix
+    real(kind(0d0)), allocatable, dimension(:, :) :: EC !< double element centroids
+    integer, allocatable, dimension(:, :) :: E !< Element connectivity mnatrix
+    real(kind(0d0)), dimension(4,4) :: D !< stress strain matrix
+    real(kind(0d0)), dimension(2,6) :: N !< (x,y) to x(s,t) y(s,t) matrix
 
-    integer :: i, j, k
+    real(kind(0d0)) :: ym !< youngs modulus
+    real(kind(0d0)) :: nu !< poissons ratio
 
     public
 
 contains
 
     subroutine s_initialize_global_parameters()
+
+    end subroutine
+
+    subroutine s_finalize_program()
+
+        deallocate (dofs, M, S, E)
+
+    end subroutine s_finalize_program
+
+    subroutine s_print_array(A, m, n)
+
+        real(kind(0d0)), dimension(m,n) :: A
+        integer :: i, j
+        integer :: m, n
+        
+        do i = 1,m
+            do j = 1,n
+                write(*,fmt="(F16.4)",advance="no") A(i,j)
+            end do
+            write(*, fmt="(A1)") " "
+        end do
+        write(*, fmt="(A1)") " "
+
+    end subroutine
+
+    subroutine s_print_int_array(A, m, n)
+
+        integer, dimension(m,n) :: A
+        integer :: i, j
+        integer :: m, n
+        
+        do i = 1,m
+            do j = 1,n
+                write(*,fmt="(I5)",advance="no") A(i,j)
+            end do
+            write(*, fmt="(A1)") " "
+        end do
+        write(*, fmt="(A1)") " "
 
     end subroutine
 
