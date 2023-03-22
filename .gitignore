@@ -5,5 +5,5 @@ fem/src/*.o
 fem/*.mod
 fem/*.o
 fem/test.mesh
-fem/lamp.obj
+fem/*.obj
 fem/p
