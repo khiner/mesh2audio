@@ -24,6 +24,7 @@ Install LLVM/Clang
 ```shell
 $ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
 $ export PATH="$PATH:$(llvm-config-15 --bindir)"
+$ sudo apt-get install libc++-dev libc++abi-dev
 ```
 
 Install GTK (for native file dialogs):
