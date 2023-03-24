@@ -22,7 +22,7 @@ $ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Proj
 Install LLVM/Clang
 
 ```shell
-$ bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+$ sudo apt install clang
 $ export PATH="$PATH:$(llvm-config-15 --bindir)"
 $ sudo apt-get install libc++-dev libc++abi-dev
 ```

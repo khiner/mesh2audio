@@ -64,6 +64,9 @@
     "system_error": "cpp",
     "typeinfo": "cpp",
     "unordered_map": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "string_view": "cpp",
+    "span": "cpp",
+    "queue": "cpp"
   }
 }
