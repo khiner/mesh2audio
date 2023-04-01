@@ -455,9 +455,9 @@ int main(int, char **) {
             ImGuizmo::SetOrthographic(!isPerspective);
 
             if (gl_canvas.SetupRender(content_region.x, content_region.y)) {
-                const mat4 proj = objectMatrix * cameraProjection;
-                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &proj[0][0]);
-                glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &cameraView[0][0]);
+                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &cameraProjection[0][0]);
+                const mat4 modelView = cameraView * objectMatrix;
+                glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelView[0][0]);
                 Display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
                 gl_canvas.Render();
@@ -472,7 +472,8 @@ int main(int, char **) {
             }
             if (showGizmo) {
                 const float viewManipulateRight = io.DisplaySize.x, viewManipulateTop = 0;
-                ImGuizmo::DrawCubes(&cameraView[0][0], &cameraProjection[0][0], &objectMatrix[0][0], 1);
+                // This is how you would draw a test cube:
+                // ImGuizmo::DrawCubes(&cameraView[0][0], &cameraProjection[0][0], &objectMatrix[0][0], 1);
                 ImGuizmo::Manipulate(
                     &cameraView[0][0], &cameraProjection[0][0], mCurrentGizmoOperation, mCurrentGizmoMode, &objectMatrix[0][0], nullptr,
                     useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr
