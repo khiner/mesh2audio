@@ -2,7 +2,7 @@
 
 // Render an OpenGL frame buffer to a texture, for drawing to an ImGui window.
 struct GlCanvas {
-    bool SetupRender();
+    bool SetupRender(float width, float height);
     void Render();
     void Destroy();
 

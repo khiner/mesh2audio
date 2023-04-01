@@ -1,9 +1,12 @@
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <stdio.h>
 
 #include "imgui.h"
+
+#include "ImGuizmo.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
@@ -28,30 +31,35 @@ using std::string;
 
 static gl::Mesh mesh;
 static GLuint projectionPos, modelviewPos;
-static float fovy = 90.0f;
-static float zNear = 0.1f, zFar = 99.0f;
-static int amountinit = 5, amount;
-static vec3 eyeinit(0.0, 0.0, 5.0), upinit(0.0, 1.0, 0.0), center(0.0, 0.0, 0.0);
-static vec3 eye, up;
 
-// Lighting details
-const int numLights = 5;
-
+static const int numLights = 5;
 // Variables to set uniform params for lighting fragment shader
 static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
-// Callback and reshape globals
-static int render_mode = 0;
-
+static int render_mode = 3;
 static GLuint vertexshader, fragmentshader, shaderprogram;
 
-float ambient[4] = {0.05, 0.05, 0.05, 1};
-float diffusion[4] = {0.2, 0.2, 0.2, 1};
-float specular[4] = {0.5, 0.5, 0.5, 1};
-float light_positions[20] = {0.0f};
-float light_colors[20] = {0.0f};
-float shininess = 10;
-bool custom_color = false;
+static float ambient[4] = {0.05, 0.05, 0.05, 1};
+static float diffusion[4] = {0.2, 0.2, 0.2, 1};
+static float specular[4] = {0.5, 0.5, 0.5, 1};
+static float light_positions[20] = {0.0f};
+static float light_colors[20] = {0.0f};
+static float shininess = 10;
+static bool custom_color = false;
+
+static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::TRANSLATE);
+static const mat4 identityMatrix(1.f);
+static mat4 objectMatrix(1.f), cameraView(1.f), cameraProjection;
+static float camDistance = 8.f, fov = 27.f;
+static float orthoViewWidth = 10.f;
+static bool showGrid = false, isPerspective = true;
+
+static bool showGizmo = false;
+static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
+static float snap[3] = {1.f, 1.f, 1.f};
+static float bounds[] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
+static float boundsSnap[] = {0.1f, 0.1f, 0.1f};
+static bool useSnap = false, boundSizing = false, boundSizingSnap = false;
 
 void InitializeShaderAndMesh() {
     // Initialize shaders
@@ -75,10 +83,6 @@ void InitializeShaderAndMesh() {
 }
 
 void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
-    static mat4 modelview;
-    modelview = glm::lookAt(eye, center, up);
-    glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelview[0][0]);
-
     glUniform4fv(lightpos, numLights, &light_position);
     glUniform4fv(lightcol, numLights, &light_color);
 
@@ -98,7 +102,6 @@ void Display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     glUniform4fv(specularcol, 1, &specular_slider);
     glUniform1f(shininesscol, shininess_slider);
 
-    glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(modelview * glm::scale(mat4(1.0f), vec3(2, 2, 2)))[0][0]);
     glBindVertexArray(mesh.vertex_array);
     if (render_mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -231,18 +234,10 @@ int main(int, char **) {
 
     static GlCanvas gl_canvas;
 
-    eye = (eyeinit);
-    up = (upinit);
-    amount = amountinit;
-
     glEnable(GL_DEPTH_TEST);
 
     light_positions[1] = 6.5f;
-    light_colors[0] = 1.0f;
-    light_colors[1] = 1.0f;
-    light_colors[2] = 1.0f;
-
-    render_mode = 3;
+    light_colors[0] = light_colors[1] = light_colors[2] = 1.0f;
 
     // Main loop
     bool done = false;
@@ -263,9 +258,7 @@ int main(int, char **) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT)
-                done = true;
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
+            if (event.type == SDL_EVENT_QUIT || (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window)))
                 done = true;
         }
 
@@ -316,14 +309,89 @@ int main(int, char **) {
             }
             ImGui::EndMainMenuBar();
         }
-        if (s.Windows.ImGuiDemo.Visible)
-            // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-            ImGui::ShowDemoWindow(&s.Windows.ImGuiDemo.Visible);
-        if (s.Windows.ImPlotDemo.Visible)
-            ImPlot::ShowDemoWindow(&s.Windows.ImPlotDemo.Visible);
+
+        if (s.Windows.ImGuiDemo.Visible) ImGui::ShowDemoWindow(&s.Windows.ImGuiDemo.Visible);
+        if (s.Windows.ImPlotDemo.Visible) ImPlot::ShowDemoWindow(&s.Windows.ImPlotDemo.Visible);
+
         if (s.Windows.MeshControls.Visible) {
             ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
 
+            ImGui::SeparatorText("Camera");
+            ImGui::Checkbox("Show grid", &showGrid);
+            if (ImGui::RadioButton("Perspective", isPerspective)) isPerspective = true;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Orthographic", !isPerspective)) isPerspective = false;
+            if (isPerspective) ImGui::SliderFloat("Fov", &fov, 20.f, 110.f);
+            else ImGui::SliderFloat("Ortho width", &orthoViewWidth, 1, 20);
+
+            static bool viewDirty = true;
+            viewDirty |= ImGui::SliderFloat("Distance", &camDistance, 1.f, 10.f);
+            if (viewDirty) {
+                static float camYAngle = 165.f / 180.f * M_PI;
+                static float camXAngle = 32.f / 180.f * M_PI;
+                const vec3 eye = {cosf(camYAngle) * cosf(camXAngle) * camDistance, sinf(camXAngle) * camDistance, sinf(camYAngle) * cosf(camXAngle) * camDistance};
+                static const vec3 center = {0.f, 0.f, 0.f};
+                static const vec3 up = {0.f, 1.f, 0.f};
+                cameraView = glm::lookAt(eye, center, up);
+            }
+
+            ImGui::SeparatorText("Gizmo");
+            ImGui::Checkbox("Show gizmo", &showGizmo);
+            if (showGizmo) {
+                ImGui::Text("X: %f Y: %f", io.MousePos.x, io.MousePos.y);
+                if (ImGuizmo::IsUsing()) {
+                    ImGui::Text("Using gizmo");
+                } else {
+                    ImGui::Text(ImGuizmo::IsOver() ? "Over gizmo" : "");
+                    ImGui::SameLine();
+                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Over translate gizmo" : "");
+                    ImGui::SameLine();
+                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::ROTATE) ? "Over rotate gizmo" : "");
+                    ImGui::SameLine();
+                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::SCALE) ? "Over scale gizmo" : "");
+                }
+
+                if (ImGui::IsKeyPressed(ImGuiKey_T)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+                if (ImGui::IsKeyPressed(ImGuiKey_E)) mCurrentGizmoOperation = ImGuizmo::ROTATE;
+                if (ImGui::IsKeyPressed(ImGuiKey_R)) mCurrentGizmoOperation = ImGuizmo::SCALE;
+                if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE)) mCurrentGizmoOperation = ImGuizmo::ROTATE;
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE)) mCurrentGizmoOperation = ImGuizmo::SCALE;
+                if (ImGui::RadioButton("Universal", mCurrentGizmoOperation == ImGuizmo::UNIVERSAL)) mCurrentGizmoOperation = ImGuizmo::UNIVERSAL;
+
+                if (mCurrentGizmoOperation != ImGuizmo::SCALE) {
+                    if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL)) mCurrentGizmoMode = ImGuizmo::LOCAL;
+                    ImGui::SameLine();
+                    if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD)) mCurrentGizmoMode = ImGuizmo::WORLD;
+                }
+                if (ImGui::IsKeyPressed(ImGuiKey_S)) useSnap = !useSnap;
+                ImGui::Checkbox("##UseSnap", &useSnap);
+                ImGui::SameLine();
+
+                switch (mCurrentGizmoOperation) {
+                    case ImGuizmo::TRANSLATE:
+                        ImGui::InputFloat3("Snap", &snap[0]);
+                        break;
+                    case ImGuizmo::ROTATE:
+                        ImGui::InputFloat("Angle Snap", &snap[0]);
+                        break;
+                    case ImGuizmo::SCALE:
+                        ImGui::InputFloat("Scale Snap", &snap[0]);
+                        break;
+                }
+                ImGui::Checkbox("Bound Sizing", &boundSizing);
+                if (boundSizing) {
+                    ImGui::PushID(3);
+                    ImGui::Checkbox("##BoundSizing", &boundSizingSnap);
+                    ImGui::SameLine();
+                    ImGui::InputFloat3("Snap", boundsSnap);
+                    ImGui::PopID();
+                }
+            }
+
+            // Mesh controls. TODO tabs for camera/guizmo/mesh?
             ImGui::SeparatorText("Render Mode");
             ImGui::RadioButton("Smooth", &render_mode, 0);
             ImGui::SameLine();
@@ -346,13 +414,6 @@ int main(int, char **) {
                 ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
                 ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
             }
-
-            ImGui::SeparatorText("Camera");
-            ImGui::SliderFloat("Field of view", &fovy, 0.0f, 180.0f);
-            ImGui::SliderFloat("Frustum near plane", &zNear, 0.0f, 15.0f);
-            ImGui::SliderFloat("Frustum far plane", &zFar, 0.0f, 150.0f);
-            ImGui::Text(" ");
-            ImGui::SliderFloat3("Camera position ", &eye[0], -10.0f, 10.0f);
 
             ImGui::SeparatorText("Lighting");
             for (int i = 0; i < numLights; i++) {
@@ -381,16 +442,43 @@ int main(int, char **) {
             ImGui::InputTextMultiline("##Faust", &s.Audio.Faust.Code, ImGui::GetContentRegionAvail());
             ImGui::End();
         }
-
         if (s.Windows.Mesh.Visible) {
             ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
-            if (gl_canvas.SetupRender()) {
-                static mat4 projection;
-                projection = glm::perspective(glm::radians(fovy), gl_canvas.Width / gl_canvas.Height, zNear, zFar);
-                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &projection[0][0]);
+
+            const auto content_region = ImGui::GetContentRegionAvail();
+            if (isPerspective) {
+                cameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
+            } else {
+                const float viewHeight = orthoViewWidth * content_region.y / content_region.x;
+                cameraProjection = glm::ortho(-orthoViewWidth, orthoViewWidth, -viewHeight, viewHeight, 1000.f, -1000.f);
+            }
+            ImGuizmo::SetOrthographic(!isPerspective);
+
+            if (gl_canvas.SetupRender(content_region.x, content_region.y)) {
+                const mat4 proj = objectMatrix * cameraProjection;
+                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &proj[0][0]);
+                glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &cameraView[0][0]);
                 Display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
                 gl_canvas.Render();
+            }
+            if (showGizmo || showGrid) {
+                ImGuizmo::BeginFrame();
+                ImGuizmo::SetDrawlist();
+                ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
+            }
+            if (showGrid) {
+                ImGuizmo::DrawGrid(&cameraView[0][0], &cameraProjection[0][0], &identityMatrix[0][0], 100.f);
+            }
+            if (showGizmo) {
+                const float viewManipulateRight = io.DisplaySize.x, viewManipulateTop = 0;
+                ImGuizmo::DrawCubes(&cameraView[0][0], &cameraProjection[0][0], &objectMatrix[0][0], 1);
+                ImGuizmo::Manipulate(
+                    &cameraView[0][0], &cameraProjection[0][0], mCurrentGizmoOperation, mCurrentGizmoMode, &objectMatrix[0][0], nullptr,
+                    useSnap ? &snap[0] : nullptr, boundSizing ? bounds : nullptr, boundSizingSnap ? boundsSnap : nullptr
+                );
+                const static ImU32 bg_color = 0x10101010;
+                ImGuizmo::ViewManipulate(&cameraView[0][0], camDistance, {viewManipulateRight - 128, viewManipulateTop}, {128, 128}, bg_color);
             }
             ImGui::End();
         }

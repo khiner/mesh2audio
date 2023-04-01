@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-using glm::vec3;
+using glm::vec2, glm::vec3;
+using std::vector;
 namespace fs = std::filesystem;
 
 namespace gl {

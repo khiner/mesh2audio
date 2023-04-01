@@ -19,6 +19,7 @@ file(
     lib/implot/implot.cpp lib/implot/implot_items.cpp lib/implot/implot_demo.cpp
     lib/fmt/src/format.cc
     lib/imgui/misc/cpp/imgui_stdlib.cpp
+    lib/ImGuizmo/ImGuizmo.cpp
 )
 
 # Recursively copy the res directory to the build directory.
@@ -26,7 +27,7 @@ file(COPY res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture lib/imgui/misc/cpp)
+include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture lib/imgui/misc/cpp lib/ImGuizmo)
 
 find_package(GLEW REQUIRED)
 # `dynamiclib` is faust.

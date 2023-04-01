@@ -4,13 +4,12 @@
 #include "imgui.h"
 #include <stdexcept>
 
-bool GlCanvas::SetupRender() {
-    const auto avail_size = ImGui::GetContentRegionAvail();
-    if (avail_size.x == 0 || avail_size.y == 0) return false;
+bool GlCanvas::SetupRender(float width, float height) {
+    if (width == 0 || height == 0) return false;
 
-    if (avail_size.x != Width || avail_size.y != Height) {
-        Width = avail_size.x;
-        Height = avail_size.y;
+    if (width != Width || height != Height) {
+        Width = width;
+        Height = height;
         Destroy();
 
         glGenFramebuffers(1, &FrameBufferId);
