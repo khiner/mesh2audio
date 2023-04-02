@@ -52,7 +52,7 @@ static ImGuizmo::OPERATION currGizmoOp(ImGuizmo::TRANSLATE);
 static const vec3 center = {0.f, 0.f, 0.f};
 static const vec3 up = {0.f, 1.f, 0.f};
 static const mat4 identity(1.f);
-static mat4 objectMatrix(1.f), cameraView(1.f), cameraProjection;
+static mat4 objectMatrix(1.f), cameraView, cameraProjection;
 static float camDistance = 4, fov = 27;
 static bool showCameraGizmo = true, showGrid = false;
 
@@ -249,10 +249,12 @@ int main(int, char **) {
         * Positive x pointing right
         * Positive y pointing up, and
         * Positive z pointing forward (toward the camera).
-      This would put the camera `eye` at position (0, 0, -1) in world space.
-      We offset the camera angle slightly to make the initial view more interesting.
+      This would put the camera `eye` at position (0, 0, camDistance) in world space, pointing at the origin.
+      We offset the camera angle slightly from this point along spherical coordinates to make the initial view more interesting.
     */
-    static const vec3 eye(-0.3f, 0.3f, -1.0f);
+    static float x_angle = M_PI / 10; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
+    static float y_angle = M_PI / 2 - M_PI / 10; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
+    static vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
     cameraView = glm::lookAt(eye * camDistance, center, up);
 
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
@@ -263,8 +265,9 @@ int main(int, char **) {
         light_positions[i * 4 + 0] = dist * cosf(angle);
         light_positions[i * 4 + 1] = 0;
         light_positions[i * 4 + 2] = dist * sinf(angle);
+        light_positions[4 * i + 3] = 1.0f;
+        light_colors[4 * i + 3] = 1.0f;
     }
-
     // Main loop
     bool done = false;
 #ifdef __EMSCRIPTEN__
@@ -342,81 +345,80 @@ int main(int, char **) {
         if (s.Windows.MeshControls.Visible) {
             ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
 
-            ImGui::SeparatorText("Camera");
-            ImGui::Checkbox("Show gizmo", &showCameraGizmo);
-            ImGui::SameLine();
-            ImGui::Checkbox("Show grid", &showGrid);
-            ImGui::SliderFloat("Fov", &fov, 20.f, 110.f);
+            if (ImGui::BeginTabBar("MeshControlsTabBar")) {
+                if (ImGui::BeginTabItem("Mesh")) {
+                    ImGui::SeparatorText("Render mode");
+                    ImGui::RadioButton("Smooth", &render_mode, 0);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Lines", &render_mode, 1);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Point cloud", &render_mode, 2);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("Mesh", &render_mode, 3);
+                    ImGui::NewLine();
+                    ImGui::SeparatorText("Gizmo");
+                    ImGui::Checkbox("Show gizmo", &showMeshGizmo);
+                    if (showMeshGizmo) {
+                        const string interaction_text = "Interaction: " +
+                            string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
+                                       ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
+                                       ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
+                                       ImGuizmo::IsOver()                                                      ? "Hovered" :
+                                                                                                                 "Not interacting");
+                        ImGui::Text(interaction_text.c_str());
 
-            const float prevCamDistance = camDistance;
-            if (ImGui::SliderFloat("Distance", &camDistance, 1.f, 10.f)) {
-                // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
-                const vec3 eye = glm::inverse(cameraView)[3];
-                cameraView = glm::lookAt(eye * (camDistance / prevCamDistance), center, up);
-            }
-
-            ImGui::SeparatorText("Mesh gizmo");
-            ImGui::Checkbox("Show mesh gizmo", &showMeshGizmo);
-            if (showMeshGizmo) {
-                ImGui::Text("X: %f Y: %f", io.MousePos.x, io.MousePos.y);
-                if (ImGuizmo::IsUsing()) {
-                    ImGui::Text("Using gizmo");
-                } else {
-                    ImGui::Text(ImGuizmo::IsOver() ? "Over gizmo" : "");
-                    ImGui::SameLine();
-                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Over translate gizmo" : "");
-                    ImGui::SameLine();
-                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::ROTATE) ? "Over rotate gizmo" : "");
-                    ImGui::SameLine();
-                    ImGui::Text(ImGuizmo::IsOver(ImGuizmo::SCALE) ? "Over scale gizmo" : "");
+                        if (ImGui::IsKeyPressed(ImGuiKey_T)) currGizmoOp = ImGuizmo::TRANSLATE;
+                        if (ImGui::IsKeyPressed(ImGuiKey_R)) currGizmoOp = ImGuizmo::ROTATE;
+                        if (ImGui::IsKeyPressed(ImGuiKey_S)) currGizmoOp = ImGuizmo::SCALE;
+                        if (ImGui::RadioButton("Translate (T)", currGizmoOp == ImGuizmo::TRANSLATE)) currGizmoOp = ImGuizmo::TRANSLATE;
+                        if (ImGui::RadioButton("Rotate (R)", currGizmoOp == ImGuizmo::ROTATE)) currGizmoOp = ImGuizmo::ROTATE;
+                        if (ImGui::RadioButton("Scale (S)", currGizmoOp == ImGuizmo::SCALE)) currGizmoOp = ImGuizmo::SCALE;
+                        if (ImGui::RadioButton("Universal", currGizmoOp == ImGuizmo::UNIVERSAL)) currGizmoOp = ImGuizmo::UNIVERSAL;
+                        ImGui::Checkbox("Bound sizing", &showBounds);
+                    }
+                    ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("Camera")) {
+                    ImGui::Checkbox("Show gizmo", &showCameraGizmo);
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Grid", &showGrid);
+                    ImGui::SliderFloat("FOV", &fov, 20.f, 110.f);
 
-                if (ImGui::IsKeyPressed(ImGuiKey_T)) currGizmoOp = ImGuizmo::TRANSLATE;
-                if (ImGui::IsKeyPressed(ImGuiKey_E)) currGizmoOp = ImGuizmo::ROTATE;
-                if (ImGui::IsKeyPressed(ImGuiKey_R)) currGizmoOp = ImGuizmo::SCALE;
-                if (ImGui::RadioButton("Translate", currGizmoOp == ImGuizmo::TRANSLATE)) currGizmoOp = ImGuizmo::TRANSLATE;
-                ImGui::SameLine();
-                if (ImGui::RadioButton("Rotate", currGizmoOp == ImGuizmo::ROTATE)) currGizmoOp = ImGuizmo::ROTATE;
-                ImGui::SameLine();
-                if (ImGui::RadioButton("Scale", currGizmoOp == ImGuizmo::SCALE)) currGizmoOp = ImGuizmo::SCALE;
-                if (ImGui::RadioButton("Universal", currGizmoOp == ImGuizmo::UNIVERSAL)) currGizmoOp = ImGuizmo::UNIVERSAL;
-                ImGui::Checkbox("Bound sizing", &showBounds);
-            }
+                    const float prevCamDistance = camDistance;
+                    if (ImGui::SliderFloat("Distance", &camDistance, 1.f, 10.f)) {
+                        // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
+                        const vec3 eye = glm::inverse(cameraView)[3];
+                        cameraView = glm::lookAt(eye * (camDistance / prevCamDistance), center, up);
+                    }
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Lighing")) {
+                    ImGui::SeparatorText("Colors");
+                    ImGui::Checkbox("Custom colors", &custom_color);
+                    if (custom_color) {
+                        ImGui::SliderFloat3("Ambient R, G, B", &ambient[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat3("Diffusion R, G, B", &diffusion[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat3("Specular R, G, B", &specular[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+                    } else {
+                        ImGui::SliderFloat("Ambient", &ambient[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Diffusion", &diffusion[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+                    }
 
-            ImGui::SeparatorText("Render mode");
-            ImGui::RadioButton("Smooth", &render_mode, 0);
-            ImGui::SameLine();
-            ImGui::RadioButton("Lines", &render_mode, 1);
-            ImGui::SameLine();
-            ImGui::RadioButton("Point cloud", &render_mode, 2);
-            ImGui::SameLine();
-            ImGui::RadioButton("Mesh", &render_mode, 3);
-
-            ImGui::SeparatorText("Colors");
-            ImGui::Checkbox("Custom colors", &custom_color);
-            if (custom_color) {
-                ImGui::SliderFloat3("Ambient R, G, B", &ambient[0], 0.0f, 1.0f);
-                ImGui::SliderFloat3("Diffusion R, G, B", &diffusion[0], 0.0f, 1.0f);
-                ImGui::SliderFloat3("Specular R, G, B", &specular[0], 0.0f, 1.0f);
-                ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
-            } else {
-                ImGui::SliderFloat("Ambient", &ambient[0], 0.0f, 1.0f);
-                ImGui::SliderFloat("Diffusion", &diffusion[0], 0.0f, 1.0f);
-                ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
-                ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
-            }
-
-            ImGui::SeparatorText("Lighting");
-            for (int i = 0; i < numLights; i++) {
-                ImGui::Separator();
-                ImGui::PushID(i);
-                ImGui::Text("Light %d", i + 1);
-                ImGui::SliderFloat3("Positions", &light_positions[4 * i], -25.0f, 25.0f);
-                ImGui::ColorEdit3("Color", &light_colors[4 * i]);
-                ImGui::PopID();
-
-                light_positions[(4 * i) + 3] = 1.0f;
-                light_colors[(4 * i) + 3] = 1.0f;
+                    ImGui::SeparatorText("Lights");
+                    for (int i = 0; i < numLights; i++) {
+                        ImGui::Separator();
+                        ImGui::PushID(i);
+                        ImGui::Text("Light %d", i + 1);
+                        ImGui::SliderFloat3("Positions", &light_positions[4 * i], -25.0f, 25.0f);
+                        ImGui::ColorEdit3("Color", &light_colors[4 * i]);
+                        ImGui::PopID();
+                    }
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
 
             ImGui::End();
@@ -439,11 +441,10 @@ int main(int, char **) {
 
             const auto content_region = ImGui::GetContentRegionAvail();
             cameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
-            ImGuizmo::SetOrthographic(false);
 
             if (gl_canvas.SetupRender(content_region.x, content_region.y)) {
                 glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &cameraProjection[0][0]);
-                const mat4 modelView = cameraView * objectMatrix;
+                const mat4 &modelView = cameraView * objectMatrix;
                 glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelView[0][0]);
                 Display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
 
@@ -452,6 +453,7 @@ int main(int, char **) {
             if (showMeshGizmo || showCameraGizmo || showGrid) {
                 ImGuizmo::BeginFrame();
                 ImGuizmo::SetDrawlist();
+                ImGuizmo::SetOrthographic(false);
                 ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
             }
             if (showGrid) {
