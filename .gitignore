@@ -1,5 +1,6 @@
 build/
 .vscode/
+.DS_Store
 
 fem/src/*.mod
 fem/src/*.o
