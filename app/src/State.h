@@ -16,8 +16,10 @@ struct WindowsState {
     Window FaustCode{"Faust Code"};
     Window MeshControls{"Mesh Controls"};
     Window Mesh{"Mesh"};
-    Window ImGuiDemo{"Dear ImGui Demo"};
-    Window ImPlotDemo{"ImPlot Demo"};
+    Window MeshProfile{"Mesh Profile"};
+    // By default, these demo windows are docked, but not visible.
+    Window ImGuiDemo{"Dear ImGui Demo", false};
+    Window ImPlotDemo{"ImPlot Demo", false};
 };
 
 struct State;

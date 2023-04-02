@@ -78,23 +78,29 @@ void InitializeShaderAndMesh() {
     projectionPos = glGetUniformLocation(shaderprogram, "projection");
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
-    // Create a triangle path of x,y coordinates, with the left edge at x = 1, centered about the y axis, pointing at x = 2, y = 0.
-    // We'll extrude this path around the y axis.
-    const vector<vec2> trianglePath = {
-        {1.0f, 1.0f},
-        {2.0f, 0.0f},
-        {1.0f, -1.0f},
-    };
-    const auto &bell_profile = GenerateBellProfile();
     mesh.Destroy();
     mesh.Init();
 
-    mesh.SetProfile(bell_profile);
-    mesh.InvertProfileY();
-    mesh.ExtrudeProfile(100);
-    // Alternatively, we could initialize with a mesh file:
+    mesh.Load(fs::path("res") / "svg" / "std.svg");
+    // Alternatively, we could initialize with a mesh obj file:
     // mesh.Load(fs::path("res") / "obj" / "car.obj");
 
+    // Or, we could create a triangle path of x,y coordinates, with the left edge at x = 1, centered about the y axis, pointing at x = 2, y = 0.
+    // We'll extrude this path around the y axis.
+    // const vector<vec2> trianglePath = {
+    //     {1.0f, 1.0f},
+    //     {2.0f, 0.0f},
+    //     {1.0f, -1.0f},
+    // };
+    // mesh.SetProfile(trianglePath);
+
+    // Or generate a bell profile parametrically:
+    // const auto &bell_profile = GenerateBellProfile();
+    // mesh.SetProfile(bell_profile);
+    // mesh.InvertProfileY();
+
+    // ... and extrude the path around the y axis.
+    // mesh.ExtrudeProfile(100);
     mesh.Bind();
 }
 
@@ -315,7 +321,9 @@ int main(int, char **) {
             ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
             auto mesh_node_id = dockspace_id;
             auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
+            auto mesh_profile_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.6f, nullptr, &mesh_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
+            ImGui::DockBuilderDockWindow(s.Windows.MeshProfile.Name, mesh_profile_node_id);
             ImGui::DockBuilderDockWindow(s.Windows.Mesh.Name, mesh_node_id);
         }
 
@@ -343,6 +351,7 @@ int main(int, char **) {
                 ImGui::MenuItem(s.Windows.FaustCode.Name, nullptr, &s.Windows.FaustCode.Visible);
                 ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
                 ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
+                ImGui::MenuItem(s.Windows.MeshProfile.Name, nullptr, &s.Windows.MeshProfile.Visible);
                 ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
                 ImGui::MenuItem(s.Windows.ImPlotDemo.Name, nullptr, &s.Windows.ImPlotDemo.Visible);
                 ImGui::EndMenu();
@@ -362,7 +371,6 @@ int main(int, char **) {
                     ImGui::RadioButton("Smooth", &render_mode, 0);
                     ImGui::SameLine();
                     ImGui::RadioButton("Lines", &render_mode, 1);
-                    ImGui::SameLine();
                     ImGui::RadioButton("Point cloud", &render_mode, 2);
                     ImGui::SameLine();
                     ImGui::RadioButton("Mesh", &render_mode, 3);
@@ -435,17 +443,6 @@ int main(int, char **) {
             ImGui::End();
         }
 
-        s.Audio.Update();
-        if (s.Windows.AudioDevice.Visible) {
-            ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
-            s.Audio.Device.Render();
-            ImGui::End();
-        }
-        if (s.Windows.FaustCode.Visible) {
-            ImGui::Begin(s.Windows.FaustCode.Name, &s.Windows.FaustCode.Visible);
-            ImGui::InputTextMultiline("##Faust", &s.Audio.Faust.Code, ImGui::GetContentRegionAvail());
-            ImGui::End();
-        }
         if (s.Windows.Mesh.Visible) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
@@ -489,6 +486,27 @@ int main(int, char **) {
             }
             ImGui::End();
             ImGui::PopStyleVar();
+        }
+        if (s.Windows.MeshProfile.Visible) {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+            ImGui::Begin(s.Windows.MeshProfile.Name, &s.Windows.MeshProfile.Visible);
+
+            mesh.RenderProfile();
+
+            ImGui::End();
+            ImGui::PopStyleVar();
+        }
+
+        s.Audio.Update();
+        if (s.Windows.AudioDevice.Visible) {
+            ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
+            s.Audio.Device.Render();
+            ImGui::End();
+        }
+        if (s.Windows.FaustCode.Visible) {
+            ImGui::Begin(s.Windows.FaustCode.Name, &s.Windows.FaustCode.Visible);
+            ImGui::InputTextMultiline("##Faust", &s.Audio.Faust.Code, ImGui::GetContentRegionAvail());
+            ImGui::End();
         }
 
         // Rendering

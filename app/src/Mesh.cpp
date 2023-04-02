@@ -6,6 +6,9 @@
 #define NANOSVG_IMPLEMENTATION // Expands implementation
 #include "nanosvg.h"
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+
 namespace gl {
 void Mesh::Init() {
     glGenVertexArrays(1, &vertex_array);
@@ -68,8 +71,10 @@ void Mesh::Load(fs::path file_path) {
         nsvgDelete(image);
 
         NormalizeProfile();
-        InvertProfileY(); // SVG coordinates are upside-down relative to our rendering coordinates.
         ExtrudeProfile();
+        // SVG coordinates are upside-down relative to our 3D rendering coordinates.
+        // However, they're correctly oriented top-to-bottom for ImGui rendering, so we only invert the 3D mesh.
+        InvertY();
 
         return;
     }
@@ -118,8 +123,6 @@ void Mesh::Load(fs::path file_path) {
     }
 }
 
-void Mesh::SetProfile(const vector<vec2> &profile) { profile_vertices = profile; }
-
 void Mesh::NormalizeProfile() {
     float max_dim = 0.0f;
     for (auto &v : profile_vertices) {
@@ -129,13 +132,13 @@ void Mesh::NormalizeProfile() {
     for (auto &v : profile_vertices) v /= max_dim;
 }
 
-void Mesh::InvertProfileY() {
+void Mesh::InvertY() {
     float min_y = INFINITY, max_y = -INFINITY;
-    for (auto &v : profile_vertices) {
+    for (auto &v : vertices) {
         if (v.y < min_y) min_y = v.y;
         if (v.y > max_y) max_y = v.y;
     }
-    for (auto &v : profile_vertices) v.y = max_y - (v.y - min_y);
+    for (auto &v : vertices) v.y = max_y - (v.y - min_y);
 }
 
 void Mesh::CenterProfileY() {
@@ -182,6 +185,29 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
             indices.push_back(next_base_index + 1);
         }
     }
+}
+
+// Render the current 2D profile as a closed line shape (using ImGui).
+void Mesh::RenderProfile() const {
+    const int num_vertices = profile_vertices.size();
+    if (num_vertices == 0) {
+        ImGui::Text("The current mesh is not based on a 2D profile.");
+        return;
+    }
+
+    const static float line_thickness = 2.f;
+
+    ImVec2 vecs[num_vertices]; // TODO memoize
+    const auto screen_pos = ImGui::GetCursorScreenPos();
+    // The profile is normalized to 1 based on its largest dimension.
+    const float scale = ImGui::GetContentRegionAvail().y - line_thickness * 2;
+    for (int i = 0; i < num_vertices; i++) {
+        vecs[i] = ImVec2(profile_vertices[i].x, profile_vertices[i].y);
+        vecs[i] *= scale;
+        vecs[i] += screen_pos;
+    }
+    auto *draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddPolyline(vecs, profile_vertices.size(), IM_COL32_WHITE, ImDrawFlags_Closed, line_thickness);
 }
 
 static float dist_pt_seg(float x, float y, float px, float py, float qx, float qy) {
