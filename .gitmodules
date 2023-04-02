@@ -27,3 +27,6 @@
 [submodule "app/lib/ImGuizmo"]
 	path = app/lib/ImGuizmo
 	url = git@github.com:CedricGuillemet/ImGuizmo.git
+[submodule "app/lib/nanosvg"]
+	path = app/lib/nanosvg
+	url = git@github.com:memononen/nanosvg.git

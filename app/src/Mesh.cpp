@@ -2,7 +2,9 @@
 #include "Transform.h"
 
 #include <GL/glew.h>
-#include <stdexcept>
+
+#define NANOSVG_IMPLEMENTATION // Expands implementation
+#include "nanosvg.h"
 
 namespace gl {
 void Mesh::Init() {
@@ -21,15 +23,60 @@ void Mesh::Destroy() {
     vertices.clear();
     normals.clear();
     indices.clear();
+    profile_vertices.clear();
+}
+void Mesh::Bind() const {
+    glBindVertexArray(vertex_array);
+
+    // Bind vertices to layout location 0
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    // Bind normals to layout location 1
+    glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * normals.size(), &normals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices.size(), &indices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
-void Mesh::Load(fs::path object_path) {
-    Destroy();
-    Init();
+void Mesh::Load(fs::path file_path) {
+    const bool is_svg = file_path.extension() == ".svg";
+    const bool is_obj = file_path.extension() == ".obj";
+    if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
+
+    if (is_svg) {
+        struct NSVGimage *image;
+        image = nsvgParseFromFile(file_path.c_str(), "px", 96);
+
+        static const float tol = 10;
+        for (auto *shape = image->shapes; shape != nullptr; shape = shape->next) {
+            for (auto *path = shape->paths; path != nullptr; path = path->next) {
+                for (int i = 0; i < path->npts - 1; i += 3) {
+                    float *p = &path->pts[i * 2];
+                    CubicBez(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], tol);
+                }
+            }
+        }
+        nsvgDelete(image);
+
+        NormalizeProfile();
+        InvertProfileY(); // SVG coordinates are upside-down relative to our rendering coordinates.
+        ExtrudeProfile();
+
+        return;
+    }
 
     FILE *fp;
-    fp = fopen(object_path.c_str(), "rb");
-    if (fp == nullptr) throw std::runtime_error("Error loading file: " + object_path.string());
+    fp = fopen(file_path.c_str(), "rb");
+    if (fp == nullptr) throw std::runtime_error("Error loading file: " + file_path.string());
 
     float x, y, z;
     int fx, fy, fz, ignore;
@@ -69,20 +116,43 @@ void Mesh::Load(fs::path object_path) {
         vertices[i] -= vec3(0.0f, y_avg, z_avg);
         vertices[i] *= vec3(1.58f, 1.58f, 1.58f);
     }
-
-    Bind();
 }
 
-void Mesh::ExtrudeXYPath(const vector<vec2> &path, int num_radial_slices) {
-    Destroy();
-    Init();
+void Mesh::SetProfile(const vector<vec2> &profile) { profile_vertices = profile; }
 
+void Mesh::NormalizeProfile() {
+    float max_dim = 0.0f;
+    for (auto &v : profile_vertices) {
+        if (v.x > max_dim) max_dim = v.x;
+        if (v.y > max_dim) max_dim = v.y;
+    }
+    for (auto &v : profile_vertices) v /= max_dim;
+}
+
+void Mesh::InvertProfileY() {
+    float min_y = INFINITY, max_y = -INFINITY;
+    for (auto &v : profile_vertices) {
+        if (v.y < min_y) min_y = v.y;
+        if (v.y > max_y) max_y = v.y;
+    }
+    for (auto &v : profile_vertices) v.y = max_y - (v.y - min_y);
+}
+
+void Mesh::CenterProfileY() {
+    float min_y = INFINITY, max_y = -INFINITY;
+    for (const auto &v : profile_vertices) {
+        if (v.y < min_y) min_y = v.y;
+        if (v.y > max_y) max_y = v.y;
+    }
+    for (auto &v : profile_vertices) v.y -= (min_y + max_y) / 2;
+}
+
+void Mesh::ExtrudeProfile(int num_radial_slices) {
     const double angle_increment = 2.0 * M_PI / num_radial_slices;
     for (int i = 0; i < num_radial_slices; i++) {
         const double angle = i * angle_increment;
-        for (int j = 0; j < int(path.size()); j++) {
+        for (const auto &p : profile_vertices) {
             // Compute the x and y coordinates for this point on the extruded surface.
-            const vec2 &p = path[j];
             const double x = p.x * cos(angle);
             const double y = p.y; // Use the original z-coordinate from the 2D path
             const double z = p.x * sin(angle);
@@ -97,9 +167,9 @@ void Mesh::ExtrudeXYPath(const vector<vec2> &path, int num_radial_slices) {
 
     // Compute indices for the triangles.
     for (int i = 0; i < num_radial_slices; i++) {
-        for (int j = 0; j < int(path.size() - 1); j++) {
-            const int base_index = i * path.size() + j;
-            const int next_base_index = ((i + 1) % num_radial_slices) * path.size() + j;
+        for (int j = 0; j < int(profile_vertices.size() - 1); j++) {
+            const int base_index = i * profile_vertices.size() + j;
+            const int next_base_index = ((i + 1) % num_radial_slices) * profile_vertices.size() + j;
 
             // First triangle
             indices.push_back(base_index);
@@ -112,31 +182,53 @@ void Mesh::ExtrudeXYPath(const vector<vec2> &path, int num_radial_slices) {
             indices.push_back(next_base_index + 1);
         }
     }
+}
 
-    Bind();
+static float dist_pt_seg(float x, float y, float px, float py, float qx, float qy) {
+    const float pqx = qx - px;
+    const float pqy = qy - py;
+    float dx = x - px;
+    float dy = y - py;
+    const float d = pqx * pqx + pqy * pqy;
+    float t = pqx * dx + pqy * dy;
+    if (d > 0) t /= d;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+
+    dx = px + t * pqx - x;
+    dy = py + t * pqy - y;
+
+    return dx * dx + dy * dy;
 }
 
 // Private:
 
-void Mesh::Bind() const {
-    glBindVertexArray(vertex_array);
+void Mesh::CubicBez(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4, float tol, int level) {
+    float x12, y12, x23, y23, x34, y34, x123, y123, x234, y234, x1234, y1234;
+    float d;
 
-    // Bind vertices to layout location 0
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+    if (level > 12) return;
 
-    // Bind normals to layout location 1
-    glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * normals.size(), &normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+    x12 = (x1 + x2) * 0.5f;
+    y12 = (y1 + y2) * 0.5f;
+    x23 = (x2 + x3) * 0.5f;
+    y23 = (y2 + y3) * 0.5f;
+    x34 = (x3 + x4) * 0.5f;
+    y34 = (y3 + y4) * 0.5f;
+    x123 = (x12 + x23) * 0.5f;
+    y123 = (y12 + y23) * 0.5f;
+    x234 = (x23 + x34) * 0.5f;
+    y234 = (y23 + y34) * 0.5f;
+    x1234 = (x123 + x234) * 0.5f;
+    y1234 = (y123 + y234) * 0.5f;
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices.size(), &indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    d = dist_pt_seg(x1234, y1234, x1, y1, x4, y4);
+    if (d > tol * tol) {
+        CubicBez(x1, y1, x12, y12, x123, y123, x1234, y1234, tol, level + 1);
+        CubicBez(x1234, y1234, x234, y234, x34, y34, x4, y4, tol, level + 1);
+    } else {
+        profile_vertices.push_back({x4, y4});
+    }
 }
+
 } // namespace gl

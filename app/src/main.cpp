@@ -314,13 +314,16 @@ int main(int, char **) {
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Load mesh", nullptr)) {
-                    nfdchar_t *obj_file_path;
-                    nfdfilteritem_t filter[] = {{"Mesh object", "obj"}};
-                    nfdresult_t result = NFD_OpenDialog(&obj_file_path, filter, 1, "res/obj/");
+                    nfdchar_t *file_path;
+                    nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
+                    nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
-                        // Load object file.
-                        mesh.Load(obj_file_path);
-                        NFD_FreePath(obj_file_path);
+                        mesh.Destroy();
+                        mesh.Init();
+                        mesh.Load(file_path);
+                        mesh.Bind();
+
+                        NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }

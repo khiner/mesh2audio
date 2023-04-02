@@ -26,9 +26,10 @@ file(COPY res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture lib/imgui/misc/cpp lib/ImGuizmo)
+include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture lib/imgui/misc/cpp lib/ImGuizmo lib/nanosvg/src)
 
 find_package(GLEW REQUIRED)
+
 # `dynamiclib` is faust.
 target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib)
 
