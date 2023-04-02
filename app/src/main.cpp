@@ -17,6 +17,7 @@
 #include <SDL_opengl.h>
 #include <nfd.h>
 
+#include "BellProfileGenerator.h"
 #include "GlCanvas.h"
 #include "Mesh.h"
 #include "Shader.h"
@@ -84,10 +85,17 @@ void InitializeShaderAndMesh() {
         {2.0f, 0.0f},
         {1.0f, -1.0f},
     };
-    const int num_radial_slices = 100;
-    mesh.ExtrudeXYPath(trianglePath, num_radial_slices);
+    const auto &bell_profile = GenerateBellProfile();
+    mesh.Destroy();
+    mesh.Init();
+
+    mesh.SetProfile(bell_profile);
+    mesh.InvertProfileY();
+    mesh.ExtrudeProfile(100);
     // Alternatively, we could initialize with a mesh file:
     // mesh.Load(fs::path("res") / "obj" / "car.obj");
+
+    mesh.Bind();
 }
 
 void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
