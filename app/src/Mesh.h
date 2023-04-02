@@ -37,6 +37,7 @@ struct Mesh {
 private:
     void CubicBez(float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4, float tol, int level = 0);
 
-    vector<vec2> profile_vertices; // Non-empty if the mesh was generated from a 2D profile.
+    // Non-empty if the mesh was generated from a 2D profile:
+    vector<vec2> profile_vertices, control_points;
 };
 } // namespace gl

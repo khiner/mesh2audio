@@ -59,9 +59,13 @@ void Mesh::Load(fs::path file_path) {
         struct NSVGimage *image;
         image = nsvgParseFromFile(file_path.c_str(), "px", 96);
 
-        static const float tol = 10;
+        static const float tol = 6;
         for (auto *shape = image->shapes; shape != nullptr; shape = shape->next) {
             for (auto *path = shape->paths; path != nullptr; path = path->next) {
+                for (int i = 0; i < path->npts; i++) {
+                    float *p = &path->pts[i * 2];
+                    control_points.push_back({p[0], p[1]});
+                }
                 for (int i = 0; i < path->npts - 1; i += 3) {
                     float *p = &path->pts[i * 2];
                     CubicBez(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], tol);
@@ -130,6 +134,7 @@ void Mesh::NormalizeProfile() {
         if (v.y > max_dim) max_dim = v.y;
     }
     for (auto &v : profile_vertices) v /= max_dim;
+    for (auto &v : control_points) v /= max_dim;
 }
 
 void Mesh::InvertY() {
@@ -148,6 +153,7 @@ void Mesh::CenterProfileY() {
         if (v.y > max_y) max_y = v.y;
     }
     for (auto &v : profile_vertices) v.y -= (min_y + max_y) / 2;
+    for (auto &v : control_points) v.y -= (min_y + max_y) / 2;
 }
 
 void Mesh::ExtrudeProfile(int num_radial_slices) {
@@ -190,6 +196,7 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
 // Render the current 2D profile as a closed line shape (using ImGui).
 void Mesh::RenderProfile() const {
     const int num_vertices = profile_vertices.size();
+    const int num_ctrl = control_points.size();
     if (num_vertices == 0) {
         ImGui::Text("The current mesh is not based on a 2D profile.");
         return;
@@ -197,17 +204,53 @@ void Mesh::RenderProfile() const {
 
     const static float line_thickness = 2.f;
 
-    ImVec2 vecs[num_vertices]; // TODO memoize
+    // TODO memoize
+    ImVec2 vecs[num_vertices], control_vecs[num_ctrl];
+
     const auto screen_pos = ImGui::GetCursorScreenPos();
     // The profile is normalized to 1 based on its largest dimension.
     const float scale = ImGui::GetContentRegionAvail().y - line_thickness * 2;
     for (int i = 0; i < num_vertices; i++) {
-        vecs[i] = ImVec2(profile_vertices[i].x, profile_vertices[i].y);
+        vecs[i] = {profile_vertices[i].x, profile_vertices[i].y};
         vecs[i] *= scale;
         vecs[i] += screen_pos;
     }
+    for (int i = 0; i < num_ctrl; i++) {
+        control_vecs[i] = {control_points[i].x, control_points[i].y};
+        control_vecs[i] *= scale;
+        control_vecs[i] += screen_pos;
+    }
     auto *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddPolyline(vecs, profile_vertices.size(), IM_COL32_WHITE, ImDrawFlags_Closed, line_thickness);
+
+    // Draw control lines/points.
+
+    // Control lines
+    for (int i = 0; i < num_ctrl - 1; i += 3) {
+        const auto &p1 = control_vecs[i];
+        const auto &p2 = control_vecs[i + 1];
+        const auto &p3 = control_vecs[i + 2];
+        const auto &p4 = control_vecs[i + 3];
+        draw_list->AddLine({p1.x, p1.y}, {p2.x, p2.y}, IM_COL32_WHITE, line_thickness);
+        draw_list->AddLine({p3.x, p3.y}, {p4.x, p4.y}, IM_COL32_WHITE, line_thickness);
+    }
+
+    // Control points
+    for (int i = 0; i < num_ctrl - 1; i += 3) {
+        const auto &p4 = control_vecs[i + 3];
+        draw_list->AddCircleFilled({p4.x, p4.y}, 6.0f, IM_COL32_WHITE);
+    }
+
+    const auto &p1 = control_points[0];
+    draw_list->AddCircleFilled({p1.x, p1.y}, 3.0f, IM_COL32_BLACK);
+    for (int i = 0; i < num_ctrl - 1; i += 3) {
+        const auto &p2 = control_vecs[i + 1];
+        const auto &p3 = control_vecs[i + 2];
+        const auto &p4 = control_vecs[i + 3];
+        draw_list->AddCircleFilled({p2.x, p2.y}, 3.0f, IM_COL32_WHITE);
+        draw_list->AddCircleFilled({p3.x, p3.y}, 3.0f, IM_COL32_WHITE);
+        draw_list->AddCircleFilled({p4.x, p4.y}, 3.0f, IM_COL32_BLACK);
+    }
 }
 
 static float dist_pt_seg(float x, float y, float px, float py, float qx, float qy) {

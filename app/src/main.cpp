@@ -82,25 +82,20 @@ void InitializeShaderAndMesh() {
     mesh.Init();
 
     mesh.Load(fs::path("res") / "svg" / "std.svg");
+
     // Alternatively, we could initialize with a mesh obj file:
     // mesh.Load(fs::path("res") / "obj" / "car.obj");
 
-    // Or, we could create a triangle path of x,y coordinates, with the left edge at x = 1, centered about the y axis, pointing at x = 2, y = 0.
-    // We'll extrude this path around the y axis.
-    // const vector<vec2> trianglePath = {
-    //     {1.0f, 1.0f},
-    //     {2.0f, 0.0f},
-    //     {1.0f, -1.0f},
-    // };
+    // Or generate a profile parametrically, and extrude it around the y axis.
+    // const vector<vec2> trianglePath = {{1.0f, 1.0f}, {2.0f, 0.0f}, {1.0f, -1.0f}};
     // mesh.SetProfile(trianglePath);
-
-    // Or generate a bell profile parametrically:
-    // const auto &bell_profile = GenerateBellProfile();
-    // mesh.SetProfile(bell_profile);
-    // mesh.InvertProfileY();
-
-    // ... and extrude the path around the y axis.
     // mesh.ExtrudeProfile(100);
+
+    // mesh.SetProfile(GenerateBellProfile());
+    // mesh.NormalizeProfile();
+    // mesh.ExtrudeProfile(100);
+    // mesh.InvertY();
+
     mesh.Bind();
 }
 
