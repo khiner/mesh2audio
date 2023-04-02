@@ -77,8 +77,17 @@ void InitializeShaderAndMesh() {
     projectionPos = glGetUniformLocation(shaderprogram, "projection");
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
-    // Initialize global mesh
-    mesh.Load(fs::path("res") / "obj" / "car.obj");
+    // Create a triangle path of x,y coordinates, with the left edge at x = 1, centered about the y axis, pointing at x = 2, y = 0.
+    // We'll extrude this path around the y axis.
+    const vector<vec2> trianglePath = {
+        {1.0f, 1.0f},
+        {2.0f, 0.0f},
+        {1.0f, -1.0f},
+    };
+    const int num_radial_slices = 100;
+    mesh.ExtrudeXYPath(trianglePath, num_radial_slices);
+    // Alternatively, we could initialize with a mesh file:
+    // mesh.Load(fs::path("res") / "obj" / "car.obj");
 }
 
 void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {

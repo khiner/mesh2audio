@@ -70,6 +70,55 @@ void Mesh::Load(fs::path object_path) {
         vertices[i] *= vec3(1.58f, 1.58f, 1.58f);
     }
 
+    Bind();
+}
+
+void Mesh::ExtrudeXYPath(const vector<vec2> &path, int num_radial_slices) {
+    Destroy();
+    Init();
+
+    const double angle_increment = 2.0 * M_PI / num_radial_slices;
+    for (int i = 0; i < num_radial_slices; i++) {
+        const double angle = i * angle_increment;
+        for (int j = 0; j < int(path.size()); j++) {
+            // Compute the x and y coordinates for this point on the extruded surface.
+            const vec2 &p = path[j];
+            const double x = p.x * cos(angle);
+            const double y = p.y; // Use the original z-coordinate from the 2D path
+            const double z = p.x * sin(angle);
+            vertices.push_back({x, y, z});
+
+            // Compute the normal for this vertex.
+            const double nx = cos(angle);
+            const double nz = sin(angle);
+            normals.push_back({nx, 0.0, nz});
+        }
+    }
+
+    // Compute indices for the triangles.
+    for (int i = 0; i < num_radial_slices; i++) {
+        for (int j = 0; j < int(path.size() - 1); j++) {
+            const int base_index = i * path.size() + j;
+            const int next_base_index = ((i + 1) % num_radial_slices) * path.size() + j;
+
+            // First triangle
+            indices.push_back(base_index);
+            indices.push_back(next_base_index + 1);
+            indices.push_back(base_index + 1);
+
+            // Second triangle
+            indices.push_back(base_index);
+            indices.push_back(next_base_index);
+            indices.push_back(next_base_index + 1);
+        }
+    }
+
+    Bind();
+}
+
+// Private:
+
+void Mesh::Bind() const {
     glBindVertexArray(vertex_array);
 
     // Bind vertices to layout location 0
