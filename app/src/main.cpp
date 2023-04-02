@@ -37,14 +37,14 @@ static const int numLights = 5;
 // Variables to set uniform params for lighting fragment shader
 static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
-static int render_mode = 3;
+static int render_mode = 0;
 static GLuint vertexshader, fragmentshader, shaderprogram;
 
 static float ambient[4] = {0.05, 0.05, 0.05, 1};
 static float diffusion[4] = {0.2, 0.2, 0.2, 1};
 static float specular[4] = {0.5, 0.5, 0.5, 1};
-static float light_positions[20] = {0.0f};
-static float light_colors[20] = {0.0f};
+static float light_positions[numLights * 4] = {0.0f};
+static float light_colors[numLights * 4] = {0.0f};
 static float shininess = 10;
 static bool custom_color = false;
 
@@ -61,12 +61,12 @@ static float bounds[] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
 static bool showBounds = false;
 
 void InitializeShaderAndMesh() {
-    // Initialize shaders
+    // Initialize shaders.
     vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
     fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
     shaderprogram = Shader::InitProgram(vertexshader, fragmentshader);
 
-    // Get uniform locations
+    // Get uniform locations.
     lightpos = glGetUniformLocation(shaderprogram, "light_posn");
     lightcol = glGetUniformLocation(shaderprogram, "light_col");
     ambientcol = glGetUniformLocation(shaderprogram, "ambient");
@@ -235,14 +235,26 @@ int main(int, char **) {
 
     glEnable(GL_DEPTH_TEST);
 
-    // Initialize camera view.
-    static const float x_angle = M_PI / 5, y_angle = 4 * M_PI / 5;
-    static const float cos_x = cosf(x_angle), sin_x = sinf(x_angle), cos_y = cosf(y_angle), sin_y = sinf(y_angle);
-    static const vec3 eye = {cos_y * cos_x, sin_x, sin_y * cos_x};
+    /**
+      Initialize a right-handed coordinate system, with:
+        * Positive x pointing right
+        * Positive y pointing up, and
+        * Positive z pointing forward (toward the camera).
+      This would put the camera `eye` at position (0, 0, -1) in world space.
+      We offset the camera angle slightly to make the initial view more interesting.
+    */
+    static const vec3 eye(-0.3f, 0.3f, -1.0f);
     cameraView = glm::lookAt(eye * camDistance, center, up);
 
-    light_positions[1] = 6.5f;
-    light_colors[0] = light_colors[1] = light_colors[2] = 1.0f;
+    // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
+    std::fill_n(light_colors, numLights * 4, 1.0f);
+    for (int i = 0; i < numLights; i++) {
+        const float angle = 2 * M_PI * i / numLights;
+        const float dist = 15.0f;
+        light_positions[i * 4 + 0] = dist * cosf(angle);
+        light_positions[i * 4 + 1] = 0;
+        light_positions[i * 4 + 2] = dist * sinf(angle);
+    }
 
     // Main loop
     bool done = false;
