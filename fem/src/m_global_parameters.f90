@@ -1,4 +1,3 @@
-!> \\file testModule.f
 module m_global_parameters
 
     implicit none
@@ -7,7 +6,7 @@ module m_global_parameters
     integer :: elements
     integer :: edges
 
-    integer, parameter :: debug = 1
+    integer, parameter :: debug = 0
 
     real(kind(0d0)), allocatable, dimension(:,:) :: dofs  !< degrees of freedom
     real(kind(0d0)), allocatable, dimension(:, :) :: M  !< Mass matrix
@@ -19,6 +18,8 @@ module m_global_parameters
 
     real(kind(0d0)) :: ym !< youngs modulus
     real(kind(0d0)) :: nu !< poissons ratio
+    integer :: ndofs
+
 
     public
 
@@ -27,12 +28,6 @@ contains
     subroutine s_initialize_global_parameters()
 
     end subroutine
-
-    subroutine s_finalize_program()
-
-        deallocate (dofs, M, S, E)
-
-    end subroutine s_finalize_program
 
     subroutine s_print_array(A, m, n)
 

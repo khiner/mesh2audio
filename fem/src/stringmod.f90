@@ -2,7 +2,7 @@ module stringmod
 
 use precmod
 
-private :: value_dr,value_sr,value_di,value_si
+private :: value_dr,value_sr,value_si,value_di
 private :: write_dr,write_sr,write_di,write_si
 private :: writeq_dr,writeq_sr,writeq_di,writeq_si
 

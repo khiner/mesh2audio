@@ -14,12 +14,17 @@ program p_main
     nu = 0.3
 
     call s_initialize_guass_quadrature()
+
     call s_initialize_d()
 
     call s_read_obj_file()
 
     call s_compute_global_stiffness_matrix()
+
+    call s_compute_global_mass_matrix()
+
+    call s_write_output()
     
-    call s_finalize_program()
+    !call s_finalize_program()
 
 end program p_main

@@ -6,7 +6,8 @@ module m_math
 
     private; public :: s_initialize_d, &
         s_compute_b_matrix, &
-        s_compute_jacobian_determinant
+        s_compute_jacobian_determinant, &
+        s_compute_N_matrix
 
 contains
 
@@ -107,5 +108,27 @@ contains
         jacD = 0.125d0*(1 + t)*(r3*(z1-z2) + r2*(z3-z1) + r1*(z2-z3))
 
     end subroutine
+
+    subroutine s_compute_N_matrix(N, s, t)
+
+        real(kind(0d0)), dimension(2,6) :: N
+        real(kind(0d0)) :: s, t
+
+        N(1,1) = 25e-2*(1+s)*(1+t)
+        N(1,2) = 0d0
+        N(1,3) = 25e-2*(1-s)*(1+t)
+        N(1,4) = 0d0
+        N(1,5) = 50e-2*(1-t)
+        N(1,6) = 0d0
+
+        N(2,1) = 0d0
+        N(2,2) = 25e-2*(1+s)*(1+t)
+        N(2,3) = 0d0
+        N(2,4) = 25e-2*(1-s)*(1+t)
+        N(2,5) = 0d0
+        N(2,6) = 50e-2*(1-t)
+
+    end subroutine
+
 
 end module m_math

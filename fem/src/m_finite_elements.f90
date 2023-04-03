@@ -8,7 +8,8 @@ module m_finite_elements
 
     private; public :: s_initialize_guass_quadrature, &
         s_compute_element_stiffness_matrix, &
-        s_compute_global_stiffness_matrix
+        s_compute_global_stiffness_matrix, &
+        s_compute_global_mass_matrix
 
     real(kind(0d0)), dimension(4) :: gx !< x guass-quadrature points
     real(kind(0d0)), dimension(4) :: gy !< y guass-quadrature points
@@ -29,20 +30,75 @@ contains
 
     subroutine S_compute_global_stiffness_matrix()
 
-        integer :: i, j, k, u, v
-        real(kind(0d0)), dimension(6,6) :: KL !< element stiffness matrix 
+        integer :: i, j, k
+        real(kind(0d0)), dimension(6,6) :: KL !< element stiffness matrix
+        integer, dimension(3) :: GN !< global node numbers
+
+        do i = 1,ndofs
+            do j = 1,ndofs
+                S(i,j) = 0d0
+            end do
+        end do
 
         do i = 1, elements
             call s_compute_element_stiffness_matrix(i, KL)
-            ! do j = 1,6
-            !     do k = 1,6
-            !         u = 
-            !         v = 
-            !     end do
-            ! end do
+
+            GN(1) = E(i, 1)
+            GN(2) = E(i, 2)
+            GN(3) = E(i, 3)
+
+            do j = 1,3
+                do k = 1,3
+                    S(2*(GN(k)-1)+1,2*(GN(j)-1)+1)  = S(2*(GN(k)-1)+1,2*(GN(j)-1)+1) + KL(2*(k-1)+1, 2*(j-1)+1)
+                    S(2*(GN(k)-1)+1,2*(GN(j)-1)+2)  = S(2*(GN(k)-1)+1,2*(GN(j)-1)+2) + KL(2*(k-1)+1, 2*(j-1)+2)
+                    S(2*(GN(k)-1)+2,2*(GN(j)-1)+1)  = S(2*(GN(k)-1)+2,2*(GN(j)-1)+1) + KL(2*(k-1)+2, 2*(j-1)+1)
+                    S(2*(GN(k)-1)+2,2*(GN(j)-1)+2)  = S(2*(GN(k)-1)+2,2*(GN(j)-1)+2) + KL(2*(k-1)+2, 2*(j-1)+2)
+                end do
+            end do
         end do
+
+        if (debug == 1) then
+            print*, "Gobal Stiffness Matrix"
+            call s_print_array(S,ndofs,ndofs)
+        end if
         
     end subroutine s_compute_global_stiffness_matrix
+
+    subroutine s_compute_global_mass_matrix()
+
+        integer :: i, j, k
+        real(kind(0d0)), dimension(6,6) :: ML
+        integer, dimension(3) :: GN !< global node numbers
+
+        do i = 1,ndofs
+            do j = 1,ndofs
+                M(i,j) = 0d0
+            end do
+        end do
+
+        do i = 1,elements
+            call s_compute_element_mass_matrix(i, ML)
+            
+            GN(1) = E(i, 1)
+            GN(2) = E(i, 2)
+            GN(3) = E(i, 3)
+
+            do j = 1,3
+                do k = 1,3
+                    M(2*(GN(k)-1)+1,2*(GN(j)-1)+1)  = M(2*(GN(k)-1)+1,2*(GN(j)-1)+1) + ML(2*(k-1)+1, 2*(j-1)+1)
+                    M(2*(GN(k)-1)+1,2*(GN(j)-1)+2)  = M(2*(GN(k)-1)+1,2*(GN(j)-1)+2) + ML(2*(k-1)+1, 2*(j-1)+2)
+                    M(2*(GN(k)-1)+2,2*(GN(j)-1)+1)  = M(2*(GN(k)-1)+2,2*(GN(j)-1)+1) + ML(2*(k-1)+2, 2*(j-1)+1)
+                    M(2*(GN(k)-1)+2,2*(GN(j)-1)+2)  = M(2*(GN(k)-1)+2,2*(GN(j)-1)+2) + ML(2*(k-1)+2, 2*(j-1)+2)
+                end do
+            end do
+        end do
+
+        if (debug == 1) then
+            print*, "Gobal Mass Matrix"
+            call s_print_array(M,ndofs,ndofs)
+        end if
+
+    end subroutine s_compute_global_mass_matrix
 
     subroutine s_compute_element_stiffness_matrix(elm, Ke)
 
@@ -86,5 +142,43 @@ contains
         end if
 
     end subroutine s_compute_element_stiffness_matrix
+
+    subroutine s_compute_element_mass_matrix(elm, Me)
+
+        integer :: elm, i, j
+
+        real(kind(0d0)), dimension(2,6) :: N  !< shape function matrix matrix
+        real(kind(0d0)), dimension(6,6) :: Me !< element mass matrix
+
+        !< intermitant calculation matrices
+        real(kind(0d0)), dimension(6,6) :: I1
+
+        ! Initialize Me
+        do i = 1,6
+            do j = 1,6
+                Me(i,j) = 0d0
+            end do
+        end do
+
+                ! Perform Guassian Quadrature
+        do i = 1,4
+            call s_compute_N_matrix(N, gx(i), gy(i))
+
+            I1 = matmul(transpose(N),N)
+
+            Me = Me + weights(i)*I1
+
+        end do
+
+        ! Convert to volume
+        Me = Me*(2*pi)
+
+        if (debug == 1) then
+            print*, "Local Mass Matrix of element: ", elm
+            call s_print_array(Me, 6, 6)
+        end if
+
+
+    end subroutine s_compute_element_mass_matrix
 
 end module m_finite_elements

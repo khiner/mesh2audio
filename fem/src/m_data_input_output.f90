@@ -13,7 +13,11 @@ module m_data_input_output
     integer:: io       !< iostat variable
     character (len=100) :: filecontents, msg, lineType !< strings for stuff
 
-    private;  public :: s_read_obj_file
+    character filename*50
+    character arg*50
+
+    private;  public :: s_read_obj_file, &
+        s_write_output
 
 contains
 
@@ -23,10 +27,13 @@ contains
         integer :: i, j, k !< standard loop iterators
         real(kind(0d0)) :: r1, z1, r2, z2, r3, z3 !< vertex coordinates
 
-        character filename*50
         call getarg(1, filename) !< gets filename from CLA
+        call getarg(2, arg)       !< gets youngs modules
+        read(arg, *) ym
+        call getarg(3, arg)       !< gets poissons ratio
+        read(arg, *) nu
 
-        open (unit = 1, file = filename, iostat=io)
+        open (unit = 1, file = trim(filename)//".obj", iostat=io)
 
         !< read raw data
         do
@@ -41,6 +48,7 @@ contains
                 if (lineType == "Vertices:") then
                     call split(filecontents, " ", lineType)
                     read(lineType, *) vertices
+                    Ndofs = vertices*2
                     allocate (dofs(1:vertices,2))
                     allocate (M(1:vertices*2,1:vertices*2))
                     allocate (S(1:vertices*2,1:vertices*2))
@@ -76,6 +84,8 @@ contains
 
         end do
 
+        close(1)
+
         !< populate element centroids
         do i = 1, elements
 
@@ -101,5 +111,44 @@ contains
         end if
 
     end subroutine s_read_obj_file
+
+    subroutine s_write_output()
+
+        integer :: i, j
+        character f*50
+
+        !< Write Stiffness Matrix
+        f = trim(filename)//"_K.out"
+        open(1, file = trim(f), iostat = io)
+
+        do i = 1,Ndofs
+            do j = 1,Ndofs
+                if (j < Ndofs) then
+                    write(1,"(F16.8,A)",advance="no") S(i,j), ','
+                else
+                    write(1,"(F16.8)") S(i,j)
+                end if
+            end do
+        end do
+
+        close(1)
+
+        !< Write Mass Matrix
+        f = trim(filename)//"M_out"
+        open(1, file = trim(f), iostat = io)
+
+        do i = 1,Ndofs
+            do j = 1,Ndofs
+                if (j < Ndofs) then
+                    write(1,"(F16.8,A)",advance="no") M(i,j), ','
+                else
+                    write(1,"(F16.8)") M(i,j)
+                end if
+            end do
+        end do
+
+        close(1)
+
+    end subroutine s_write_output
 
 end module m_data_input_output
