@@ -17,7 +17,6 @@
 #include <SDL_opengl.h>
 #include <nfd.h>
 
-#include "BellProfileGenerator.h"
 #include "GlCanvas.h"
 #include "Mesh.h"
 #include "Shader.h"
@@ -90,11 +89,6 @@ void InitializeShaderAndMesh() {
     // const vector<vec2> trianglePath = {{1.0f, 1.0f}, {2.0f, 0.0f}, {1.0f, -1.0f}};
     // mesh.SetProfile(trianglePath);
     // mesh.ExtrudeProfile(100);
-
-    // mesh.SetProfile(GenerateBellProfile());
-    // mesh.NormalizeProfile();
-    // mesh.ExtrudeProfile(100);
-    // mesh.InvertY();
 
     mesh.Bind();
 }
