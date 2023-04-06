@@ -17,18 +17,20 @@
 #include <SDL_opengl.h>
 #include <nfd.h>
 
+#include "Audio.h"
 #include "GlCanvas.h"
 #include "Mesh.h"
 #include "Shader.h"
-#include "State.h"
 #include "Transform.h"
+#include "Window.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-using std::string;
+static Audio Audio;
+static WindowsState Windows;
 
 static gl::Mesh mesh;
 static GLuint projectionPos, modelviewPos;
@@ -116,33 +118,33 @@ void Display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     glBindVertexArray(mesh.vertex_array);
     if (render_mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 1) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 2) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 3) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
         glUniform4fv(diffusecol, 1, black);
         glUniform4fv(specularcol, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
 
         glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
 }
@@ -217,11 +219,9 @@ int main(int, char **) {
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    State s{}; // Main application state
-
     // Initialize file dialog & audio device.
     NFD_Init();
-    s.Audio.Init();
+    Audio.Init();
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -303,17 +303,17 @@ int main(int, char **) {
         if (ImGui::GetFrameCount() == 1) {
             auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
             auto faust_code_node_id = ImGui::DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.AudioDevice.Name, audio_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.FaustCode.Name, faust_code_node_id);
+            ImGui::DockBuilderDockWindow(Windows.AudioDevice.Name, audio_node_id);
+            ImGui::DockBuilderDockWindow(Windows.FaustCode.Name, faust_code_node_id);
             auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
-            ImGui::DockBuilderDockWindow(s.Windows.ImGuiDemo.Name, demo_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.ImPlotDemo.Name, demo_node_id);
+            ImGui::DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
+            ImGui::DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
             auto mesh_node_id = dockspace_id;
             auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
             auto mesh_profile_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.6f, nullptr, &mesh_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.MeshControls.Name, mesh_controls_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.MeshProfile.Name, mesh_profile_node_id);
-            ImGui::DockBuilderDockWindow(s.Windows.Mesh.Name, mesh_node_id);
+            ImGui::DockBuilderDockWindow(Windows.MeshControls.Name, mesh_controls_node_id);
+            ImGui::DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
+            ImGui::DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
         }
 
         if (ImGui::BeginMainMenuBar()) {
@@ -336,23 +336,23 @@ int main(int, char **) {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Windows")) {
-                ImGui::MenuItem(s.Windows.AudioDevice.Name, nullptr, &s.Windows.AudioDevice.Visible);
-                ImGui::MenuItem(s.Windows.FaustCode.Name, nullptr, &s.Windows.FaustCode.Visible);
-                ImGui::MenuItem(s.Windows.MeshControls.Name, nullptr, &s.Windows.MeshControls.Visible);
-                ImGui::MenuItem(s.Windows.Mesh.Name, nullptr, &s.Windows.Mesh.Visible);
-                ImGui::MenuItem(s.Windows.MeshProfile.Name, nullptr, &s.Windows.MeshProfile.Visible);
-                ImGui::MenuItem(s.Windows.ImGuiDemo.Name, nullptr, &s.Windows.ImGuiDemo.Visible);
-                ImGui::MenuItem(s.Windows.ImPlotDemo.Name, nullptr, &s.Windows.ImPlotDemo.Visible);
+                ImGui::MenuItem(Windows.AudioDevice.Name, nullptr, &Windows.AudioDevice.Visible);
+                ImGui::MenuItem(Windows.FaustCode.Name, nullptr, &Windows.FaustCode.Visible);
+                ImGui::MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
+                ImGui::MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
+                ImGui::MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
+                ImGui::MenuItem(Windows.ImGuiDemo.Name, nullptr, &Windows.ImGuiDemo.Visible);
+                ImGui::MenuItem(Windows.ImPlotDemo.Name, nullptr, &Windows.ImPlotDemo.Visible);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
         }
 
-        if (s.Windows.ImGuiDemo.Visible) ImGui::ShowDemoWindow(&s.Windows.ImGuiDemo.Visible);
-        if (s.Windows.ImPlotDemo.Visible) ImPlot::ShowDemoWindow(&s.Windows.ImPlotDemo.Visible);
+        if (Windows.ImGuiDemo.Visible) ImGui::ShowDemoWindow(&Windows.ImGuiDemo.Visible);
+        if (Windows.ImPlotDemo.Visible) ImPlot::ShowDemoWindow(&Windows.ImPlotDemo.Visible);
 
-        if (s.Windows.MeshControls.Visible) {
-            ImGui::Begin(s.Windows.MeshControls.Name, &s.Windows.MeshControls.Visible);
+        if (Windows.MeshControls.Visible) {
+            ImGui::Begin(Windows.MeshControls.Name, &Windows.MeshControls.Visible);
 
             if (ImGui::BeginTabBar("MeshControlsTabBar")) {
                 if (ImGui::BeginTabItem("Mesh")) {
@@ -432,9 +432,9 @@ int main(int, char **) {
             ImGui::End();
         }
 
-        if (s.Windows.Mesh.Visible) {
+        if (Windows.Mesh.Visible) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-            ImGui::Begin(s.Windows.Mesh.Name, &s.Windows.Mesh.Visible);
+            ImGui::Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
             const auto content_region = ImGui::GetContentRegionAvail();
             cameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
@@ -476,9 +476,9 @@ int main(int, char **) {
             ImGui::End();
             ImGui::PopStyleVar();
         }
-        if (s.Windows.MeshProfile.Visible) {
+        if (Windows.MeshProfile.Visible) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-            ImGui::Begin(s.Windows.MeshProfile.Name, &s.Windows.MeshProfile.Visible);
+            ImGui::Begin(Windows.MeshProfile.Name, &Windows.MeshProfile.Visible);
 
             mesh.RenderProfile();
 
@@ -486,15 +486,15 @@ int main(int, char **) {
             ImGui::PopStyleVar();
         }
 
-        s.Audio.Update();
-        if (s.Windows.AudioDevice.Visible) {
-            ImGui::Begin(s.Windows.AudioDevice.Name, &s.Windows.AudioDevice.Visible);
-            s.Audio.Device.Render();
+        Audio.Update();
+        if (Windows.AudioDevice.Visible) {
+            ImGui::Begin(Windows.AudioDevice.Name, &Windows.AudioDevice.Visible);
+            Audio.Device.Render();
             ImGui::End();
         }
-        if (s.Windows.FaustCode.Visible) {
-            ImGui::Begin(s.Windows.FaustCode.Name, &s.Windows.FaustCode.Visible);
-            ImGui::InputTextMultiline("##Faust", &s.Audio.Faust.Code, ImGui::GetContentRegionAvail());
+        if (Windows.FaustCode.Visible) {
+            ImGui::Begin(Windows.FaustCode.Name, &Windows.FaustCode.Visible);
+            ImGui::InputTextMultiline("##Faust", &Audio.Faust.Code, ImGui::GetContentRegionAvail());
             ImGui::End();
         }
 
@@ -531,7 +531,7 @@ int main(int, char **) {
     mesh.Destroy();
     gl_canvas.Destroy();
 
-    s.Audio.Destroy();
+    Audio.Destroy();
     NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);

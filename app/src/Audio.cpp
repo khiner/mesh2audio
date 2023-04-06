@@ -3,6 +3,7 @@
 #include <locale>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
@@ -15,10 +16,10 @@ using Sample = float;
 
 #include "imgui.h"
 
-#include "State.h"
+#include "Audio.h"
 
 using fmt::format;
-using std::string_view;
+using std::string_view, std::vector;
 
 namespace fs = std::filesystem;
 
@@ -32,7 +33,7 @@ static string Capitalize(string copy) {
 namespace FaustContext {
 static dsp *Dsp = nullptr;
 
-static void Init(Audio::FaustState &faust, u32 sample_rate) {
+static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
     createLibContext();
 
     int argc = 0;
