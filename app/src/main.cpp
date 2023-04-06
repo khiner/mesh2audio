@@ -1,6 +1,8 @@
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/mat4x4.hpp>
+
 #include <iostream>
 #include <stdio.h>
 
@@ -21,13 +23,14 @@
 #include "GlCanvas.h"
 #include "Mesh.h"
 #include "Shader.h"
-#include "Transform.h"
 #include "Window.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
+
+using glm::mat4;
 
 static Audio Audio;
 static WindowsState Windows;

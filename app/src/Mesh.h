@@ -1,16 +1,10 @@
 #pragma once
 
-#include <glm/glm.hpp>
-
-#include <filesystem>
-#include <string>
-#include <vector>
+#include <glm/vec3.hpp>
 
 #include "MeshProfile.h"
 
-using glm::vec2, glm::vec3;
-using std::vector;
-namespace fs = std::filesystem;
+using glm::vec3;
 
 struct ImVec2;
 
