@@ -66,8 +66,13 @@ vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) const {
     return vertices;
 }
 
+// Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
+// control points at the time of drag initiation.
+static int SelectedAnchorPoint = -1;
+static ImVec2 SelectedDragInitPositions[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}}; // (Only the first point uses the fourth element.)
+
 // Render the current 2D profile as a closed line shape (using ImGui).
-void MeshProfile::Render() const {
+void MeshProfile::Render() {
     const size_t num_ctrl = NumControlPoints();
     if (num_ctrl < 4) return;
 
@@ -76,10 +81,9 @@ void MeshProfile::Render() const {
     // The profile is normalized to 1 based on its largest dimension.
     const float scale = ImGui::GetContentRegionAvail().y - 2 * spacing;
 
-    const auto path_line_color = ImGui::ColorConvertFloat4ToU32({PathLineColor[0], PathLineColor[1], PathLineColor[2], PathLineColor[3]});
-
     auto *dl = ImGui::GetWindowDrawList();
     if (ShowPath) {
+        const auto path_line_color = ImGui::ColorConvertFloat4ToU32({PathLineColor[0], PathLineColor[1], PathLineColor[2], PathLineColor[3]});
         dl->PathLineTo(GetControlPoint(0, offset, scale));
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
             dl->PathBezierCubicCurveTo(
@@ -90,7 +94,6 @@ void MeshProfile::Render() const {
         }
         dl->PathStroke(path_line_color, 0, PathLineThickness);
     }
-
     if (ShowControlPoints) {
         const auto control_color = ImGui::ColorConvertFloat4ToU32({ControlColor[0], ControlColor[1], ControlColor[2], ControlColor[3]});
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
@@ -108,11 +111,32 @@ void MeshProfile::Render() const {
         }
     }
     if (ShowAnchorPoints) {
+        const auto &io = ImGui::GetIO();
+        if (SelectedAnchorPoint > -1 && SelectedAnchorPoint < int(num_ctrl)) {
+            const auto &drag_delta = ImGui::GetMouseDragDelta() / scale;
+            ControlPoints[SelectedAnchorPoint] = SelectedDragInitPositions[0] + drag_delta;
+            ControlPoints[SelectedAnchorPoint == 0 ? num_ctrl - 1 : SelectedAnchorPoint - 1] = SelectedDragInitPositions[1] + drag_delta;
+            ControlPoints[SelectedAnchorPoint + 1] = SelectedDragInitPositions[2] + drag_delta;
+            if (SelectedAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + drag_delta;
+        }
+        if (ImGui::IsMouseReleased(0)) SelectedAnchorPoint = -1;
+        const bool mouse_clicked = ImGui::IsMouseClicked(0);
         const auto anchor_fill_color = ImGui::ColorConvertFloat4ToU32({AnchorFillColor[0], AnchorFillColor[1], AnchorFillColor[2], AnchorFillColor[3]});
         const auto anchor_stroke_color = ImGui::ColorConvertFloat4ToU32({AnchorStrokeColor[0], AnchorStrokeColor[1], AnchorStrokeColor[2], AnchorStrokeColor[3]});
+        const ImVec2 radius_area{AnchorPointRadius, AnchorPointRadius};
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
-            dl->AddCircleFilled(GetControlPoint(i + 3, offset, scale), AnchorPointRadius, anchor_fill_color);
-            dl->AddCircle(GetControlPoint(i + 3, offset, scale), AnchorPointRadius, anchor_stroke_color, 0, AnchorStrokeThickness);
+            const auto &cp = GetControlPoint(i, offset, scale);
+            const ImRect cp_rect = {cp - radius_area, cp + radius_area};
+            const bool is_active = SelectedAnchorPoint == int(i) || ImGui::IsMouseHoveringRect(cp_rect.Min, cp_rect.Max);
+            if (SelectedAnchorPoint == -1 && mouse_clicked && cp_rect.Contains(io.MouseClickedPos[0])) {
+                SelectedAnchorPoint = i;
+                SelectedDragInitPositions[0] = ControlPoints[i];
+                SelectedDragInitPositions[1] = ControlPoints[i == 0 ? num_ctrl - 1 : i - 1];
+                SelectedDragInitPositions[2] = ControlPoints[i + 1];
+                if (i == 0) SelectedDragInitPositions[3] = ControlPoints[num_ctrl - 2]; // Control points of first anchor wrap around.
+            }
+            dl->AddCircleFilled(cp, AnchorPointRadius, is_active ? ImGui::GetColorU32(ImGuiCol_ButtonHovered) : anchor_fill_color);
+            dl->AddCircle(cp, AnchorPointRadius, anchor_stroke_color, 0, AnchorStrokeThickness);
         }
     }
 }
@@ -131,6 +155,7 @@ void MeshProfile::RenderConfig() {
     }
 
     if (AnchorPointRadius < ControlPointRadius) AnchorPointRadius = ControlPointRadius;
+
     ImGui::Checkbox("Anchor points", &ShowAnchorPoints);
     if (ShowAnchorPoints) {
         ImGui::SliderFloat("Anchor point radius", &AnchorPointRadius, std::max(0.5f, ControlPointRadius), 10.f);
