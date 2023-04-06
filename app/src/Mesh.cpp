@@ -171,7 +171,7 @@ void Mesh::ExtrudeProfile() {
     Normals.clear();
     Indices.clear();
 
-    const vector<ImVec2> profile_vertices = Profile->CreateVertices(0.0001);
+    const vector<ImVec2> &profile_vertices = Profile->GetVertices();
     const int slices = Profile->NumRadialSlices;
     const double angle_increment = 2.0 * M_PI / slices;
     for (int i = 0; i < slices; i++) {

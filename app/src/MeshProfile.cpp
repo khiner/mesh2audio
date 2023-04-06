@@ -23,17 +23,16 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     }
     nsvgDelete(image);
 
-    Normalize();
-    SvgFilePath = svg_file_path;
-}
-
-void MeshProfile::Normalize() {
+    // Normalize control points so that the largest dimension is 1.0:
     float max_dim = 0.0f;
     for (auto &v : ControlPoints) {
         if (v.x > max_dim) max_dim = v.x;
         if (v.y > max_dim) max_dim = v.y;
     }
     for (auto &v : ControlPoints) v /= max_dim;
+
+    CreateVertices();
+    SvgFilePath = svg_file_path;
 }
 
 int MeshProfile::NumControlPoints() const { return ControlPoints.size(); }
@@ -41,29 +40,8 @@ int MeshProfile::NumControlPoints() const { return ControlPoints.size(); }
 ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale) const {
     return ControlPoints[i] * scale + offset;
 }
-
-vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) const {
-    const size_t num_ctrl = NumControlPoints();
-    if (num_ctrl < 4) return {};
-
-    static ImDrawListSharedData sharedData;
-    sharedData.CurveTessellationTol = tolerance;
-
-    // Use ImGui to create the Bezier curve vertices, to ensure that the vertices are identical to those rendered by ImGui.
-    // Note: tolerance is scaled to normalized control points in [-1, 1], whereas tolerance in ImGui rendering is in pixels.
-    // TODO should unify these two tolerances.
-    static ImDrawList dl(&sharedData);
-    dl.PathLineTo(ControlPoints[0]);
-    for (size_t i = 0; i < ControlPoints.size() - 1; i += 3) {
-        dl.PathBezierCubicCurveTo(ControlPoints[i + 1], ControlPoints[i + 2], ControlPoints[i + 3]);
-    }
-
-    vector<ImVec2> vertices(dl._Path.Size);
-    for (int i = 0; i < dl._Path.Size; i++) vertices.push_back(dl._Path[i]);
-
-    dl.PathClear();
-
-    return vertices;
+ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
+    return Vertices[i] * scale + offset;
 }
 
 // Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
@@ -80,17 +58,17 @@ bool MeshProfile::Render() {
     const auto offset = ImGui::GetCursorScreenPos() + ImVec2{spacing, spacing};
     // The profile is normalized to 1 based on its largest dimension.
     const float scale = ImGui::GetContentRegionAvail().y - 2 * spacing;
+    if (scale <= 0) return false;
 
     auto *dl = ImGui::GetWindowDrawList();
+    const float curr_tol = dl->_Data->CurveTessellationTol; // Save current tolerance to restore later.
+    dl->_Data->CurveTessellationTol = CurveTolerance;
     if (ShowPath) {
+        // Bezier path has already been calculated, so just push it to the draw list's path.
         const auto path_line_color = ImGui::ColorConvertFloat4ToU32({PathLineColor[0], PathLineColor[1], PathLineColor[2], PathLineColor[3]});
-        dl->PathLineTo(GetControlPoint(0, offset, scale));
-        for (size_t i = 0; i < num_ctrl - 1; i += 3) {
-            dl->PathBezierCubicCurveTo(
-                GetControlPoint(i + 1, offset, scale),
-                GetControlPoint(i + 2, offset, scale),
-                GetControlPoint(i + 3, offset, scale)
-            );
+        dl->PathLineTo(GetVertex(0, offset, scale));
+        for (size_t i = 1; i < Vertices.size(); i++) {
+            dl->_Path.push_back(GetVertex(i, offset, scale));
         }
         dl->PathStroke(path_line_color, 0, PathLineThickness);
     }
@@ -148,6 +126,9 @@ bool MeshProfile::Render() {
         }
     }
 
+    dl->_Data->CurveTessellationTol = curr_tol;
+
+    if (modified) CreateVertices();
     return modified;
 }
 
@@ -157,32 +138,59 @@ bool MeshProfile::RenderConfig() {
     ImGui::Text("(File -> Load mesh)");
     ImGui::Unindent();
 
-    // If the number of radial slices to extrude is changed, we need to regenerate the mesh.
-    bool modified = ImGui::SliderInt("Radial slices", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
+    // If either of these parameters change, we need to regenerate the mesh.
+    ImGui::SeparatorText("Resolution");
+    bool modified = ImGui::SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
+    modified |= ImGui::SliderFloat("Curve tol.", &CurveTolerance, 0.00001f, 0.5f, "%.5f", ImGuiSliderFlags_Logarithmic);
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
     if (ShowPath) {
-        ImGui::SliderFloat("Path line thickness", &PathLineThickness, 0.5f, 5.f);
-        ImGui::ColorEdit3("Path line color", &PathLineColor[0]);
+        ImGui::SeparatorText("Path");
+        ImGui::SliderFloat("Stroke weight", &PathLineThickness, 0.5f, 5.f);
+        ImGui::ColorEdit3("Color", &PathLineColor[0]);
     }
 
     if (AnchorPointRadius < ControlPointRadius) AnchorPointRadius = ControlPointRadius;
 
     ImGui::Checkbox("Anchor points", &ShowAnchorPoints);
     if (ShowAnchorPoints) {
-        ImGui::SliderFloat("Anchor point radius", &AnchorPointRadius, std::max(0.5f, ControlPointRadius), 10.f);
-        ImGui::SliderFloat("Anchor stroke thickness", &AnchorStrokeThickness, 5.f, 5.f);
-        ImGui::ColorEdit3("Anchor fill color", &AnchorFillColor[0]);
-        ImGui::ColorEdit3("Anchor stroke color", &AnchorStrokeColor[0]);
+        ImGui::SeparatorText("Anchor points");
+        ImGui::SliderFloat("Radius", &AnchorPointRadius, std::max(0.5f, ControlPointRadius), 10.f);
+        ImGui::SliderFloat("Stroke weight", &AnchorStrokeThickness, 5.f, 5.f);
+        ImGui::ColorEdit3("Fill", &AnchorFillColor[0]);
+        ImGui::ColorEdit3("Stroke", &AnchorStrokeColor[0]);
     }
 
     ImGui::Checkbox("Control points", &ShowControlPoints);
     if (ShowControlPoints) {
-        ImGui::SliderFloat("Control point radius", &ControlPointRadius, 0.5f, 5.f);
-        ImGui::SliderFloat("Control line thickness", &ControlLineThickness, 0.5f, 5.f);
-        ImGui::ColorEdit3("Control color", &ControlColor[0]);
+        ImGui::SeparatorText("Control points");
+        ImGui::SliderFloat("Radius", &ControlPointRadius, 0.5f, 5.f);
+        ImGui::SliderFloat("Stroke weight", &ControlLineThickness, 0.5f, 5.f);
+        ImGui::ColorEdit3("Color", &ControlColor[0]);
     }
 
+    if (modified) CreateVertices();
     return modified;
+}
+
+// Private
+
+void MeshProfile::CreateVertices() {
+    const size_t num_ctrl = NumControlPoints();
+    if (num_ctrl < 4) return;
+
+    static ImDrawListSharedData sharedData;
+    sharedData.CurveTessellationTol = CurveTolerance;
+
+    static ImDrawList dl(&sharedData);
+    dl.PathLineTo(ControlPoints[0]);
+    for (size_t i = 0; i < ControlPoints.size() - 1; i += 3) {
+        dl.PathBezierCubicCurveTo(ControlPoints[i + 1], ControlPoints[i + 2], ControlPoints[i + 3]);
+    }
+
+    Vertices.resize(dl._Path.Size);
+    for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
+
+    dl.PathClear();
 }

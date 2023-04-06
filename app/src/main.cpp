@@ -180,8 +180,8 @@ int main(int, char **) {
             ImGui::DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
             auto mesh_node_id = dockspace_id;
-            auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.3f, nullptr, &mesh_node_id);
-            auto mesh_profile_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.6f, nullptr, &mesh_node_id);
+            auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.4f, nullptr, &mesh_node_id);
+            auto mesh_profile_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.8f, nullptr, &mesh_node_id);
             ImGui::DockBuilderDockWindow(Windows.MeshControls.Name, mesh_controls_node_id);
             ImGui::DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
             ImGui::DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
