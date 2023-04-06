@@ -72,9 +72,9 @@ static int SelectedAnchorPoint = -1;
 static ImVec2 SelectedDragInitPositions[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}}; // (Only the first point uses the fourth element.)
 
 // Render the current 2D profile as a closed line shape (using ImGui).
-void MeshProfile::Render() {
+bool MeshProfile::Render() {
     const size_t num_ctrl = NumControlPoints();
-    if (num_ctrl < 4) return;
+    if (num_ctrl < 4) return false;
 
     const float spacing = 2 + std::max(PathLineThickness, std::max(AnchorPointRadius, ControlPointRadius));
     const auto offset = ImGui::GetCursorScreenPos() + ImVec2{spacing, spacing};
@@ -110,16 +110,24 @@ void MeshProfile::Render() {
             dl->AddCircleFilled(GetControlPoint(i + 2, offset, scale), ControlPointRadius, control_color);
         }
     }
+
+    bool modified = false;
     if (ShowAnchorPoints) {
         const auto &io = ImGui::GetIO();
         if (SelectedAnchorPoint > -1 && SelectedAnchorPoint < int(num_ctrl)) {
             const auto &drag_delta = ImGui::GetMouseDragDelta() / scale;
-            ControlPoints[SelectedAnchorPoint] = SelectedDragInitPositions[0] + drag_delta;
-            ControlPoints[SelectedAnchorPoint == 0 ? num_ctrl - 1 : SelectedAnchorPoint - 1] = SelectedDragInitPositions[1] + drag_delta;
-            ControlPoints[SelectedAnchorPoint + 1] = SelectedDragInitPositions[2] + drag_delta;
-            if (SelectedAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + drag_delta;
+            if (drag_delta.x != 0 || drag_delta.y != 0) {
+                ControlPoints[SelectedAnchorPoint] = SelectedDragInitPositions[0] + drag_delta;
+                ControlPoints[SelectedAnchorPoint == 0 ? num_ctrl - 1 : SelectedAnchorPoint - 1] = SelectedDragInitPositions[1] + drag_delta;
+                ControlPoints[SelectedAnchorPoint + 1] = SelectedDragInitPositions[2] + drag_delta;
+                if (SelectedAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + drag_delta;
+
+                modified = true;
+            }
         }
+
         if (ImGui::IsMouseReleased(0)) SelectedAnchorPoint = -1;
+
         const bool mouse_clicked = ImGui::IsMouseClicked(0);
         const auto anchor_fill_color = ImGui::ColorConvertFloat4ToU32({AnchorFillColor[0], AnchorFillColor[1], AnchorFillColor[2], AnchorFillColor[3]});
         const auto anchor_stroke_color = ImGui::ColorConvertFloat4ToU32({AnchorStrokeColor[0], AnchorStrokeColor[1], AnchorStrokeColor[2], AnchorStrokeColor[3]});
@@ -139,6 +147,8 @@ void MeshProfile::Render() {
             dl->AddCircle(cp, AnchorPointRadius, anchor_stroke_color, 0, AnchorStrokeThickness);
         }
     }
+
+    return modified;
 }
 
 void MeshProfile::RenderConfig() {

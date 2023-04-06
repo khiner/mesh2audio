@@ -139,8 +139,6 @@ int main(int, char **) {
     // mesh.SetProfile(trianglePath);
     // mesh.ExtrudeProfile(100);
 
-    mesh->Bind();
-
     glEnable(GL_DEPTH_TEST);
     static GlCanvas gl_canvas;
 
@@ -197,7 +195,6 @@ int main(int, char **) {
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
                         mesh = std::make_unique<Mesh>(file_path);
-                        mesh->Bind();
 
                         NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {

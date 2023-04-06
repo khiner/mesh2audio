@@ -16,17 +16,14 @@ struct Mesh {
     Mesh(fs::path file_path);
     ~Mesh();
 
-    void Bind() const;
-    void InvertY(); // Invert the y-coordinates of the current 3D mesh.
     void Render(int mode) const;
-    void RenderProfile() const;
+    void RenderProfile();
     void RenderProfileConfig() const;
 
-    // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
-    // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
-    void ExtrudeProfile(int num_radial_slices = 100);
-
     int NumIndices() const { return Indices.size(); }
+
+    static void SetCameraDistance(float distance);
+    static void UpdateCameraProjection(const ImVec2 &size);
 
     static const int NumLights = 5;
     inline static float Ambient[4] = {0.05, 0.05, 0.05, 1};
@@ -42,16 +39,19 @@ struct Mesh {
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
 
-    static void SetCameraDistance(float distance);
-    static void UpdateCameraProjection(const ImVec2 &size);
-
 private:
+    static void InitializeStatic(); // Initialize variables shared across all meshes.
+
+    void InvertY(); // Invert the y-coordinates of the current 3D mesh.
+    // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
+    // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
+    void ExtrudeProfile(int num_radial_slices = 100);
+    void Bind() const; // Bind all buffers and set up vertex attributes.
+
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
 
     vector<vec3> Vertices, Normals;
     vector<unsigned int> Indices;
     unsigned int VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
-
-    static void InitializeStatic(); // Initialize variables shared across all meshes.
 };

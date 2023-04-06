@@ -17,7 +17,7 @@ struct MeshProfile {
     vector<ImVec2> CreateVertices(float tolerance) const;
 
     void Normalize(); // Normalize control points so that the largest dimension is 1.0:
-    void Render(); // Render as a closed line shape (using ImGui).
+    bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     void RenderConfig(); // Render config section (using ImGui).
 
     bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false};

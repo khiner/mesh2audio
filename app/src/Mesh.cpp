@@ -75,12 +75,11 @@ Mesh::Mesh(fs::path file_path) {
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(file_path);
         ExtrudeProfile();
-        // SVG coordinates are upside-down relative to our 3D rendering coordinates.
-        // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the 3D mesh - not the profile.
-        InvertY();
-
+        Bind();
         return;
     }
+
+    Profile.reset();
 
     FILE *fp;
     fp = fopen(file_path.c_str(), "rb");
@@ -124,6 +123,7 @@ Mesh::Mesh(fs::path file_path) {
         Vertices[i] -= vec3(0.0f, y_avg, z_avg);
         Vertices[i] *= vec3(1.58f, 1.58f, 1.58f);
     }
+    Bind();
 }
 
 Mesh::~Mesh() {
@@ -202,6 +202,10 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
             Indices.push_back(next_base_index + 1);
         }
     }
+
+    // SVG coordinates are upside-down relative to our 3D rendering coordinates.
+    // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the 3D mesh - not the profile.
+    InvertY();
 }
 
 void Mesh::SetCameraDistance(float distance) {
@@ -260,9 +264,19 @@ void Mesh::Render(int mode) const {
     glBindVertexArray(0);
 }
 
-void Mesh::RenderProfile() const {
-    if (Profile != nullptr && Profile->NumControlPoints() > 0) Profile->Render();
-    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
+void Mesh::RenderProfile() {
+    if (Profile == nullptr) {
+        ImGui::Text("The current mesh was not loaded from a 2D profile.");
+        return;
+    }
+
+    if (Profile->Render()) {
+        Vertices.clear();
+        Normals.clear();
+        Indices.clear();
+        ExtrudeProfile();
+        Bind();
+    }
 }
 
 void Mesh::RenderProfileConfig() const {
