@@ -120,7 +120,7 @@ void Mesh::InvertY() {
 void Mesh::ExtrudeProfile(int num_radial_slices) {
     if (profile == nullptr) return;
 
-    const vector<ImVec2> profile_vertices = profile->CreateVertices(0.1);
+    const vector<ImVec2> profile_vertices = profile->CreateVertices(0.01);
     const double angle_increment = 2.0 * M_PI / num_radial_slices;
     for (int i = 0; i < num_radial_slices; i++) {
         const double angle = i * angle_increment;

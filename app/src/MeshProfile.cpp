@@ -6,6 +6,8 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
+#include <algorithm>
+
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
 
@@ -25,70 +27,6 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     Normalize();
 }
 
-int MeshProfile::NumControlPoints() const { return control_points.size(); }
-
-ImVec2 MeshProfile::GetControlPoint(int i, const ImVec2 &offset, const float scale) const {
-    return control_points[i] * scale + offset;
-}
-
-static float DistPtSeg(float x, float y, float px, float py, float qx, float qy) {
-    const float pqx = qx - px;
-    const float pqy = qy - py;
-    float dx = x - px;
-    float dy = y - py;
-    const float d = pqx * pqx + pqy * pqy;
-    float t = pqx * dx + pqy * dy;
-    if (d > 0) t /= d;
-    if (t < 0) t = 0;
-    else if (t > 1) t = 1;
-
-    dx = px + t * pqx - x;
-    dy = py + t * pqy - y;
-
-    return dx * dx + dy * dy;
-}
-
-static void AddCubicBez(vector<ImVec2> &vertices, float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4, float tol, int level = 0) {
-    float x12, y12, x23, y23, x34, y34, x123, y123, x234, y234, x1234, y1234;
-    float d;
-
-    if (level > 12) return;
-
-    x12 = (x1 + x2) * 0.5f;
-    y12 = (y1 + y2) * 0.5f;
-    x23 = (x2 + x3) * 0.5f;
-    y23 = (y2 + y3) * 0.5f;
-    x34 = (x3 + x4) * 0.5f;
-    y34 = (y3 + y4) * 0.5f;
-    x123 = (x12 + x23) * 0.5f;
-    y123 = (y12 + y23) * 0.5f;
-    x234 = (x23 + x34) * 0.5f;
-    y234 = (y23 + y34) * 0.5f;
-    x1234 = (x123 + x234) * 0.5f;
-    y1234 = (y123 + y234) * 0.5f;
-
-    d = DistPtSeg(x1234, y1234, x1, y1, x4, y4);
-    if (d > tol * tol) {
-        AddCubicBez(vertices, x1, y1, x12, y12, x123, y123, x1234, y1234, tol, level + 1);
-        AddCubicBez(vertices, x1234, y1234, x234, y234, x34, y34, x4, y4, tol, level + 1);
-    } else {
-        vertices.push_back({x4, y4});
-    }
-}
-
-vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) {
-    vector<ImVec2> vertices;
-    for (int i = 0; i < int(control_points.size()) - 1; i += 3) {
-        const auto p1 = control_points[i];
-        const auto p2 = control_points[i + 1];
-        const auto p3 = control_points[i + 2];
-        const auto p4 = control_points[i + 3];
-        AddCubicBez(vertices, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, tolerance);
-    }
-
-    return vertices;
-}
-
 void MeshProfile::Normalize() {
     float max_dim = 0.0f;
     for (auto &v : control_points) {
@@ -96,6 +34,50 @@ void MeshProfile::Normalize() {
         if (v.y > max_dim) max_dim = v.y;
     }
     for (auto &v : control_points) v /= max_dim;
+}
+
+int MeshProfile::NumControlPoints() const { return control_points.size(); }
+
+ImVec2 MeshProfile::GetControlPoint(int i, const ImVec2 &offset, const float scale) const {
+    return control_points[i] * scale + offset;
+}
+
+static float DistPtSeg(const ImVec2 &p1, const ImVec2 &p2, const ImVec2 &p3) {
+    const auto d23 = p3 - p2;
+    const auto d12 = p1 - p2;
+    const float d_mag = d23.x * d23.x + d23.y * d23.y;
+    const float t_mag = std::clamp(d23.x * d12.x + d23.y * d12.y / (d_mag > 0 ? d_mag : 1), 0.f, 1.f);
+
+    const ImVec2 d = p2 + d23 * t_mag - p1;
+    return d.x * d.x + d.y * d.y;
+}
+
+static void AddCubicBez(vector<ImVec2> &vertices, const ImVec2 &p1, const ImVec2 &p2, const ImVec2 &p3, const ImVec2 &p4, float tol, int level = 0) {
+    if (level > 12) return;
+
+    const auto p12 = (p1 + p2) * 0.5f;
+    const auto p23 = (p2 + p3) * 0.5f;
+    const auto p34 = (p3 + p4) * 0.5f;
+    const auto p123 = (p12 + p23) * 0.5f;
+    const auto p234 = (p23 + p34) * 0.5f;
+    const auto p1234 = (p123 + p234) * 0.5f;
+    const float d = DistPtSeg(p1234, p1, p4);
+
+    if (d > tol * tol) {
+        AddCubicBez(vertices, p1, p12, p123, p1234, tol, level + 1);
+        AddCubicBez(vertices, p1234, p234, p34, p4, tol, level + 1);
+    } else {
+        vertices.push_back(p4);
+    }
+}
+
+vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) {
+    vector<ImVec2> vertices;
+    for (int i = 0; i < int(control_points.size()) - 1; i += 3) {
+        AddCubicBez(vertices, control_points[i], control_points[i + 1], control_points[i + 2], control_points[i + 3], tolerance);
+    }
+
+    return vertices;
 }
 
 // Render the current 2D profile as a closed line shape (using ImGui).
