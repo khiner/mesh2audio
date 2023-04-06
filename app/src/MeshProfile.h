@@ -18,7 +18,14 @@ struct MeshProfile {
 
     void Normalize(); // Normalize control points so that the largest dimension is 1.0:
     void Render() const; // Render as a closed line shape (using ImGui).
+    void RenderConfig(); // Render config section (using ImGui).
+
+    bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false};
+    float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
+    float PathLineColor[4] = {1, 1, 1, 1}, AnchorFillColor[4] = {0, 0, 0, 1}, AnchorStrokeColor[4] = {1, 1, 1, 1}, ControlColor[4] = {0, 1, 0, 1};
+    float AnchorPointRadius{6}, ControlPointRadius{3};
 
 private:
-    vector<ImVec2> control_points;
+    fs::path SvgFilePath; // Most recently loaded .svg file path.
+    vector<ImVec2> ControlPoints;
 };

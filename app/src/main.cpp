@@ -100,6 +100,9 @@ int main(int, char **) {
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        // Smoother circles and curves.
+        style.CircleTessellationMaxError = 0.1f;
+        style.CurveTessellationTol = 0.1f;
     }
 
     // Setup Platform/Renderer backends
@@ -254,6 +257,11 @@ int main(int, char **) {
                     }
                     ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("Mesh profile")) {
+                    if (mesh != nullptr) mesh->RenderProfileConfig();
+                    else ImGui::Text("No mesh has been loaded.");
+                    ImGui::EndTabItem();
+                }
                 if (ImGui::BeginTabItem("Camera")) {
                     ImGui::Checkbox("Show gizmo", &ShowCameraGizmo);
                     ImGui::SameLine();
@@ -270,9 +278,9 @@ int main(int, char **) {
                     ImGui::SeparatorText("Colors");
                     ImGui::Checkbox("Custom colors", &Mesh::CustomColor);
                     if (Mesh::CustomColor) {
-                        ImGui::SliderFloat3("Ambient R, G, B", &Mesh::Ambient[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat3("Diffusion R, G, B", &Mesh::Diffusion[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat3("Specular R, G, B", &Mesh::Specular[0], 0.0f, 1.0f);
+                        ImGui::ColorEdit3("Ambient", &Mesh::Ambient[0]);
+                        ImGui::ColorEdit3("Diffusion", &Mesh::Diffusion[0]);
+                        ImGui::ColorEdit3("Specular", &Mesh::Specular[0]);
                         ImGui::SliderFloat("Shininess", &Mesh::Shininess, 0.0f, 150.0f);
                     } else {
                         for (int i = 1; i < 3; i++) {

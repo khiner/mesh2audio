@@ -14,6 +14,7 @@ using Sample = float;
 #define FAUSTFLOAT Sample
 #endif
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
 #include "Audio.h"

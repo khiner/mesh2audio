@@ -204,11 +204,6 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
     }
 }
 
-void Mesh::RenderProfile() const {
-    if (Profile != nullptr && Profile->NumControlPoints() > 0) Profile->Render();
-    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
-}
-
 void Mesh::SetCameraDistance(float distance) {
     // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
     const vec3 eye = glm::inverse(CameraView)[3];
@@ -263,4 +258,14 @@ void Mesh::Render(int mode) const {
         glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
+}
+
+void Mesh::RenderProfile() const {
+    if (Profile != nullptr && Profile->NumControlPoints() > 0) Profile->Render();
+    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
+}
+
+void Mesh::RenderProfileConfig() const {
+    if (Profile != nullptr && Profile->NumControlPoints() > 0) Profile->RenderConfig();
+    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
 }

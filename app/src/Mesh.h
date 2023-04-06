@@ -20,6 +20,8 @@ struct Mesh {
     void InvertY(); // Invert the y-coordinates of the current 3D mesh.
     void Render(int mode) const;
     void RenderProfile() const;
+    void RenderProfileConfig() const;
+
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile(int num_radial_slices = 100);
