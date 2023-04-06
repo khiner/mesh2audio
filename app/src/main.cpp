@@ -1,10 +1,6 @@
 #include <GL/glew.h>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/mat4x4.hpp>
 
 #include <iostream>
-#include <stdio.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -22,7 +18,6 @@
 #include "Audio.h"
 #include "GlCanvas.h"
 #include "Mesh.h"
-#include "Shader.h"
 #include "Window.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
@@ -30,126 +25,16 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-using glm::mat4;
-
 static Audio Audio;
 static WindowsState Windows;
 
 static std::unique_ptr<Mesh> mesh;
-static GLuint projectionPos, modelviewPos;
 
-static const int numLights = 5;
-// Variables to set uniform params for lighting fragment shader
-static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
+static ImGuizmo::OPERATION GizmoOp(ImGuizmo::TRANSLATE);
+static const mat4 Identity(1.f);
 
-static int render_mode = 0;
-static GLuint vertexshader, fragmentshader, shaderprogram;
-
-static float ambient[4] = {0.05, 0.05, 0.05, 1};
-static float diffusion[4] = {0.2, 0.2, 0.2, 1};
-static float specular[4] = {0.5, 0.5, 0.5, 1};
-static float light_positions[numLights * 4] = {0.0f};
-static float light_colors[numLights * 4] = {0.0f};
-static float shininess = 10;
-static bool custom_color = false;
-
-static ImGuizmo::OPERATION currGizmoOp(ImGuizmo::TRANSLATE);
-static const vec3 center = {0.f, 0.f, 0.f};
-static const vec3 up = {0.f, 1.f, 0.f};
-static const mat4 identity(1.f);
-static mat4 objectMatrix(1.f), cameraView, cameraProjection;
-static float camDistance = 4, fov = 27;
-static bool showCameraGizmo = true, showGrid = false;
-
-static bool showMeshGizmo = false;
-static float bounds[] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-static bool showBounds = false;
-
-void InitializeShaderAndMesh() {
-    // Initialize shaders.
-    vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
-    fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
-    shaderprogram = Shader::InitProgram(vertexshader, fragmentshader);
-
-    // Get uniform locations.
-    lightpos = glGetUniformLocation(shaderprogram, "light_posn");
-    lightcol = glGetUniformLocation(shaderprogram, "light_col");
-    ambientcol = glGetUniformLocation(shaderprogram, "ambient");
-    diffusecol = glGetUniformLocation(shaderprogram, "diffuse");
-    specularcol = glGetUniformLocation(shaderprogram, "specular");
-    emissioncol = glGetUniformLocation(shaderprogram, "emission");
-    shininesscol = glGetUniformLocation(shaderprogram, "shininess");
-    projectionPos = glGetUniformLocation(shaderprogram, "projection");
-    modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
-
-    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "std.svg");
-
-    // Alternatively, we could initialize with a mesh obj file:
-    // mesh.Load(fs::path("res") / "obj" / "car.obj");
-
-    // Or generate a profile parametrically, and extrude it around the y axis.
-    // const vector<vec2> trianglePath = {{1.0f, 1.0f}, {2.0f, 0.0f}, {1.0f, -1.0f}};
-    // mesh.SetProfile(trianglePath);
-    // mesh.ExtrudeProfile(100);
-
-    mesh->Bind();
-}
-
-void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
-    if (mesh == nullptr) return;
-
-    glUniform4fv(lightpos, numLights, &light_position);
-    glUniform4fv(lightcol, numLights, &light_color);
-
-    if (!custom_color) {
-        *(&ambient_slider + 1) = ambient_slider;
-        *(&ambient_slider + 2) = ambient_slider;
-
-        *(&diffuse_slider + 1) = diffuse_slider;
-        *(&diffuse_slider + 2) = diffuse_slider;
-
-        *(&specular_slider + 1) = specular_slider;
-        *(&specular_slider + 2) = specular_slider;
-    }
-
-    glUniform4fv(ambientcol, 1, &ambient_slider);
-    glUniform4fv(diffusecol, 1, &diffuse_slider);
-    glUniform4fv(specularcol, 1, &specular_slider);
-    glUniform1f(shininesscol, shininess_slider);
-
-    glBindVertexArray(mesh->vertex_array);
-    if (render_mode == 0) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-    }
-    if (render_mode == 1) {
-        glLineWidth(1);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-    }
-    if (render_mode == 2) {
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-    }
-    if (render_mode == 3) {
-        const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
-
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-        glUniform4fv(diffusecol, 1, black);
-        glUniform4fv(specularcol, 1, white);
-
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-
-        glLineWidth(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
-    }
-    glBindVertexArray(0);
-}
+static int RenderMode = 0;
+static bool ShowCameraGizmo = true, ShowGrid = false, ShowMeshGizmo = false, ShowBounds = false;
 
 int main(int, char **) {
     // Setup SDL
@@ -242,37 +127,20 @@ int main(int, char **) {
     // ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     // IM_ASSERT(font != NULL);
 
-    // Initialise all variable initial values
-    InitializeShaderAndMesh();
+    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "std.svg");
+    // Alternatively, we could initialize with a mesh obj file:
+    // mesh.Load(fs::path("res") / "obj" / "car.obj");
 
-    static GlCanvas gl_canvas;
+    // Or generate a profile parametrically, and extrude it around the y axis.
+    // const vector<vec2> trianglePath = {{1.0f, 1.0f}, {2.0f, 0.0f}, {1.0f, -1.0f}};
+    // mesh.SetProfile(trianglePath);
+    // mesh.ExtrudeProfile(100);
+
+    mesh->Bind();
 
     glEnable(GL_DEPTH_TEST);
+    static GlCanvas gl_canvas;
 
-    /**
-      Initialize a right-handed coordinate system, with:
-        * Positive x pointing right
-        * Positive y pointing up, and
-        * Positive z pointing forward (toward the camera).
-      This would put the camera `eye` at position (0, 0, camDistance) in world space, pointing at the origin.
-      We offset the camera angle slightly from this point along spherical coordinates to make the initial view more interesting.
-    */
-    static float x_angle = M_PI / 10; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
-    static float y_angle = M_PI / 2 - M_PI / 10; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
-    static vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
-    cameraView = glm::lookAt(eye * camDistance, center, up);
-
-    // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
-    std::fill_n(light_colors, numLights * 4, 1.0f);
-    for (int i = 0; i < numLights; i++) {
-        const float angle = 2 * M_PI * i / numLights;
-        const float dist = 15.0f;
-        light_positions[i * 4 + 0] = dist * cosf(angle);
-        light_positions[i * 4 + 1] = 0;
-        light_positions[i * 4 + 2] = dist * sinf(angle);
-        light_positions[4 * i + 3] = 1.0f;
-        light_colors[4 * i + 3] = 1.0f;
-    }
     // Main loop
     bool done = false;
 #ifdef __EMSCRIPTEN__
@@ -357,16 +225,16 @@ int main(int, char **) {
             if (ImGui::BeginTabBar("MeshControlsTabBar")) {
                 if (ImGui::BeginTabItem("Mesh")) {
                     ImGui::SeparatorText("Render mode");
-                    ImGui::RadioButton("Smooth", &render_mode, 0);
+                    ImGui::RadioButton("Smooth", &RenderMode, 0);
                     ImGui::SameLine();
-                    ImGui::RadioButton("Lines", &render_mode, 1);
-                    ImGui::RadioButton("Point cloud", &render_mode, 2);
+                    ImGui::RadioButton("Lines", &RenderMode, 1);
+                    ImGui::RadioButton("Point cloud", &RenderMode, 2);
                     ImGui::SameLine();
-                    ImGui::RadioButton("Mesh", &render_mode, 3);
+                    ImGui::RadioButton("Mesh", &RenderMode, 3);
                     ImGui::NewLine();
                     ImGui::SeparatorText("Gizmo");
-                    ImGui::Checkbox("Show gizmo", &showMeshGizmo);
-                    if (showMeshGizmo) {
+                    ImGui::Checkbox("Show gizmo", &ShowMeshGizmo);
+                    if (ShowMeshGizmo) {
                         const string interaction_text = "Interaction: " +
                             string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
                                        ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
@@ -375,53 +243,56 @@ int main(int, char **) {
                                                                                                                  "Not interacting");
                         ImGui::Text(interaction_text.c_str());
 
-                        if (ImGui::IsKeyPressed(ImGuiKey_T)) currGizmoOp = ImGuizmo::TRANSLATE;
-                        if (ImGui::IsKeyPressed(ImGuiKey_R)) currGizmoOp = ImGuizmo::ROTATE;
-                        if (ImGui::IsKeyPressed(ImGuiKey_S)) currGizmoOp = ImGuizmo::SCALE;
-                        if (ImGui::RadioButton("Translate (T)", currGizmoOp == ImGuizmo::TRANSLATE)) currGizmoOp = ImGuizmo::TRANSLATE;
-                        if (ImGui::RadioButton("Rotate (R)", currGizmoOp == ImGuizmo::ROTATE)) currGizmoOp = ImGuizmo::ROTATE;
-                        if (ImGui::RadioButton("Scale (S)", currGizmoOp == ImGuizmo::SCALE)) currGizmoOp = ImGuizmo::SCALE;
-                        if (ImGui::RadioButton("Universal", currGizmoOp == ImGuizmo::UNIVERSAL)) currGizmoOp = ImGuizmo::UNIVERSAL;
-                        ImGui::Checkbox("Bound sizing", &showBounds);
+                        if (ImGui::IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
+                        if (ImGui::IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
+                        if (ImGui::IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
+                        if (ImGui::RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
+                        if (ImGui::RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
+                        if (ImGui::RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
+                        if (ImGui::RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
+                        ImGui::Checkbox("Bound sizing", &ShowBounds);
                     }
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Camera")) {
-                    ImGui::Checkbox("Show gizmo", &showCameraGizmo);
+                    ImGui::Checkbox("Show gizmo", &ShowCameraGizmo);
                     ImGui::SameLine();
-                    ImGui::Checkbox("Grid", &showGrid);
-                    ImGui::SliderFloat("FOV", &fov, 20.f, 110.f);
+                    ImGui::Checkbox("Grid", &ShowGrid);
+                    ImGui::SliderFloat("FOV", &Mesh::fov, 20.f, 110.f);
 
-                    const float prevCamDistance = camDistance;
-                    if (ImGui::SliderFloat("Distance", &camDistance, 1.f, 10.f)) {
-                        // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
-                        const vec3 eye = glm::inverse(cameraView)[3];
-                        cameraView = glm::lookAt(eye * (camDistance / prevCamDistance), center, up);
+                    float cameraDistance = Mesh::CameraDistance;
+                    if (ImGui::SliderFloat("Distance", &cameraDistance, 1.f, 10.f)) {
+                        Mesh::SetCameraDistance(cameraDistance);
                     }
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Lighing")) {
                     ImGui::SeparatorText("Colors");
-                    ImGui::Checkbox("Custom colors", &custom_color);
-                    if (custom_color) {
-                        ImGui::SliderFloat3("Ambient R, G, B", &ambient[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat3("Diffusion R, G, B", &diffusion[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat3("Specular R, G, B", &specular[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+                    ImGui::Checkbox("Custom colors", &Mesh::CustomColor);
+                    if (Mesh::CustomColor) {
+                        ImGui::SliderFloat3("Ambient R, G, B", &Mesh::Ambient[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat3("Diffusion R, G, B", &Mesh::Diffusion[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat3("Specular R, G, B", &Mesh::Specular[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Shininess", &Mesh::Shininess, 0.0f, 150.0f);
                     } else {
-                        ImGui::SliderFloat("Ambient", &ambient[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Diffusion", &diffusion[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Specular", &specular[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Shininess", &shininess, 0.0f, 150.0f);
+                        for (int i = 1; i < 3; i++) {
+                            Mesh::Ambient[i] = Mesh::Ambient[0];
+                            Mesh::Diffusion[i] = Mesh::Diffusion[0];
+                            Mesh::Specular[i] = Mesh::Specular[0];
+                        }
+                        ImGui::SliderFloat("Ambient", &Mesh::Ambient[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Diffusion", &Mesh::Diffusion[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Specular", &Mesh::Specular[0], 0.0f, 1.0f);
+                        ImGui::SliderFloat("Shininess", &Mesh::Shininess, 0.0f, 150.0f);
                     }
 
                     ImGui::SeparatorText("Lights");
-                    for (int i = 0; i < numLights; i++) {
+                    for (int i = 0; i < Mesh::NumLights; i++) {
                         ImGui::Separator();
                         ImGui::PushID(i);
                         ImGui::Text("Light %d", i + 1);
-                        ImGui::SliderFloat3("Positions", &light_positions[4 * i], -25.0f, 25.0f);
-                        ImGui::ColorEdit3("Color", &light_colors[4 * i]);
+                        ImGui::SliderFloat3("Positions", &Mesh::LightPositions[4 * i], -25.0f, 25.0f);
+                        ImGui::ColorEdit3("Color", &Mesh::LightColors[4 * i]);
                         ImGui::PopID();
                     }
                     ImGui::EndTabItem();
@@ -437,41 +308,39 @@ int main(int, char **) {
             ImGui::Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
             const auto content_region = ImGui::GetContentRegionAvail();
-            cameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
-
-            if (gl_canvas.SetupRender(content_region.x, content_region.y)) {
-                glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &cameraProjection[0][0]);
-                const mat4 &modelView = cameraView * objectMatrix;
-                glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &modelView[0][0]);
-                Display(*ambient, *diffusion, *specular, shininess, custom_color, *light_positions, *light_colors);
-
-                gl_canvas.Render();
+            Mesh::UpdateCameraProjection(content_region);
+            if (mesh != nullptr && content_region.x > 0 && content_region.y > 0) {
+                const auto bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+                gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+                mesh->Render(RenderMode);
+                unsigned int texture_id = gl_canvas.Render();
+                ImGui::Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
             }
-            if (showMeshGizmo || showCameraGizmo || showGrid) {
+            if (ShowMeshGizmo || ShowCameraGizmo || ShowGrid) {
                 ImGuizmo::BeginFrame();
                 ImGuizmo::SetDrawlist();
                 ImGuizmo::SetOrthographic(false);
                 ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
             }
-            if (showGrid) {
-                ImGuizmo::DrawGrid(&cameraView[0][0], &cameraProjection[0][0], &identity[0][0], 100.f);
+            if (ShowGrid) {
+                ImGuizmo::DrawGrid(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Identity[0][0], 100.f);
             }
-            if (showMeshGizmo) {
+            if (ShowMeshGizmo) {
                 // This is how you would draw a test cube:
-                // ImGuizmo::DrawCubes(&cameraView[0][0], &cameraProjection[0][0], &objectMatrix[0][0], 1);
+                // ImGuizmo::DrawCubes(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Mesh::ObjectMatrix[0][0], 1);
                 ImGuizmo::Manipulate(
-                    &cameraView[0][0], &cameraProjection[0][0], currGizmoOp, ImGuizmo::LOCAL, &objectMatrix[0][0], nullptr,
-                    nullptr, showBounds ? bounds : nullptr, nullptr
+                    &Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &Mesh::ObjectMatrix[0][0], nullptr,
+                    nullptr, ShowBounds ? Mesh::Bounds : nullptr, nullptr
                 );
             }
-            if (showCameraGizmo) {
+            if (ShowCameraGizmo) {
                 static const float view_manipulate_size = 128;
                 const auto viewManipulatePos = ImGui::GetWindowPos() +
                     ImVec2{
                         ImGui::GetWindowContentRegionMax().x - view_manipulate_size,
                         ImGui::GetWindowContentRegionMin().y,
                     };
-                ImGuizmo::ViewManipulate(&cameraView[0][0], camDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
+                ImGuizmo::ViewManipulate(&Mesh::CameraView[0][0], Mesh::CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
             }
             ImGui::End();
             ImGui::PopStyleVar();
@@ -528,8 +397,6 @@ int main(int, char **) {
     ImGui_ImplSDL3_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-
-    gl_canvas.Destroy();
 
     Audio.Destroy();
     NFD_Quit();

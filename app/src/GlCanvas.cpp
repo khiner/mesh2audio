@@ -1,12 +1,13 @@
 #include "GlCanvas.h"
 
 #include "GL/glew.h"
-#include "imgui.h"
 #include <stdexcept>
 
-bool GlCanvas::SetupRender(float width, float height) {
-    if (width == 0 || height == 0) return false;
+GlCanvas::~GlCanvas() {
+    Destroy();
+}
 
+void GlCanvas::SetupRender(float width, float height, float r, float g, float b, float a) {
     if (width != Width || height != Height) {
         Width = width;
         Height = height;
@@ -17,12 +18,11 @@ bool GlCanvas::SetupRender(float width, float height) {
 
         glGenTextures(1, &TextureId);
         glBindTexture(GL_TEXTURE_2D, TextureId);
+
         // Render image to twice the dimensions, for better quality.
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width * 2, Height * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glGenRenderbuffers(1, &DepthRenderBufferId);
         glBindRenderbuffer(GL_RENDERBUFFER, DepthRenderBufferId);
@@ -37,20 +37,20 @@ bool GlCanvas::SetupRender(float width, float height) {
             throw std::runtime_error("Error: Framebuffer is not complete.\n");
         }
     }
+
     glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferId);
     glViewport(0, 0, Width * 2, Height * 2); // Rendered image is twice the dimensions, for better quality.
 
-    const auto bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
-    glClearColor(bg.x, bg.y, bg.z, bg.w);
+    glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    return true;
 }
 
-void GlCanvas::Render() {
+unsigned int GlCanvas::Render() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    ImGui::Image((void *)(intptr_t)TextureId, {Width, Height}, {0, 1}, {1, 0});
+    return TextureId;
 }
+
+// Private
 
 void GlCanvas::Destroy() {
     glDeleteRenderbuffers(1, &DepthRenderBufferId);
