@@ -68,10 +68,7 @@ vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) const {
 // Render the current 2D profile as a closed line shape (using ImGui).
 void MeshProfile::Render() const {
     const size_t num_ctrl = NumControlPoints();
-    if (num_ctrl < 4) {
-        ImGui::Text("The current mesh was not loaded from a 2D profile.");
-        return;
-    }
+    if (num_ctrl < 4) return;
 
     const static float line_thickness = 2.f;
     const auto offset = ImGui::GetCursorScreenPos();

@@ -6,50 +6,12 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
-namespace gl {
-void Mesh::Init() {
+Mesh::Mesh(fs::path file_path) {
     glGenVertexArrays(1, &vertex_array);
     glGenBuffers(1, &vertex_buffer);
     glGenBuffers(1, &normal_buffer);
     glGenBuffers(1, &index_buffer);
-}
 
-void Mesh::Destroy() {
-    glDeleteBuffers(1, &index_buffer);
-    glDeleteBuffers(1, &normal_buffer);
-    glDeleteBuffers(1, &vertex_buffer);
-    glDeleteVertexArrays(1, &vertex_array);
-
-    vertices.clear();
-    normals.clear();
-    indices.clear();
-
-    profile.reset();
-}
-
-void Mesh::Bind() const {
-    glBindVertexArray(vertex_array);
-
-    // Bind vertices to layout location 0
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    // Bind normals to layout location 1
-    glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * normals.size(), &normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices.size(), &indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-void Mesh::Load(fs::path file_path) {
     const bool is_svg = file_path.extension() == ".svg";
     const bool is_obj = file_path.extension() == ".obj";
     if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -108,6 +70,35 @@ void Mesh::Load(fs::path file_path) {
     }
 }
 
+Mesh::~Mesh() {
+    glDeleteBuffers(1, &index_buffer);
+    glDeleteBuffers(1, &normal_buffer);
+    glDeleteBuffers(1, &vertex_buffer);
+    glDeleteVertexArrays(1, &vertex_array);
+}
+
+void Mesh::Bind() const {
+    glBindVertexArray(vertex_array);
+
+    // Bind vertices to layout location 0
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    // Bind normals to layout location 1
+    glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * normals.size(), &normals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices.size(), &indices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 void Mesh::InvertY() {
     float min_y = INFINITY, max_y = -INFINITY;
     for (auto &v : vertices) {
@@ -156,4 +147,8 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
         }
     }
 }
-} // namespace gl
+
+void Mesh::RenderProfile() const {
+    if (profile != nullptr && profile->NumControlPoints() > 0) profile->Render();
+    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
+}

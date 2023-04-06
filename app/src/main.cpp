@@ -35,7 +35,7 @@ using glm::mat4;
 static Audio Audio;
 static WindowsState Windows;
 
-static gl::Mesh mesh;
+static std::unique_ptr<Mesh> mesh;
 static GLuint projectionPos, modelviewPos;
 
 static const int numLights = 5;
@@ -82,10 +82,7 @@ void InitializeShaderAndMesh() {
     projectionPos = glGetUniformLocation(shaderprogram, "projection");
     modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
 
-    mesh.Destroy();
-    mesh.Init();
-
-    mesh.Load(fs::path("res") / "svg" / "std.svg");
+    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "std.svg");
 
     // Alternatively, we could initialize with a mesh obj file:
     // mesh.Load(fs::path("res") / "obj" / "car.obj");
@@ -95,10 +92,12 @@ void InitializeShaderAndMesh() {
     // mesh.SetProfile(trianglePath);
     // mesh.ExtrudeProfile(100);
 
-    mesh.Bind();
+    mesh->Bind();
 }
 
 void Display(float &ambient_slider, float &diffuse_slider, float &specular_slider, float &shininess_slider, bool custom_color, float &light_position, float &light_color) {
+    if (mesh == nullptr) return;
+
     glUniform4fv(lightpos, numLights, &light_position);
     glUniform4fv(lightcol, numLights, &light_color);
 
@@ -118,36 +117,36 @@ void Display(float &ambient_slider, float &diffuse_slider, float &specular_slide
     glUniform4fv(specularcol, 1, &specular_slider);
     glUniform1f(shininesscol, shininess_slider);
 
-    glBindVertexArray(mesh.vertex_array);
+    glBindVertexArray(mesh->vertex_array);
     if (render_mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 1) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 2) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
     }
     if (render_mode == 3) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
         glUniform4fv(diffusecol, 1, black);
         glUniform4fv(specularcol, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
 
         glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, mesh.NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh->NumIndices(), GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
 }
@@ -326,10 +325,8 @@ int main(int, char **) {
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
-                        mesh.Destroy();
-                        mesh.Init();
-                        mesh.Load(file_path);
-                        mesh.Bind();
+                        mesh = std::make_unique<Mesh>(file_path);
+                        mesh->Bind();
 
                         NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {
@@ -483,7 +480,8 @@ int main(int, char **) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             ImGui::Begin(Windows.MeshProfile.Name, &Windows.MeshProfile.Visible);
 
-            mesh.RenderProfile();
+            if (mesh != nullptr) mesh->RenderProfile();
+            else ImGui::Text("No mesh has been loaded.");
 
             ImGui::End();
             ImGui::PopStyleVar();
@@ -531,7 +529,6 @@ int main(int, char **) {
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
-    mesh.Destroy();
     gl_canvas.Destroy();
 
     Audio.Destroy();
