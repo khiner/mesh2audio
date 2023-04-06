@@ -18,7 +18,7 @@ struct Mesh {
 
     void Render(int mode) const;
     void RenderProfile();
-    void RenderProfileConfig() const;
+    void RenderProfileConfig();
 
     int NumIndices() const { return Indices.size(); }
 
@@ -45,7 +45,7 @@ private:
     void InvertY(); // Invert the y-coordinates of the current 3D mesh.
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
-    void ExtrudeProfile(int num_radial_slices = 100);
+    void ExtrudeProfile();
     void Bind() const; // Bind all buffers and set up vertex attributes.
 
     // Non-empty if the mesh was generated from a 2D profile:

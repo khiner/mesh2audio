@@ -151,11 +151,14 @@ bool MeshProfile::Render() {
     return modified;
 }
 
-void MeshProfile::RenderConfig() {
+bool MeshProfile::RenderConfig() {
     ImGui::Text("SVG file: %s", SvgFilePath.filename().string().c_str());
     ImGui::Indent();
     ImGui::Text("(File -> Load mesh)");
     ImGui::Unindent();
+
+    // If the number of radial slices to extrude is changed, we need to regenerate the mesh.
+    bool modified = ImGui::SliderInt("Radial slices", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
@@ -180,4 +183,6 @@ void MeshProfile::RenderConfig() {
         ImGui::SliderFloat("Control line thickness", &ControlLineThickness, 0.5f, 5.f);
         ImGui::ColorEdit3("Control color", &ControlColor[0]);
     }
+
+    return modified;
 }

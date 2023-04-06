@@ -164,12 +164,17 @@ void Mesh::InvertY() {
     for (auto &v : Vertices) v.y = max_y - (v.y - min_y);
 }
 
-void Mesh::ExtrudeProfile(int num_radial_slices) {
+void Mesh::ExtrudeProfile() {
     if (Profile == nullptr) return;
 
+    Vertices.clear();
+    Normals.clear();
+    Indices.clear();
+
     const vector<ImVec2> profile_vertices = Profile->CreateVertices(0.0001);
-    const double angle_increment = 2.0 * M_PI / num_radial_slices;
-    for (int i = 0; i < num_radial_slices; i++) {
+    const int slices = Profile->NumRadialSlices;
+    const double angle_increment = 2.0 * M_PI / slices;
+    for (int i = 0; i < slices; i++) {
         const double angle = i * angle_increment;
         for (const auto &p : profile_vertices) {
             // Compute the x and y coordinates for this point on the extruded surface.
@@ -186,10 +191,10 @@ void Mesh::ExtrudeProfile(int num_radial_slices) {
     }
 
     // Compute indices for the triangles.
-    for (int i = 0; i < num_radial_slices; i++) {
+    for (int i = 0; i < slices; i++) {
         for (int j = 0; j < int(profile_vertices.size() - 1); j++) {
             const int base_index = i * profile_vertices.size() + j;
-            const int next_base_index = ((i + 1) % num_radial_slices) * profile_vertices.size() + j;
+            const int next_base_index = ((i + 1) % slices) * profile_vertices.size() + j;
 
             // First triangle
             Indices.push_back(base_index);
@@ -271,15 +276,19 @@ void Mesh::RenderProfile() {
     }
 
     if (Profile->Render()) {
-        Vertices.clear();
-        Normals.clear();
-        Indices.clear();
         ExtrudeProfile();
         Bind();
     }
 }
 
-void Mesh::RenderProfileConfig() const {
-    if (Profile != nullptr && Profile->NumControlPoints() > 0) Profile->RenderConfig();
-    else ImGui::Text("The current mesh was not loaded from a 2D profile.");
+void Mesh::RenderProfileConfig() {
+    if (Profile == nullptr) {
+        ImGui::Text("The current mesh was not loaded from a 2D profile.");
+        return;
+    }
+
+    if (Profile->RenderConfig()) {
+        ExtrudeProfile();
+        Bind();
+    }
 }

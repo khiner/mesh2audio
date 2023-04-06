@@ -18,7 +18,9 @@ struct MeshProfile {
 
     void Normalize(); // Normalize control points so that the largest dimension is 1.0:
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
-    void RenderConfig(); // Render config section (using ImGui).
+    bool RenderConfig(); // Render config section (using ImGui).
+
+    int NumRadialSlices{100};
 
     bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false};
     float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
