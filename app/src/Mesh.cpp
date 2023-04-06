@@ -1,5 +1,6 @@
 #include "Mesh.h"
 
+#include <fstream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -119,10 +120,11 @@ Mesh::Mesh(fs::path file_path) {
 
     const float y_avg = (y_min + y_max) / 2.0f - 0.02f;
     const float z_avg = (z_min + z_max) / 2.0f;
-    for (unsigned int i = 0; i < Vertices.size(); ++i) {
-        Vertices[i] -= vec3(0.0f, y_avg, z_avg);
-        Vertices[i] *= vec3(1.58f, 1.58f, 1.58f);
+    for (auto &vertex : Vertices) {
+        vertex -= vec3(0.0f, y_avg, z_avg);
+        vertex *= vec3(1.58f, 1.58f, 1.58f);
     }
+
     Bind();
 }
 
@@ -131,6 +133,25 @@ Mesh::~Mesh() {
     glDeleteBuffers(1, &NormalBuffer);
     glDeleteBuffers(1, &VertexBuffer);
     glDeleteVertexArrays(1, &VertexArray);
+}
+
+void Mesh::Save(fs::path file_path) const {
+    std::ofstream out(file_path.c_str());
+    if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
+
+    for (const vec3 &v : Vertices) {
+        out << "v " << v.x << " " << v.y << " " << v.z << "\n";
+    }
+    for (const vec3 &n : Normals) {
+        out << "vn " << n.x << " " << n.y << " " << n.z << "\n";
+    }
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        out << "f " << Indices[i] + 1 << "//" << Indices[i] + 1 << " "
+            << Indices[i + 1] + 1 << "//" << Indices[i + 1] + 1 << " "
+            << Indices[i + 2] + 1 << "//" << Indices[i + 2] + 1 << "\n";
+    }
+
+    out.close();
 }
 
 void Mesh::Bind() const {

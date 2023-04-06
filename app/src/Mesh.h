@@ -19,6 +19,7 @@ struct Mesh {
     void Render(int mode) const;
     void RenderProfile();
     void RenderProfileConfig();
+    void Save(fs::path file_path) const; // Export the mesh to a .obj file.
 
     int NumIndices() const { return Indices.size(); }
 

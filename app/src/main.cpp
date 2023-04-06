@@ -195,8 +195,18 @@ int main(int, char **) {
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
                         mesh = std::make_unique<Mesh>(file_path);
-
                         NFD_FreePath(file_path);
+                    } else if (result != NFD_CANCEL) {
+                        std::cerr << "Error: " << NFD_GetError() << '\n';
+                    }
+                }
+                if (ImGui::MenuItem("Export mesh as obj", nullptr, false, mesh != nullptr)) {
+                    nfdchar_t *save_path;
+                    nfdfilteritem_t filter[] = {{"Mesh object", "obj"}};
+                    nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
+                    if (result == NFD_OKAY) {
+                        mesh->Save(save_path);
+                        NFD_FreePath(save_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
