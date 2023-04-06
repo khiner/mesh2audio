@@ -5,8 +5,7 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
-
-#include <algorithm>
+#include "imgui_internal.h"
 
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
@@ -38,52 +37,38 @@ void MeshProfile::Normalize() {
 
 int MeshProfile::NumControlPoints() const { return control_points.size(); }
 
-ImVec2 MeshProfile::GetControlPoint(int i, const ImVec2 &offset, const float scale) const {
+ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale) const {
     return control_points[i] * scale + offset;
 }
 
-static float DistPtSeg(const ImVec2 &p1, const ImVec2 &p2, const ImVec2 &p3) {
-    const auto d23 = p3 - p2;
-    const auto d12 = p1 - p2;
-    const float d_mag = d23.x * d23.x + d23.y * d23.y;
-    const float t_mag = std::clamp(d23.x * d12.x + d23.y * d12.y / (d_mag > 0 ? d_mag : 1), 0.f, 1.f);
+vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) const {
+    const size_t num_ctrl = NumControlPoints();
+    if (num_ctrl < 4) return {};
 
-    const ImVec2 d = p2 + d23 * t_mag - p1;
-    return d.x * d.x + d.y * d.y;
-}
+    static ImDrawListSharedData sharedData;
+    sharedData.CurveTessellationTol = tolerance;
 
-static void AddCubicBez(vector<ImVec2> &vertices, const ImVec2 &p1, const ImVec2 &p2, const ImVec2 &p3, const ImVec2 &p4, float tol, int level = 0) {
-    if (level > 12) return;
-
-    const auto p12 = (p1 + p2) * 0.5f;
-    const auto p23 = (p2 + p3) * 0.5f;
-    const auto p34 = (p3 + p4) * 0.5f;
-    const auto p123 = (p12 + p23) * 0.5f;
-    const auto p234 = (p23 + p34) * 0.5f;
-    const auto p1234 = (p123 + p234) * 0.5f;
-    const float d = DistPtSeg(p1234, p1, p4);
-
-    if (d > tol * tol) {
-        AddCubicBez(vertices, p1, p12, p123, p1234, tol, level + 1);
-        AddCubicBez(vertices, p1234, p234, p34, p4, tol, level + 1);
-    } else {
-        vertices.push_back(p4);
+    // Use ImGui to create the Bezier curve vertices, to ensure that the vertices are identical to those rendered by ImGui.
+    // Note: tolerance is scaled to normalized control points in [-1, 1], whereas tolerance in ImGui rendering is in pixels.
+    // TODO should unify these two tolerances.
+    static ImDrawList dl(&sharedData);
+    dl.PathLineTo(control_points[0]);
+    for (size_t i = 0; i < control_points.size() - 1; i += 3) {
+        dl.PathBezierCubicCurveTo(control_points[i + 1], control_points[i + 2], control_points[i + 3]);
     }
-}
 
-vector<ImVec2> MeshProfile::CreateVertices(const float tolerance) {
-    vector<ImVec2> vertices;
-    for (int i = 0; i < int(control_points.size()) - 1; i += 3) {
-        AddCubicBez(vertices, control_points[i], control_points[i + 1], control_points[i + 2], control_points[i + 3], tolerance);
-    }
+    vector<ImVec2> vertices(dl._Path.Size);
+    for (int i = 0; i < dl._Path.Size; i++) vertices.push_back(dl._Path[i]);
+
+    dl.PathClear();
 
     return vertices;
 }
 
 // Render the current 2D profile as a closed line shape (using ImGui).
 void MeshProfile::Render() const {
-    const int num_ctrl = NumControlPoints();
-    if (num_ctrl == 0) {
+    const size_t num_ctrl = NumControlPoints();
+    if (num_ctrl < 4) {
         ImGui::Text("The current mesh was not loaded from a 2D profile.");
         return;
     }
@@ -95,12 +80,11 @@ void MeshProfile::Render() const {
 
     auto *dl = ImGui::GetWindowDrawList();
     dl->PathLineTo(GetControlPoint(0, offset, scale));
-    for (int i = 0; i < num_ctrl - 1; i += 3) {
+    for (size_t i = 0; i < num_ctrl - 1; i += 3) {
         dl->PathBezierCubicCurveTo(
             GetControlPoint(i + 1, offset, scale),
             GetControlPoint(i + 2, offset, scale),
-            GetControlPoint(i + 3, offset, scale),
-            0
+            GetControlPoint(i + 3, offset, scale)
         );
     }
     dl->PathStroke(IM_COL32_WHITE, 0, line_thickness);
@@ -108,7 +92,7 @@ void MeshProfile::Render() const {
     // Draw control lines/points.
 
     // Control lines
-    for (int i = 0; i < num_ctrl - 1; i += 3) {
+    for (size_t i = 0; i < num_ctrl - 1; i += 3) {
         dl->AddLine(
             GetControlPoint(i, offset, scale),
             GetControlPoint(i + 1, offset, scale),
@@ -122,12 +106,12 @@ void MeshProfile::Render() const {
     }
 
     // Control points
-    for (int i = 0; i < num_ctrl - 1; i += 3) {
+    for (size_t i = 0; i < num_ctrl - 1; i += 3) {
         dl->AddCircleFilled(GetControlPoint(i + 3, offset, scale), 6.0f, IM_COL32_WHITE);
     }
 
     dl->AddCircleFilled(GetControlPoint(0, offset, scale), 3.0f, IM_COL32_BLACK);
-    for (int i = 0; i < num_ctrl - 1; i += 3) {
+    for (size_t i = 0; i < num_ctrl - 1; i += 3) {
         dl->AddCircleFilled(GetControlPoint(i + 1, offset, scale), 3.0f, IM_COL32_WHITE);
         dl->AddCircleFilled(GetControlPoint(i + 2, offset, scale), 3.0f, IM_COL32_WHITE);
         dl->AddCircleFilled(GetControlPoint(i + 3, offset, scale), 3.0f, IM_COL32_BLACK);
