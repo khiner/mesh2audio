@@ -26,12 +26,26 @@ file(COPY res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-include_directories(lib/implot lib/glm lib/miniaudio lib/fmt/include lib/faust/architecture lib/imgui/misc/cpp lib/ImGuizmo lib/nanosvg/src)
+set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
+set(Mesh2FaustDir ${CMAKE_CURRENT_SOURCE_DIR}/lib/faust/tools/physicalModeling/mesh2faust)
+add_subdirectory(${Mesh2FaustDir})
+
+include_directories(
+    lib/implot
+    lib/glm
+    lib/miniaudio
+    lib/fmt/include
+    lib/faust/architecture
+    lib/imgui/misc/cpp
+    lib/ImGuizmo
+    lib/nanosvg/src
+    ${Mesh2FaustDir}/src
+)
 
 find_package(GLEW REQUIRED)
 
 # `dynamiclib` is faust.
-target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib)
+target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib mesh2faust)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)
