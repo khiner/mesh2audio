@@ -133,10 +133,7 @@ bool MeshProfile::Render() {
 }
 
 bool MeshProfile::RenderConfig() {
-    ImGui::Text("SVG file: %s", SvgFilePath.filename().string().c_str());
-    ImGui::Indent();
-    ImGui::Text("(File -> Load mesh)");
-    ImGui::Unindent();
+    ImGui::Text("SVG file: %s", SvgFilePath.c_str());
 
     // If either of these parameters change, we need to regenerate the mesh.
     ImGui::SeparatorText("Resolution");

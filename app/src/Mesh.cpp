@@ -1,8 +1,13 @@
 #include "Mesh.h"
 
+// mesh2faust/vega
+#include "mesh2faust.h"
+#include "tetMesher.h"
+
 #include <fstream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -64,19 +69,20 @@ void Mesh::InitializeStatic() {
 Mesh::Mesh(fs::path file_path) {
     InitializeStatic();
 
+    const bool is_svg = file_path.extension() == ".svg";
+    const bool is_obj = file_path.extension() == ".obj";
+    if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
+
+    FilePath = file_path; // Store the most recent file path.
+
     glGenVertexArrays(1, &VertexArray);
     glGenBuffers(1, &VertexBuffer);
     glGenBuffers(1, &NormalBuffer);
     glGenBuffers(1, &IndexBuffer);
 
-    const bool is_svg = file_path.extension() == ".svg";
-    const bool is_obj = file_path.extension() == ".obj";
-    if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
-
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(file_path);
         ExtrudeProfile();
-        Bind();
         return;
     }
 
@@ -118,14 +124,8 @@ Mesh::Mesh(fs::path file_path) {
     }
     fclose(fp);
 
-    const float y_avg = (y_min + y_max) / 2.0f - 0.02f;
-    const float z_avg = (z_min + z_max) / 2.0f;
-    for (auto &vertex : Vertices) {
-        vertex -= vec3(0.0f, y_avg, z_avg);
-        vertex *= vec3(1.58f, 1.58f, 1.58f);
-    }
-
-    Bind();
+    UpdateBounds();
+    Center();
 }
 
 Mesh::~Mesh() {
@@ -154,7 +154,22 @@ void Mesh::Save(fs::path file_path) const {
     out.close();
 }
 
-void Mesh::Bind() const {
+void Mesh::UpdateBounds() {
+    // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
+    Min = vec3(INFINITY, INFINITY, INFINITY);
+    Max = vec3(-INFINITY, -INFINITY, -INFINITY);
+    for (const vec3 &v : Vertices) {
+        if (v.x < Min.x) Min.x = v.x;
+        if (v.y < Min.y) Min.y = v.y;
+        if (v.z < Min.z) Min.z = v.z;
+        if (v.x > Max.x) Max.x = v.x;
+        if (v.y > Max.y) Max.y = v.y;
+        if (v.z > Max.z) Max.z = v.z;
+    }
+}
+void Mesh::Bind() {
+    UpdateBounds();
+
     glBindVertexArray(VertexArray);
 
     // Bind vertices to layout location 0
@@ -176,13 +191,23 @@ void Mesh::Bind() const {
     glBindVertexArray(0);
 }
 
-void Mesh::InvertY() {
-    float min_y = INFINITY, max_y = -INFINITY;
-    for (auto &v : Vertices) {
-        if (v.y < min_y) min_y = v.y;
-        if (v.y > max_y) max_y = v.y;
-    }
-    for (auto &v : Vertices) v.y = max_y - (v.y - min_y);
+void Mesh::Flip(bool x, bool y, bool z) {
+    const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
+    const vec3 center = (Min + Max) / 2.0f;
+    for (auto &vertex : Vertices) vertex = center + (vertex - center) * flip;
+    for (auto &normal : Normals) normal *= flip;
+    Bind();
+}
+void Mesh::Rotate(const vec3 &axis, float angle) {
+    const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
+    for (auto &vertex : Vertices) vertex = rotation * vertex;
+    for (auto &normal : Normals) normal = rotation * normal;
+    Bind();
+}
+void Mesh::Center() {
+    const vec3 center = (Min + Max) / 2.0f;
+    for (auto &vertex : Vertices) vertex -= center;
+    Bind();
 }
 
 void Mesh::ExtrudeProfile() {
@@ -231,7 +256,9 @@ void Mesh::ExtrudeProfile() {
 
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
     // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the 3D mesh - not the profile.
-    InvertY();
+    UpdateBounds();
+    Flip(false, true, false);
+    Center();
 }
 
 void Mesh::SetCameraDistance(float distance) {
@@ -291,25 +318,33 @@ void Mesh::Render(int mode) const {
 }
 
 void Mesh::RenderProfile() {
-    if (Profile == nullptr) {
-        ImGui::Text("The current mesh was not loaded from a 2D profile.");
-        return;
-    }
-
-    if (Profile->Render()) {
-        ExtrudeProfile();
-        Bind();
-    }
+    if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
+    else if (Profile->Render()) ExtrudeProfile();
 }
 
 void Mesh::RenderProfileConfig() {
-    if (Profile == nullptr) {
-        ImGui::Text("The current mesh was not loaded from a 2D profile.");
-        return;
-    }
+    if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
+    else if (Profile->RenderConfig()) ExtrudeProfile();
+}
 
-    if (Profile->RenderConfig()) {
-        ExtrudeProfile();
-        Bind();
+// This is not working for profiles yet.
+// One reason is that we normalize so that the largest dim. is 1.
+// But even keeping the original scale, it just hangs.
+// Using the bell .obj files works, but those are the only ones.
+void Mesh::CreateTetraheralMesh() {
+    std::unique_ptr<ObjMesh> objMesh;
+    if (FilePath.extension() == ".obj") {
+        objMesh = std::make_unique<ObjMesh>(FilePath);
+    } else {
+        // Create tmp directory if it doesn't exist.
+        fs::create_directory("tmp");
+        const fs::path path = "tmp/tmp.obj";
+        Save(path);
+        objMesh = std::make_unique<ObjMesh>(path);
+        fs::remove(path); // Delete the temporary file.
     }
+    VolumetricMesh.reset(TetMesher().compute(objMesh.get()));
+    const m2f::MaterialProperties materialProperties{}; // Default: aluminum
+    VolumetricMesh->setSingleMaterial(materialProperties.youngModulus, materialProperties.poissonRatio, materialProperties.density);
+    // string dsp = m2f::mesh2faust(VolumetricMesh);
 }

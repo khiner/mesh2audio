@@ -234,33 +234,58 @@ int main(int, char **) {
 
             if (ImGui::BeginTabBar("MeshControlsTabBar")) {
                 if (ImGui::BeginTabItem("Mesh")) {
-                    ImGui::SeparatorText("Render mode");
-                    ImGui::RadioButton("Smooth", &RenderMode, 0);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("Lines", &RenderMode, 1);
-                    ImGui::RadioButton("Point cloud", &RenderMode, 2);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("Mesh", &RenderMode, 3);
-                    ImGui::NewLine();
-                    ImGui::SeparatorText("Gizmo");
-                    ImGui::Checkbox("Show gizmo", &ShowMeshGizmo);
-                    if (ShowMeshGizmo) {
-                        const string interaction_text = "Interaction: " +
-                            string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
-                                       ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
-                                       ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
-                                       ImGuizmo::IsOver()                                                      ? "Hovered" :
-                                                                                                                 "Not interacting");
-                        ImGui::Text(interaction_text.c_str());
+                    if (mesh == nullptr) {
+                        ImGui::Text("No mesh has been loaded.");
+                    } else {
+                        ImGui::Text("File: %s", mesh->FilePath.c_str());
+                        if (ImGui::Button("Create tetrahedral mesh")) mesh->CreateTetraheralMesh();
 
-                        if (ImGui::IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
-                        if (ImGui::IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
-                        if (ImGui::IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
-                        if (ImGui::RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
-                        if (ImGui::RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
-                        if (ImGui::RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
-                        if (ImGui::RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
-                        ImGui::Checkbox("Bound sizing", &ShowBounds);
+                        ImGui::SeparatorText("Modify");
+                        if (ImGui::Button("Center")) mesh->Center();
+                        ImGui::Text("Flip");
+                        ImGui::SameLine();
+                        if (ImGui::Button("X##Flip")) mesh->Flip(true, false, false);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Y##Flip")) mesh->Flip(false, true, false);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Z##Flip")) mesh->Flip(false, false, true);
+
+                        ImGui::Text("Rotate 90 deg.");
+                        ImGui::SameLine();
+                        if (ImGui::Button("X##Rotate")) mesh->Rotate({1, 0, 0}, 90);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Y##Rotate")) mesh->Rotate({0, 1, 0}, 90);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Z##Rotate")) mesh->Rotate({0, 0, 1}, 90);
+
+                        ImGui::SeparatorText("Render mode");
+                        ImGui::RadioButton("Smooth", &RenderMode, 0);
+                        ImGui::SameLine();
+                        ImGui::RadioButton("Lines", &RenderMode, 1);
+                        ImGui::RadioButton("Point cloud", &RenderMode, 2);
+                        ImGui::SameLine();
+                        ImGui::RadioButton("Mesh", &RenderMode, 3);
+                        ImGui::NewLine();
+                        ImGui::SeparatorText("Gizmo");
+                        ImGui::Checkbox("Show gizmo", &ShowMeshGizmo);
+                        if (ShowMeshGizmo) {
+                            const string interaction_text = "Interaction: " +
+                                string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
+                                           ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
+                                           ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
+                                           ImGuizmo::IsOver()                                                      ? "Hovered" :
+                                                                                                                     "Not interacting");
+                            ImGui::Text(interaction_text.c_str());
+
+                            if (ImGui::IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
+                            if (ImGui::IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
+                            if (ImGui::IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
+                            if (ImGui::RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
+                            if (ImGui::RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
+                            if (ImGui::RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
+                            if (ImGui::RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
+                            ImGui::Checkbox("Bound sizing", &ShowBounds);
+                        }
                     }
                     ImGui::EndTabItem();
                 }

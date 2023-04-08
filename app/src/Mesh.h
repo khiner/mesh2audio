@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tetMesh.h" // Vega
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
@@ -23,6 +24,11 @@ struct Mesh {
 
     int NumIndices() const { return Indices.size(); }
 
+    void CreateTetraheralMesh();
+    void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
+    void Rotate(const vec3 &axis, float angle);
+    void Center(); // Center the mesh at the origin.
+
     static void SetCameraDistance(float distance);
     static void UpdateCameraProjection(const ImVec2 &size);
 
@@ -40,14 +46,16 @@ struct Mesh {
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
 
+    fs::path FilePath; // Most recently loaded file path.
+
 private:
     static void InitializeStatic(); // Initialize variables shared across all meshes.
 
-    void InvertY(); // Invert the y-coordinates of the current 3D mesh.
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
-    void Bind() const; // Bind all buffers and set up vertex attributes.
+    void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
+    void Bind(); // Bind all buffers and set up vertex attributes. Also updates the bounding box.
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
@@ -55,4 +63,7 @@ private:
     vector<vec3> Vertices, Normals;
     vector<unsigned int> Indices;
     unsigned int VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
+    vec3 Min, Max; // The bounding box of the mesh.
+
+    std::unique_ptr<TetMesh> VolumetricMesh;
 };
