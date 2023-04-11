@@ -9,9 +9,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
-
 #include "Shader.h"
 
 static const vec3 center = {0.f, 0.f, 0.f}, up = {0.f, 1.f, 0.f};
@@ -222,26 +219,20 @@ void Mesh::ExtrudeProfile() {
     const double angle_increment = 2.0 * M_PI / slices;
     for (int i = 0; i < slices; i++) {
         const double angle = i * angle_increment;
+        const double c = cos(angle);
+        const double s = sin(angle);
         for (const auto &p : profile_vertices) {
-            // Compute the x and y coordinates for this point on the extruded surface.
-            const double x = p.x * cos(angle);
-            const double y = p.y; // Use the original z-coordinate from the 2D path
-            const double z = p.x * sin(angle);
-            Vertices.push_back({x, y, z});
-
-            // Compute the normal for this vertex.
-            const double nx = cos(angle);
-            const double nz = sin(angle);
-            Normals.push_back({nx, 0.0, nz});
+            Vertices.push_back({p.x * c, p.y, p.x * s});
+            Normals.push_back({c, 0.0, s});
         }
     }
 
     // Compute indices for the triangles.
+    const int profile_size = profile_vertices.size();
     for (int i = 0; i < slices; i++) {
-        for (int j = 0; j < int(profile_vertices.size() - 1); j++) {
-            const int base_index = i * profile_vertices.size() + j;
-            const int next_base_index = ((i + 1) % slices) * profile_vertices.size() + j;
-
+        for (int j = 0; j < profile_size - 1; j++) {
+            const int base_index = i * profile_size + j;
+            const int next_base_index = ((i + 1) % slices) * profile_size + j;
             // First triangle
             Indices.push_back(base_index);
             Indices.push_back(next_base_index + 1);

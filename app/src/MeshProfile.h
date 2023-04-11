@@ -3,18 +3,18 @@
 #include <filesystem>
 #include <vector>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+#include "imgui_internal.h"
+
 using std::vector;
 
 namespace fs = std::filesystem;
-
-struct ImVec2;
 
 struct MeshProfile {
     explicit MeshProfile(fs::path svg_file_path); // Load a 2D profile from a .svg file.
 
     int NumControlPoints() const;
-    ImVec2 GetControlPoint(size_t i, const ImVec2 &offset, float scale) const;
-    ImVec2 GetVertex(size_t i, const ImVec2 &offset, float scale) const;
     const vector<ImVec2> &GetVertices() const { return Vertices; }
 
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
@@ -31,8 +31,18 @@ struct MeshProfile {
 
 private:
     void CreateVertices();
+    ImRect CalcBounds(); // Calculate current bounds based on control points. Note: original bounds cached in `OriginalBounds`.
+
+    // Used internally for calculating window-relative draw positions.
+    ImVec2 GetControlPoint(size_t i, const ImVec2 &offset, float scale) const;
+    ImVec2 GetVertex(size_t i, const ImVec2 &offset, float scale) const;
 
     fs::path SvgFilePath; // Most recently loaded .svg file path.
+    ImRect OriginalBounds; // Bounds as read directly from SVG, before normalizing.
+    // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
+    // Does not affect `ControlPoints`.
+    ImVec2 Offset;
+
     vector<ImVec2> ControlPoints;
     vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
 };

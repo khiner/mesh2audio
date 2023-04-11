@@ -3,10 +3,6 @@
 #define NANOSVG_IMPLEMENTATION // Expands implementation
 #include "nanosvg.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
-#include "imgui_internal.h"
-
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
 
@@ -23,26 +19,18 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     }
     nsvgDelete(image);
 
-    // Normalize control points so that the largest dimension is 1.0:
-    float max_dim = 0.0f;
+    SvgFilePath = svg_file_path;
+    OriginalBounds = CalcBounds();
+    const float max_dim = std::max(OriginalBounds.GetWidth(), OriginalBounds.GetHeight());
     for (auto &v : ControlPoints) {
-        if (v.x > max_dim) max_dim = v.x;
-        if (v.y > max_dim) max_dim = v.y;
+        v.x -= OriginalBounds.Min.x; // Offset so that leftmost x is 0.
+        v /= max_dim; // Normalize so that the largest dimension is 1.0.
     }
-    for (auto &v : ControlPoints) v /= max_dim;
 
     CreateVertices();
-    SvgFilePath = svg_file_path;
 }
 
 int MeshProfile::NumControlPoints() const { return ControlPoints.size(); }
-
-ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale) const {
-    return ControlPoints[i] * scale + offset;
-}
-ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
-    return Vertices[i] * scale + offset;
-}
 
 // Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
 // control points at the time of drag initiation.
@@ -65,12 +53,12 @@ bool MeshProfile::Render() {
     dl->_Data->CurveTessellationTol = CurveTolerance;
     if (ShowPath) {
         // Bezier path has already been calculated, so just push it to the draw list's path.
-        const auto path_line_color = ImGui::ColorConvertFloat4ToU32({PathLineColor[0], PathLineColor[1], PathLineColor[2], PathLineColor[3]});
+        const auto path_color = ImGui::ColorConvertFloat4ToU32({PathLineColor[0], PathLineColor[1], PathLineColor[2], PathLineColor[3]});
         dl->PathLineTo(GetVertex(0, offset, scale));
         for (size_t i = 1; i < Vertices.size(); i++) {
             dl->_Path.push_back(GetVertex(i, offset, scale));
         }
-        dl->PathStroke(path_line_color, 0, PathLineThickness);
+        dl->PathStroke(path_color, 0, PathLineThickness);
     }
     if (ShowControlPoints) {
         const auto control_color = ImGui::ColorConvertFloat4ToU32({ControlColor[0], ControlColor[1], ControlColor[2], ControlColor[3]});
@@ -139,6 +127,7 @@ bool MeshProfile::RenderConfig() {
     ImGui::SeparatorText("Resolution");
     bool modified = ImGui::SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("Curve tol.", &CurveTolerance, 0.00001f, 0.5f, "%.5f", ImGuiSliderFlags_Logarithmic);
+    modified |= ImGui::SliderFloat("X-Offset", &Offset.x, 0, 1.f);
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
@@ -181,13 +170,35 @@ void MeshProfile::CreateVertices() {
     sharedData.CurveTessellationTol = CurveTolerance;
 
     static ImDrawList dl(&sharedData);
-    dl.PathLineTo(ControlPoints[0]);
+    dl.PathLineTo(ControlPoints[0] + Offset);
     for (size_t i = 0; i < ControlPoints.size() - 1; i += 3) {
-        dl.PathBezierCubicCurveTo(ControlPoints[i + 1], ControlPoints[i + 2], ControlPoints[i + 3]);
+        dl.PathBezierCubicCurveTo(
+            ControlPoints[i + 1] + Offset,
+            ControlPoints[i + 2] + Offset,
+            ControlPoints[i + 3] + Offset
+        );
     }
 
     Vertices.resize(dl._Path.Size);
     for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
 
     dl.PathClear();
+}
+
+ImRect MeshProfile::CalcBounds() {
+    float x_min = INFINITY, x_max = -INFINITY, y_min = INFINITY, y_max = -INFINITY;
+    for (auto &v : ControlPoints) {
+        if (v.x < x_min) x_min = v.x;
+        if (v.x > x_max) x_max = v.x;
+        if (v.y < y_min) y_min = v.y;
+        if (v.y > y_max) y_max = v.y;
+    }
+    return {x_min, y_min, x_max - x_min, y_max - y_min};
+}
+
+ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale) const {
+    return ControlPoints[i] * scale + offset;
+}
+ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
+    return (Vertices[i] - Offset) * scale + offset;
 }
