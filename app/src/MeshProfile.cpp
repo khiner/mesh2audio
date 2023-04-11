@@ -180,7 +180,10 @@ void MeshProfile::CreateVertices() {
 
     static ImDrawList dl(&sharedData);
     dl.PathLineTo(ControlPoints[0] + Offset);
-    for (size_t i = 0; i < ControlPoints.size() - 1; i += 3) {
+    // Draw Bezier curves between each anchor point, based on its surrounding control points.
+    // We don't connect the last control point, since it's a dupe of the first.
+    // (todo Is this always the case? Maybe check for this case to be sure?)
+    for (size_t i = 0; i < ControlPoints.size() - 4; i += 3) {
         dl.PathBezierCubicCurveTo(
             ControlPoints[i + 1] + Offset,
             ControlPoints[i + 2] + Offset,

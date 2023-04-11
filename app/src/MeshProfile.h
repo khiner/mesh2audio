@@ -29,6 +29,10 @@ struct MeshProfile {
     inline static float PathLineColor[4] = {1, 1, 1, 1}, AnchorFillColor[4] = {0, 0, 0, 1}, AnchorStrokeColor[4] = {1, 1, 1, 1}, ControlColor[4] = {0, 1, 0, 1};
     inline static float AnchorPointRadius{6}, ControlPointRadius{3};
 
+    // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
+    // Does not affect `ControlPoints`.
+    inline static ImVec2 Offset;
+
 private:
     void CreateVertices();
     ImRect CalcBounds(); // Calculate current bounds based on control points. Note: original bounds cached in `OriginalBounds`.
@@ -39,9 +43,6 @@ private:
 
     fs::path SvgFilePath; // Most recently loaded .svg file path.
     ImRect OriginalBounds; // Bounds as read directly from SVG, before normalizing.
-    // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
-    // Does not affect `ControlPoints`.
-    ImVec2 Offset;
 
     vector<ImVec2> ControlPoints;
     vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
