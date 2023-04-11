@@ -45,7 +45,8 @@ bool MeshProfile::Render() {
     const float spacing = 2 + std::max(PathLineThickness, std::max(AnchorPointRadius, ControlPointRadius));
     const auto offset = ImGui::GetCursorScreenPos() + ImVec2{spacing, spacing};
     // The profile is normalized to 1 based on its largest dimension.
-    const float scale = ImGui::GetContentRegionAvail().y - 2 * spacing;
+    const auto &draw_size = ImGui::GetContentRegionAvail() - ImVec2{2.f, 2.f} * spacing;
+    const float scale = draw_size.y;
     if (scale <= 0) return false;
 
     auto *dl = ImGui::GetWindowDrawList();
@@ -62,14 +63,17 @@ bool MeshProfile::Render() {
     }
     if (ShowControlPoints) {
         const auto control_color = ImGui::ColorConvertFloat4ToU32({ControlColor[0], ControlColor[1], ControlColor[2], ControlColor[3]});
+        // Draw the two control point lines.
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
             dl->PathLineTo(GetControlPoint(i, offset, scale));
             dl->PathLineTo(GetControlPoint(i + 1, offset, scale));
             dl->PathStroke(control_color, 0, ControlLineThickness);
+
             dl->PathLineTo(GetControlPoint(i + 2, offset, scale));
             dl->PathLineTo(GetControlPoint(i + 3, offset, scale));
             dl->PathStroke(control_color, 0, ControlLineThickness);
         }
+        // Draw the control points.
         dl->AddCircleFilled(GetControlPoint(0, offset, scale), ControlPointRadius, control_color);
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
             dl->AddCircleFilled(GetControlPoint(i + 1, offset, scale), ControlPointRadius, control_color);
@@ -83,10 +87,15 @@ bool MeshProfile::Render() {
         if (SelectedAnchorPoint > -1 && SelectedAnchorPoint < int(num_ctrl)) {
             const auto &drag_delta = ImGui::GetMouseDragDelta() / scale;
             if (drag_delta.x != 0 || drag_delta.y != 0) {
-                ControlPoints[SelectedAnchorPoint] = SelectedDragInitPositions[0] + drag_delta;
-                ControlPoints[SelectedAnchorPoint == 0 ? num_ctrl - 1 : SelectedAnchorPoint - 1] = SelectedDragInitPositions[1] + drag_delta;
-                ControlPoints[SelectedAnchorPoint + 1] = SelectedDragInitPositions[2] + drag_delta;
-                if (SelectedAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + drag_delta;
+                auto new_anchor_pos = SelectedDragInitPositions[0] + drag_delta;
+                // Prevent from dragging offscreen.
+                new_anchor_pos.x = std::clamp(new_anchor_pos.x, 0.f, draw_size.x / scale);
+                new_anchor_pos.y = std::clamp(new_anchor_pos.y, 0.f, draw_size.y / scale);
+                const auto &pos_delta = new_anchor_pos - SelectedDragInitPositions[0];
+                ControlPoints[SelectedAnchorPoint] = new_anchor_pos;
+                ControlPoints[SelectedAnchorPoint == 0 ? num_ctrl - 1 : SelectedAnchorPoint - 1] = SelectedDragInitPositions[1] + pos_delta;
+                ControlPoints[SelectedAnchorPoint + 1] = SelectedDragInitPositions[2] + pos_delta;
+                if (SelectedAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + pos_delta;
 
                 modified = true;
             }
