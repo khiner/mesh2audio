@@ -36,6 +36,30 @@ static const mat4 Identity(1.f);
 static int RenderMode = 0;
 static bool ShowCameraGizmo = true, ShowGrid = false, ShowMeshGizmo = false, ShowBounds = false;
 
+// DSP code in addition to the model, to make it playable.
+// TODO after getting Faust UI working, replace `ba.beat(...)` with `gate`.
+// TODO deinterleave samples from Faust to miniaudio, then add "<: _,_" to the end of the dsp for stereo.
+static const string FaustInstrumentDsp = R"(
+
+exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);
+exSpread = hslider("exSpread",0,0,1,0.01) : ba.sAndH(gate);
+t60Scaler = hslider("t60",1,0,100,0.01) : ba.sAndH(gate);
+t60Decay = hslider("t60Decay",0.75,0,1,0.01) : ba.sAndH(gate);
+t60Slope = hslider("t60Slope",2,1,6,0.01) : ba.sAndH(gate);
+hammerHardness = hslider("hammerHardness",0.9,0,1,0.01) : ba.sAndH(gate);
+hammerSize = hslider("hammerSize",0.3,0,1,0.01) : ba.sAndH(gate);
+gain = hslider("gain",0.1,0,1,0.01);
+gate = button("gate");
+
+hammer(trig,hardness,size) = en.ar(att,att,trig)*no.noise : fi.lowpass(3,ctoff)
+with{
+  ctoff = (1-size)*9500+500;
+  att = (1-hardness)*0.01+0.001;
+};
+
+process = hammer(ba.beat(24),hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
+)";
+
 int main(int, char **) {
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMEPAD) != 0) {
@@ -246,7 +270,10 @@ int main(int, char **) {
                             if (ImGui::Button("Create tetrahedral mesh")) mesh->CreateTetraheralMesh();
                         }
                         if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
-                        if (ImGui::Button("Generate Faust DSP")) mesh->GenerateDsp();
+                        if (ImGui::Button("Generate Faust DSP")) {
+                            const string dsp = mesh->GenerateDsp() + FaustInstrumentDsp;
+                            Audio.Faust.Code = dsp;
+                        }
                         if (!has_tetrahedral_mesh) {
                             ImGui::SameLine();
                             ImGui::TextUnformatted("(Requires tetrahedral mesh)");

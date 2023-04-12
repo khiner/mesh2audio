@@ -372,23 +372,20 @@ void Mesh::CreateTetraheralMesh() {
         fs::remove(path); // Delete the temporary file.
     }
     VolumetricMesh.reset(TetMesher().compute(objMesh.get()));
-    const m2f::MaterialProperties materialProperties{}; // Default: aluminum
+    const m2f::MaterialProperties materialProperties{1.05E11, 0.33, 8600};
     VolumetricMesh->setSingleMaterial(materialProperties.youngModulus, materialProperties.poissonRatio, materialProperties.density);
-
 }
 
 std::string Mesh::GenerateDsp() const {
-    std::string dsp = m2f::mesh2faust(
+    return m2f::mesh2faust(
         VolumetricMesh.get(),
         "modalModel", // generated object name
         false, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq
-        10, // number of synthesized modes
-        10, // number of modes to be computed for the finite element analysis
+        20, // number of synthesized modes
+        100, // number of modes to be computed for the finite element analysis
         {}, // specific excitation positions
         -1 // number of excitation positions (default is max)
     );
-    std::cout << dsp << std::endl;
-    return dsp;
 }
