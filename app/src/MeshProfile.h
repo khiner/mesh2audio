@@ -16,6 +16,7 @@ struct MeshProfile {
 
     int NumControlPoints() const { return ControlPoints.size(); }
     int NumVertices() const { return Vertices.size(); }
+    bool IsClosed() const; // Takes into account `ClosePath`, `OffsetX`, and vertex positions.
 
     // The vertices should be ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
     // and last vertex corresponding the the bottom/inside of the surface.
@@ -24,8 +25,6 @@ struct MeshProfile {
     // E.g. for a bell profile, the top-center of the bell would be the first vertex, the bottom-center
     // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
     const vector<ImVec2> &GetVertices() const { return Vertices; }
-
-    std::pair<int, int> GetConnectionIndices();
 
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).
@@ -42,6 +41,10 @@ struct MeshProfile {
     // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
     // Does not affect `ControlPoints`.
     inline static float OffsetX;
+
+    // If true, the last vertex will be connected to the first vertex.
+    // If true, and if the x pos of the first or last vertex is not zero, the extruded mesh will have a hole in the middle.
+    inline static bool ClosePath{false};
 
 private:
     void CreateVertices();

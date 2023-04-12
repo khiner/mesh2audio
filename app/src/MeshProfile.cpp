@@ -30,6 +30,12 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     CreateVertices();
 }
 
+static constexpr float Epsilon = 1e-6f;
+
+bool MeshProfile::IsClosed() const {
+    return ClosePath && (OffsetX > 0 || (std::abs(Vertices.front().x) >= Epsilon && std::abs(Vertices.back().x) >= Epsilon));
+}
+
 // Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
 // control points at the time of drag initiation.
 static int SelectedAnchorPoint = -1;
@@ -57,6 +63,7 @@ bool MeshProfile::Render() {
         for (size_t i = 1; i < Vertices.size(); i++) {
             dl->_Path.push_back(GetVertex(i, offset, scale));
         }
+        if (ClosePath) dl->PathLineTo(GetVertex(0, offset, scale));
         dl->PathStroke(path_color, 0, PathLineThickness);
     }
     if (ShowControlPoints) {
@@ -135,6 +142,7 @@ bool MeshProfile::RenderConfig() {
     bool modified = ImGui::SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("Curve tol.", &CurveTolerance, 0.00001f, 0.5f, "%.5f", ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("X-Offset", &OffsetX, 0, 1.f);
+    modified |= ImGui::Checkbox("Close path", &ClosePath);
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
@@ -169,8 +177,6 @@ bool MeshProfile::RenderConfig() {
 
 // Private
 
-static constexpr float Epsilon = 1e-6f;
-
 void MeshProfile::CreateVertices() {
     const size_t num_ctrl = NumControlPoints();
     if (num_ctrl < 4) return;
@@ -179,10 +185,12 @@ void MeshProfile::CreateVertices() {
     sharedData.CurveTessellationTol = CurveTolerance;
 
     static ImDrawList dl(&sharedData);
-    // If an x-offset is applied, or if the user has moved the first or last anchor point away from `x = 0`,
-    // we add horizontal line segment(s) to the path to ensure X coordinate of first and last vertex are zero.
-    if (std::abs(ControlPoints[0].x) > Epsilon) dl.PathLineTo({0, ControlPoints[0].y});
-    if (OffsetX > 0) dl.PathLineTo(ControlPoints[0]);
+    if (!ClosePath) {
+        // If an x-offset is applied, or if the user has moved the first or last anchor point away from `x = 0`,
+        // we add horizontal line segment(s) to the path to ensure X coordinate of first and last vertex are zero.
+        if (std::abs(ControlPoints[0].x) > Epsilon) dl.PathLineTo({0, ControlPoints[0].y});
+        if (OffsetX > 0) dl.PathLineTo(ControlPoints[0]);
+    }
 
     const ImVec2 Offset = {OffsetX, 0};
     dl.PathLineTo(ControlPoints[0] + Offset);
@@ -197,8 +205,10 @@ void MeshProfile::CreateVertices() {
             ControlPoints[i + 3] + Offset
         );
     }
-    if (OffsetX > 0) dl.PathLineTo(ControlPoints[last_anchor_i]);
-    if (std::abs(ControlPoints[last_anchor_i].x) > Epsilon) dl.PathLineTo({0, ControlPoints[last_anchor_i].y});
+    if (!ClosePath) {
+        if (OffsetX > 0) dl.PathLineTo(ControlPoints[last_anchor_i]);
+        if (std::abs(ControlPoints[last_anchor_i].x) > Epsilon) dl.PathLineTo({0, ControlPoints[last_anchor_i].y});
+    }
 
     Vertices.resize(dl._Path.Size);
     for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
