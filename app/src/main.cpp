@@ -238,7 +238,20 @@ int main(int, char **) {
                         ImGui::Text("No mesh has been loaded.");
                     } else {
                         ImGui::Text("File: %s", mesh->FilePath.c_str());
-                        if (ImGui::Button("Create tetrahedral mesh")) mesh->CreateTetraheralMesh();
+                        const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
+                        if (has_tetrahedral_mesh) {
+                            ImGui::TextUnformatted("Tetrahedral mesh: Yes");
+                        } else {
+                            ImGui::TextUnformatted("Tetrahedral mesh: No");
+                            if (ImGui::Button("Create tetrahedral mesh")) mesh->CreateTetraheralMesh();
+                        }
+                        if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
+                        if (ImGui::Button("Generate Faust DSP")) mesh->GenerateDsp();
+                        if (!has_tetrahedral_mesh) {
+                            ImGui::SameLine();
+                            ImGui::TextUnformatted("(Requires tetrahedral mesh)");
+                            ImGui::EndDisabled();
+                        }
 
                         ImGui::SeparatorText("Modify");
                         if (ImGui::Button("Center")) mesh->Center();

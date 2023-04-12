@@ -83,6 +83,7 @@ Mesh::Mesh(fs::path file_path) {
         return;
     }
 
+    VolumetricMesh.reset();
     Profile.reset();
 
     FILE *fp;
@@ -215,6 +216,7 @@ void Mesh::Center() {
 void Mesh::ExtrudeProfile() {
     if (Profile == nullptr || Profile->NumVertices() < 3) return;
 
+    VolumetricMesh.reset();
     Vertices.clear();
     Normals.clear();
     Indices.clear();
@@ -372,5 +374,21 @@ void Mesh::CreateTetraheralMesh() {
     VolumetricMesh.reset(TetMesher().compute(objMesh.get()));
     const m2f::MaterialProperties materialProperties{}; // Default: aluminum
     VolumetricMesh->setSingleMaterial(materialProperties.youngModulus, materialProperties.poissonRatio, materialProperties.density);
-    // string dsp = m2f::mesh2faust(VolumetricMesh);
+
+}
+
+std::string Mesh::GenerateDsp() const {
+    std::string dsp = m2f::mesh2faust(
+        VolumetricMesh.get(),
+        "modalModel", // generated object name
+        false, // freq control activated
+        20, // lowest mode freq
+        10000, // highest mode freq
+        10, // number of synthesized modes
+        10, // number of modes to be computed for the finite element analysis
+        {}, // specific excitation positions
+        -1 // number of excitation positions (default is max)
+    );
+    std::cout << dsp << std::endl;
+    return dsp;
 }

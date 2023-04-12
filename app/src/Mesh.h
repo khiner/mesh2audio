@@ -25,6 +25,10 @@ struct Mesh {
     int NumIndices() const { return Indices.size(); }
 
     void CreateTetraheralMesh();
+    bool HasTetrahedralMesh() const { return VolumetricMesh != nullptr; }
+
+    std::string GenerateDsp() const;
+
     void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
     void Rotate(const vec3 &axis, float angle);
     void Scale(const vec3 &scale); // Scale the mesh by the given amounts.
