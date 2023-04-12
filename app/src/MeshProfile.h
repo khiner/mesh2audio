@@ -14,8 +14,18 @@ namespace fs = std::filesystem;
 struct MeshProfile {
     explicit MeshProfile(fs::path svg_file_path); // Load a 2D profile from a .svg file.
 
-    int NumControlPoints() const;
+    int NumControlPoints() const { return ControlPoints.size(); }
+    int NumVertices() const { return Vertices.size(); }
+
+    // The vertices should be ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
+    // and last vertex corresponding the the bottom/inside of the surface.
+    // These top/bottom vertices will be connected in the middle of the extruded 3D mesh,
+    // creating a continuous connected solid "bridge" between all rotated slices.
+    // E.g. for a bell profile, the top-center of the bell would be the first vertex, the bottom-center
+    // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
     const vector<ImVec2> &GetVertices() const { return Vertices; }
+
+    std::pair<int, int> GetConnectionIndices();
 
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).
@@ -31,7 +41,7 @@ struct MeshProfile {
 
     // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
     // Does not affect `ControlPoints`.
-    inline static ImVec2 Offset;
+    inline static float OffsetX;
 
 private:
     void CreateVertices();

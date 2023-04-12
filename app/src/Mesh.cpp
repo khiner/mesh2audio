@@ -201,6 +201,11 @@ void Mesh::Rotate(const vec3 &axis, float angle) {
     for (auto &normal : Normals) normal = rotation * normal;
     Bind();
 }
+void Mesh::Scale(const vec3 &scale) {
+    for (auto &vertex : Vertices) vertex *= scale;
+    Bind();
+}
+
 void Mesh::Center() {
     const vec3 center = (Min + Max) / 2.0f;
     for (auto &vertex : Vertices) vertex -= center;
@@ -208,31 +213,42 @@ void Mesh::Center() {
 }
 
 void Mesh::ExtrudeProfile() {
-    if (Profile == nullptr) return;
+    if (Profile == nullptr || Profile->NumVertices() < 3) return;
 
     Vertices.clear();
     Normals.clear();
     Indices.clear();
 
+    // The profile vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
+    // and last vertex corresponding the the bottom/inside of the surface.
+    // These top/bottom vertices will be connected in the middle of the extruded 3D mesh,
+    // creating a continuous connected solid "bridge" between all rotated slices.
     const vector<ImVec2> &profile_vertices = Profile->GetVertices();
+    const int profile_size = profile_vertices.size();
     const int slices = Profile->NumRadialSlices;
     const double angle_increment = 2.0 * M_PI / slices;
-    for (int i = 0; i < slices; i++) {
-        const double angle = i * angle_increment;
+    for (int slice = 0; slice < slices; slice++) {
+        const double angle = slice * angle_increment;
         const double c = cos(angle);
         const double s = sin(angle);
-        for (const auto &p : profile_vertices) {
+        // Exclude the top/bottom vertices, which will be connected later.
+        for (int i = 1; i < profile_size - 1; i++) {
+            const auto &p = profile_vertices[i];
             Vertices.push_back({p.x * c, p.y, p.x * s});
             Normals.push_back({c, 0.0, s});
         }
     }
+    Vertices.push_back({0.0, profile_vertices[0].y, 0.0});
+    Normals.push_back({0.0, 0.0, 0.0});
+    Vertices.push_back({0.0, profile_vertices[profile_size - 1].y, 0.0});
+    Normals.push_back({0.0, 0.0, 0.0});
 
     // Compute indices for the triangles.
-    const int profile_size = profile_vertices.size();
-    for (int i = 0; i < slices; i++) {
-        for (int j = 0; j < profile_size - 1; j++) {
-            const int base_index = i * profile_size + j;
-            const int next_base_index = ((i + 1) % slices) * profile_size + j;
+    const int profile_size_no_connect = profile_size - 2;
+    for (int slice = 0; slice < slices; slice++) {
+        for (int i = 0; i < profile_size_no_connect - 1; i++) {
+            const int base_index = slice * profile_size_no_connect + i;
+            const int next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
             // First triangle
             Indices.push_back(base_index);
             Indices.push_back(next_base_index + 1);
@@ -243,6 +259,18 @@ void Mesh::ExtrudeProfile() {
             Indices.push_back(next_base_index);
             Indices.push_back(next_base_index + 1);
         }
+    }
+
+    // Connect the top and bottom.
+    for (int slice = 0; slice < slices; slice++) {
+        // Top
+        Indices.push_back(slice * profile_size_no_connect);
+        Indices.push_back(Vertices.size() - 2);
+        Indices.push_back(((slice + 1) % slices) * profile_size_no_connect);
+        // Bottom
+        Indices.push_back(slice * profile_size_no_connect + profile_size - 3);
+        Indices.push_back(Vertices.size() - 1);
+        Indices.push_back(((slice + 1) % slices) * profile_size_no_connect + profile_size - 3);
     }
 
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.

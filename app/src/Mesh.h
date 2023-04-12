@@ -27,6 +27,7 @@ struct Mesh {
     void CreateTetraheralMesh();
     void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
     void Rotate(const vec3 &axis, float angle);
+    void Scale(const vec3 &scale); // Scale the mesh by the given amounts.
     void Center(); // Center the mesh at the origin.
 
     static void SetCameraDistance(float distance);

@@ -30,8 +30,6 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     CreateVertices();
 }
 
-int MeshProfile::NumControlPoints() const { return ControlPoints.size(); }
-
 // Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
 // control points at the time of drag initiation.
 static int SelectedAnchorPoint = -1;
@@ -136,7 +134,7 @@ bool MeshProfile::RenderConfig() {
     ImGui::SeparatorText("Resolution");
     bool modified = ImGui::SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("Curve tol.", &CurveTolerance, 0.00001f, 0.5f, "%.5f", ImGuiSliderFlags_Logarithmic);
-    modified |= ImGui::SliderFloat("X-Offset", &Offset.x, 0, 1.f);
+    modified |= ImGui::SliderFloat("X-Offset", &OffsetX, 0, 1.f);
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
@@ -171,6 +169,8 @@ bool MeshProfile::RenderConfig() {
 
 // Private
 
+static constexpr float Epsilon = 1e-6f;
+
 void MeshProfile::CreateVertices() {
     const size_t num_ctrl = NumControlPoints();
     if (num_ctrl < 4) return;
@@ -179,17 +179,26 @@ void MeshProfile::CreateVertices() {
     sharedData.CurveTessellationTol = CurveTolerance;
 
     static ImDrawList dl(&sharedData);
+    // If an x-offset is applied, or if the user has moved the first or last anchor point away from `x = 0`,
+    // we add horizontal line segment(s) to the path to ensure X coordinate of first and last vertex are zero.
+    if (std::abs(ControlPoints[0].x) > Epsilon) dl.PathLineTo({0, ControlPoints[0].y});
+    if (OffsetX > 0) dl.PathLineTo(ControlPoints[0]);
+
+    const ImVec2 Offset = {OffsetX, 0};
     dl.PathLineTo(ControlPoints[0] + Offset);
     // Draw Bezier curves between each anchor point, based on its surrounding control points.
     // We don't connect the last control point, since it's a dupe of the first.
-    // (todo Is this always the case? Maybe check for this case to be sure?)
-    for (size_t i = 0; i < ControlPoints.size() - 4; i += 3) {
+    // (TODO should check to be sure)
+    const size_t last_anchor_i = num_ctrl - 4;
+    for (size_t i = 0; i < last_anchor_i; i += 3) {
         dl.PathBezierCubicCurveTo(
             ControlPoints[i + 1] + Offset,
             ControlPoints[i + 2] + Offset,
             ControlPoints[i + 3] + Offset
         );
     }
+    if (OffsetX > 0) dl.PathLineTo(ControlPoints[last_anchor_i]);
+    if (std::abs(ControlPoints[last_anchor_i].x) > Epsilon) dl.PathLineTo({0, ControlPoints[last_anchor_i].y});
 
     Vertices.resize(dl._Path.Size);
     for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
@@ -209,8 +218,8 @@ ImRect MeshProfile::CalcBounds() {
 }
 
 ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale) const {
-    return ControlPoints[i] * scale + offset;
+    return (ControlPoints[i] + ImVec2{OffsetX, 0}) * scale + offset;
 }
 ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
-    return (Vertices[i] - Offset) * scale + offset;
+    return Vertices[i] * scale + offset;
 }
