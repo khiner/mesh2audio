@@ -1,5 +1,7 @@
 #include "Mesh.h"
 
+#include <iomanip>
+
 // mesh2faust/vega
 #include "mesh2faust.h"
 #include "tetMesher.h"
@@ -10,6 +12,12 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "Shader.h"
+
+// #include <fmt/chrono.h>
+// auto start = std::chrono::high_resolution_clock::now();
+// auto end = std::chrono::high_resolution_clock::now();
+// auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+// std::cout << fmt::format("{}", duration) << std::endl;
 
 static const vec3 center = {0.f, 0.f, 0.f}, up = {0.f, 1.f, 0.f};
 
@@ -137,6 +145,7 @@ void Mesh::Save(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
     if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
 
+    out << std::setprecision(10);
     for (const vec3 &v : Vertices) {
         out << "v " << v.x << " " << v.y << " " << v.z << "\n";
     }
@@ -360,18 +369,22 @@ void Mesh::RenderProfileConfig() {
 // But even keeping the original scale, it just hangs.
 // Using the bell .obj files works, but those are the only ones.
 void Mesh::CreateTetraheralMesh() {
-    std::unique_ptr<ObjMesh> objMesh;
-    if (FilePath.extension() == ".obj") {
-        objMesh = std::make_unique<ObjMesh>(FilePath);
-    } else {
-        // Create tmp directory if it doesn't exist.
-        fs::create_directory("tmp");
-        const fs::path path = "tmp/tmp.obj";
-        Save(path);
-        objMesh = std::make_unique<ObjMesh>(path);
-        fs::remove(path); // Delete the temporary file.
+    // Copy the vertices/normals/indices into an ObjMesh.
+    ObjMesh obj;
+    obj.addGroup({"default"});
+    for (const vec3 &v : Vertices) obj.addVertexPosition({v.x, v.y, v.z});
+    for (const vec3 &n : Normals) obj.addVertexNormal({n.x, n.y, n.z});
+    for (size_t face_i = 0; face_i < Indices.size() / 3; face_i++) {
+        ObjMesh::Face face;
+        for (size_t i = 0; i < 3; i++) {
+            const unsigned int index = Indices[face_i * 3 + i];
+            face.addVertex(ObjMesh::Vertex(index, {false, 0}, {false, index}));
+        }
+        obj.addFaceToGroup(face, 0);
     }
-    VolumetricMesh.reset(TetMesher().compute(objMesh.get()));
+    obj.addDefaultMaterial();
+
+    VolumetricMesh.reset(TetMesher().compute(&obj));
     const m2f::MaterialProperties materialProperties{1.05E11, 0.33, 8600};
     VolumetricMesh->setSingleMaterial(materialProperties.youngModulus, materialProperties.poissonRatio, materialProperties.density);
 }
