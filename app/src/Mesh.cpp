@@ -13,6 +13,13 @@
 
 #include "Shader.h"
 
+#include <cinolib/geometry/vec_mat.h>
+#include <cinolib/meshes/meshes.h>
+#include <cinolib/tetgen_wrap.h>
+
+// #include <cinolib/string_utilities.h>
+// #include <cinolib/stl_container_utilities.h>
+
 // #include <fmt/chrono.h>
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
@@ -358,29 +365,28 @@ void Mesh::RenderProfileConfig() {
     else if (Profile->RenderConfig()) ExtrudeProfile();
 }
 
-// This is not working for profiles yet.
-// One reason is that we normalize so that the largest dim. is 1.
-// But even keeping the original scale, it just hangs.
-// Using the bell .obj files works, but those are the only ones.
-void Mesh::CreateTetraheralMesh() {
-    // Copy the vertices/normals/indices into an ObjMesh.
-    ObjMesh obj;
-    obj.addGroup({"default"});
-    for (const vec3 &v : Vertices) obj.addVertexPosition({v.x, v.y, v.z});
-    for (const vec3 &n : Normals) obj.addVertexNormal({n.x, n.y, n.z});
-    for (size_t face_i = 0; face_i < Indices.size() / 3; face_i++) {
-        ObjMesh::Face face;
-        for (size_t i = 0; i < 3; i++) {
-            const unsigned int index = Indices[face_i * 3 + i];
-            face.addVertex(ObjMesh::Vertex(index, {false, 0}, {false, index}));
-        }
-        obj.addFaceToGroup(face, 0);
-    }
-    obj.addDefaultMaterial();
+static vector<cinolib::vec3d> v_out;
+static vector<uint> p_out;
+static cinolib::Tetmesh tetmesh;
 
-    VolumetricMesh.reset(TetMesher().compute(&obj));
+void Mesh::CreateTetraheralMesh() {
+    fs::create_directory("tmp");
+    const fs::path path = "tmp/tmp.obj";
+    Save(path);
+    cinolib::Polygonmesh<> m(path.c_str());
+    vector<uint> e_in;
+    tetgen_wrap(m.vector_verts(), m.vector_polys(), e_in, "q", v_out, p_out);
+    tetmesh = cinolib::Tetmesh(v_out, p_out);
+    fs::remove(path); // Delete the temporary file.
+
     const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
-    VolumetricMesh->setSingleMaterial(material.youngModulus, material.poissonRatio, material.density);
+    double vertices[v_out.size() * 3];
+    for (size_t i = 0; i < v_out.size(); i++) {
+        vertices[i * 3 + 0] = v_out[i][0];
+        vertices[i * 3 + 1] = v_out[i][1];
+        vertices[i * 3 + 2] = v_out[i][2];
+    }
+    VolumetricMesh = std::make_unique<TetMesh>(v_out.size(), (double *)vertices, p_out.size() / 4, (int *)p_out.data(), material.youngModulus, material.poissonRatio, material.density);
 }
 
 void Mesh::BindTetrahedralMesh() {
@@ -394,18 +400,19 @@ void Mesh::BindTetrahedralMesh() {
     glGenBuffers(1, &IndexBuffer);
 
     // Bind vertices, normals, and indices to the tetrahedral mesh.
-    for (int i = 0; i < VolumetricMesh->getNumVertices(); i++) {
-        const auto &v = VolumetricMesh->getVertex(i);
+    for (size_t i = 0; i < v_out.size(); i++) {
+        const auto &v = v_out[i];
         const float x = v[0], y = v[1], z = v[2];
         const float angle = atan2(z, x);
         Vertices.push_back({x, y, z});
         Normals.push_back({cos(angle), 0, sin(angle)});
+        // const auto &normal = tetmesh.face_data(fid).normal;
+        // Normals.push_back({normal.x(), normal.y(), normal.z()});
     }
-    for (int i = 0; i < VolumetricMesh->getNumElements(); i++) {
-        // Turn tetrahedron into 4 triangles with element-relative indices:
-        // 0, 1, 2; 3, 0, 1; 2, 3, 0; 1, 2, 3;
-        for (int j = 0; j < 12; j++) {
-            Indices.push_back(VolumetricMesh->getVertexIndex(i, j % 4));
+    for (uint fid = 0; fid < tetmesh.num_faces(); ++fid) {
+        const auto &tes = tetmesh.face_tessellation(fid);
+        for (uint i = 0; i < tes.size(); ++i) {
+            Indices.push_back(tes.at(i));
         }
     }
 

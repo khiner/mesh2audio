@@ -30,6 +30,10 @@ set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
 set(Mesh2FaustDir ${CMAKE_CURRENT_SOURCE_DIR}/lib/faust/tools/physicalModeling/mesh2faust)
 add_subdirectory(${Mesh2FaustDir})
 
+set(CINOLIB_USES_TETGEN ON)
+set(cinolib_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/cinolib)
+find_package(cinolib REQUIRED)
+
 include_directories(
     lib/implot
     lib/imspinner
@@ -45,8 +49,14 @@ include_directories(
 
 find_package(GLEW REQUIRED)
 
+if(APPLE)
+  target_include_directories(${PROJECT_NAME} PRIVATE /opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3)
+else()
+  target_include_directories(${PROJECT_NAME} PRIVATE /usr/include/eigen3)
+endif()
+
 # `dynamiclib` is faust.
-target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib mesh2faust)
+target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib mesh2faust cinolib)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)

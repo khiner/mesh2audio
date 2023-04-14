@@ -33,3 +33,6 @@
 [submodule "app/lib/imspinner"]
 	path = app/lib/imspinner
 	url = git@github.com:dalerank/imspinner.git
+[submodule "app/lib/cinolib"]
+	path = app/lib/cinolib
+	url = git@github.com:mlivesu/cinolib.git
