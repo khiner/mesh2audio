@@ -50,7 +50,6 @@ struct Mesh {
 
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-
     fs::path FilePath; // Most recently loaded file path.
 
 private:

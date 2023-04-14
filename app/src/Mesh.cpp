@@ -385,8 +385,8 @@ void Mesh::CreateTetraheralMesh() {
     obj.addDefaultMaterial();
 
     VolumetricMesh.reset(TetMesher().compute(&obj));
-    const m2f::MaterialProperties materialProperties{1.05E11, 0.33, 8600};
-    VolumetricMesh->setSingleMaterial(materialProperties.youngModulus, materialProperties.poissonRatio, materialProperties.density);
+    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
+    VolumetricMesh->setSingleMaterial(material.youngModulus, material.poissonRatio, material.density);
 }
 
 std::string Mesh::GenerateDsp() const {

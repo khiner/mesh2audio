@@ -1,6 +1,7 @@
 #include <GL/glew.h>
 
 #include <iostream>
+#include <thread>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -11,6 +12,7 @@
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 #include "implot.h"
+#include "imspinner.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <nfd.h>
@@ -36,6 +38,9 @@ static const mat4 Identity(1.f);
 static int RenderMode = 0;
 static bool ShowCameraGizmo = true, ShowGrid = false, ShowMeshGizmo = false, ShowBounds = false;
 
+static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes and DSP code.
+static string GeneratedDsp; // The most recently generated DSP code.
+
 // DSP code in addition to the model, to make it playable.
 // TODO after getting Faust UI working, replace `ba.beat(...)` with `gate`.
 // TODO deinterleave samples from Faust to miniaudio, then add "<: _,_" to the end of the dsp for stereo.
@@ -59,6 +64,9 @@ with{
 
 process = hammer(ba.beat(24),hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
 )";
+
+static char *GenerateTetMsg = "Generating tetrahedral mesh...";
+static char *GenerateDspMsg = "Generating DSP code...";
 
 int main(int, char **) {
     // Setup SDL
@@ -261,18 +269,50 @@ int main(int, char **) {
                     if (mesh == nullptr) {
                         ImGui::Text("No mesh has been loaded.");
                     } else {
+                        const auto &center = ImGui::GetMainViewport()->GetCenter();
+                        const auto &popup_size = ImGui::GetMainViewport()->Size / 4;
+                        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
+                        ImGui::SetNextWindowSize(popup_size);
+                        if (ImGui::BeginPopupModal(GenerateTetMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                            const auto &ws = ImGui::GetWindowSize();
+                            const float spinner_dim = std::min(ws.x, ws.y) / 2;
+                            ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
+                            ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg, spinner_dim / 2, 3);
+                            if (mesh->HasTetrahedralMesh()) ImGui::CloseCurrentPopup();
+                            ImGui::EndPopup();
+                        }
+                        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
+                        ImGui::SetNextWindowSize(popup_size);
+                        if (ImGui::BeginPopupModal(GenerateDspMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                            const auto &ws = ImGui::GetWindowSize();
+                            const float spinner_dim = std::min(ws.x, ws.y) / 2;
+                            ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
+                            ImSpinner::SpinnerWaveDots(GenerateDspMsg, spinner_dim / 2, 3);
+                            if (!GeneratedDsp.empty()) {
+                                Audio.Faust.Code = GeneratedDsp;
+                                GeneratedDsp = "";
+                                if (GeneratorThread.joinable()) GeneratorThread.join();
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::EndPopup();
+                        }
                         ImGui::Text("File: %s", mesh->FilePath.c_str());
                         const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
                         if (has_tetrahedral_mesh) {
                             ImGui::TextUnformatted("Tetrahedral mesh: Yes");
                         } else {
                             ImGui::TextUnformatted("Tetrahedral mesh: No");
-                            if (ImGui::Button("Create tetrahedral mesh")) mesh->CreateTetraheralMesh();
+                            if (ImGui::Button("Create tetrahedral mesh")) {
+                                ImGui::OpenPopup(GenerateTetMsg);
+                                if (GeneratorThread.joinable()) GeneratorThread.join();
+                                GeneratorThread = std::thread([&] { mesh->CreateTetraheralMesh(); });
+                            }
                         }
                         if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
                         if (ImGui::Button("Generate Faust DSP")) {
-                            const string dsp = mesh->GenerateDsp() + FaustInstrumentDsp;
-                            Audio.Faust.Code = dsp;
+                            ImGui::OpenPopup(GenerateDspMsg);
+                            if (GeneratorThread.joinable()) GeneratorThread.join();
+                            GeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
                         }
                         if (!has_tetrahedral_mesh) {
                             ImGui::SameLine();
@@ -479,6 +519,7 @@ int main(int, char **) {
     ImGui::DestroyContext();
 
     Audio.Destroy();
+    if (GeneratorThread.joinable()) GeneratorThread.join();
     NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);

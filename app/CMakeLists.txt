@@ -32,6 +32,7 @@ add_subdirectory(${Mesh2FaustDir})
 
 include_directories(
     lib/implot
+    lib/imspinner
     lib/glm
     lib/miniaudio
     lib/fmt/include
