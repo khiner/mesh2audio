@@ -21,6 +21,7 @@ struct Mesh {
     void RenderProfile();
     void RenderProfileConfig();
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
+    void BindTetrahedralMesh(); // Bind the volumetric mesh for rendering.
 
     int NumIndices() const { return Indices.size(); }
 
@@ -52,6 +53,7 @@ struct Mesh {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     fs::path FilePath; // Most recently loaded file path.
 
+    bool TetrahedralMeshBound = false;
 private:
     static void InitializeStatic(); // Initialize variables shared across all meshes.
 

@@ -101,9 +101,6 @@ Mesh::Mesh(fs::path file_path) {
     float x, y, z;
     int fx, fy, fz, ignore;
     int c1, c2;
-    float y_min = INFINITY, z_min = INFINITY;
-    float y_max = -INFINITY, z_max = -INFINITY;
-
     while (!feof(fp)) {
         c1 = fgetc(fp);
         while (!(c1 == 'v' || c1 == 'f')) {
@@ -114,10 +111,6 @@ Mesh::Mesh(fs::path file_path) {
         if ((c1 == 'v') && (c2 == ' ')) {
             fscanf(fp, "%f %f %f", &x, &y, &z);
             Vertices.push_back({x, y, z});
-            if (y < y_min) y_min = y;
-            if (z < z_min) z_min = z;
-            if (y > y_max) y_max = y;
-            if (z > z_max) z_max = z;
         } else if ((c1 == 'v') && (c2 == 'n')) {
             fscanf(fp, "%f %f %f", &x, &y, &z);
             Normals.push_back(glm::normalize(vec3(x, y, z)));
@@ -174,6 +167,7 @@ void Mesh::UpdateBounds() {
         if (v.z > Max.z) Max.z = v.z;
     }
 }
+
 void Mesh::Bind() {
     UpdateBounds();
 
@@ -387,6 +381,35 @@ void Mesh::CreateTetraheralMesh() {
     VolumetricMesh.reset(TetMesher().compute(&obj));
     const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
     VolumetricMesh->setSingleMaterial(material.youngModulus, material.poissonRatio, material.density);
+}
+
+void Mesh::BindTetrahedralMesh() {
+    Vertices.clear();
+    Normals.clear();
+    Indices.clear();
+
+    glGenVertexArrays(1, &VertexArray);
+    glGenBuffers(1, &VertexBuffer);
+    glGenBuffers(1, &NormalBuffer);
+    glGenBuffers(1, &IndexBuffer);
+
+    // Bind vertices, normals, and indices to the tetrahedral mesh.
+    for (int i = 0; i < VolumetricMesh->getNumVertices(); i++) {
+        const auto &v = VolumetricMesh->getVertex(i);
+        const float x = v[0], y = v[1], z = v[2];
+        Vertices.push_back({x, y, z});
+        const float angle = atan2(z, x);
+
+        Normals.push_back({cos(angle), 0, sin(angle)});
+    }
+    for (int i = 0; i < VolumetricMesh->getNumElements(); i++) {
+        for (int j = 0; j < VolumetricMesh->getNumElementVertices(); j++) {
+            Indices.push_back(VolumetricMesh->getVertexIndex(i, j));
+        }
+    }
+
+    UpdateBounds();
+    Center();
 }
 
 std::string Mesh::GenerateDsp() const {

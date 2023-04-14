@@ -299,6 +299,11 @@ int main(int, char **) {
                         ImGui::Text("File: %s", mesh->FilePath.c_str());
                         const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
                         if (has_tetrahedral_mesh) {
+                            if (!mesh->TetrahedralMeshBound) {
+                                if (ImGui::Button("Bind tetrahedral mesh")) mesh->BindTetrahedralMesh();
+                            } else {
+                                ImGui::TextUnformatted("Tetrahedral mesh bound: Yes");
+                            }
                             ImGui::TextUnformatted("Tetrahedral mesh: Yes");
                         } else {
                             ImGui::TextUnformatted("Tetrahedral mesh: No");
@@ -381,7 +386,7 @@ int main(int, char **) {
                     ImGui::SliderFloat("FOV", &Mesh::fov, 20.f, 110.f);
 
                     float cameraDistance = Mesh::CameraDistance;
-                    if (ImGui::SliderFloat("Distance", &cameraDistance, 1.f, 10.f)) {
+                    if (ImGui::SliderFloat("Distance", &cameraDistance, .1f, 10.f)) {
                         Mesh::SetCameraDistance(cameraDistance);
                     }
                     ImGui::EndTabItem();
