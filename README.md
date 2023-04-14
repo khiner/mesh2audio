@@ -40,18 +40,30 @@ $ sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev
 $ sudo apt-get install libglew-dev
 ```
 
-### Clone and build
+### Clone, clean and build app
 
 ```shell
 $ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
 $ cd mesh2audio/app
-$ ./BuildApp
 ```
+- **Clean:**
+  - Clean up everything: `./script/Clean`
+  - Clean debug build only: `./script/Clean -d [--debug]`
+  - Clean release build only: `./script/Clean -r [--release]`
+- **Build:**
+  - Debug build (default): `./script/Build`
+  - Release build: `./script/Build -r [--release]`
 
-By default, this will create a debug build in the `build-debug` directory.
-Run `./BuildApp --release` to create a release build in the `build` directory.
+Debug build is generated in the `./build` directory relative to project (repo) root.
+Release build is generated in `./build-release`.
 
-VSCode settings are also provided to open the root `mesh2audio` directory as a project, and build the app in `app/build`.
+To run the freshly built application:
+
+```sh
+# The pplication assumes it's being run from the build directory when locating its resource files.
+$ cd build # or build-release
+$ ./mesh2audio
+```
 
 ## `mesh2faust` architecture
 
