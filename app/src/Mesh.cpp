@@ -397,14 +397,15 @@ void Mesh::BindTetrahedralMesh() {
     for (int i = 0; i < VolumetricMesh->getNumVertices(); i++) {
         const auto &v = VolumetricMesh->getVertex(i);
         const float x = v[0], y = v[1], z = v[2];
-        Vertices.push_back({x, y, z});
         const float angle = atan2(z, x);
-
+        Vertices.push_back({x, y, z});
         Normals.push_back({cos(angle), 0, sin(angle)});
     }
     for (int i = 0; i < VolumetricMesh->getNumElements(); i++) {
-        for (int j = 0; j < VolumetricMesh->getNumElementVertices(); j++) {
-            Indices.push_back(VolumetricMesh->getVertexIndex(i, j));
+        // Turn tetrahedron into 4 triangles with element-relative indices:
+        // 0, 1, 2; 3, 0, 1; 2, 3, 0; 1, 2, 3;
+        for (int j = 0; j < 12; j++) {
+            Indices.push_back(VolumetricMesh->getVertexIndex(i, j % 4));
         }
     }
 
