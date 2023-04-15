@@ -1,8 +1,6 @@
 ## Next up
 
-- Fix faust audio stopping after loading completely new dsp
 - Add material controls for audio model
-- Add Triangular/Tetrahedral toggle to mesh viewer if tet mesh is present
 - Add controls for tet mesh generation params (how fine grained etc)
 - Explore the effect of the mesh scale (uniform) on the bell model
   - Add scale control for dsp generation
