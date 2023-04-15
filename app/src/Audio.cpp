@@ -86,30 +86,39 @@ static void Destroy() {
     destroyLibContext();
 }
 
-static bool NeedsRestart(const Audio::FaustState &faust) {
+static bool NeedsRestart(const Audio::FaustState &faust, u32 sample_rate) {
     static string PreviousFaustCode = faust.Code;
+    static u32 PreviousSampleRate = sample_rate;
 
-    const bool needs_restart = faust.Code != PreviousFaustCode;
+    const bool needs_restart = faust.Code != PreviousFaustCode || sample_rate != PreviousSampleRate;
     PreviousFaustCode = faust.Code;
+    PreviousSampleRate = sample_rate;
     return needs_restart;
 }
 
-static void Update(Audio::FaustState &faust, u32 sample_rate, string *status_out) {
+// Returns true if recompiled.
+static bool Update(Audio::FaustState &faust, u32 sample_rate, string *status_out) {
     // Faust setup is only dependent on the faust code.
     const bool is_faust_initialized = !faust.Code.empty() && faust.Error.empty();
-    const bool faust_needs_restart = NeedsRestart(faust); // Don't inline! Must run during every update.
+    const bool faust_needs_restart = NeedsRestart(faust, sample_rate); // Don't inline! Must run during every update.
+
+    bool recompiled = false;
     if (!Dsp && is_faust_initialized) {
         (*status_out) = AudioStatusMessage::Compiling;
         Init(faust, sample_rate);
+        recompiled = true;
     } else if (Dsp && !is_faust_initialized) {
         Destroy();
     } else if (faust_needs_restart) {
         Destroy();
         (*status_out) = AudioStatusMessage::Compiling;
         Init(faust, sample_rate);
+        recompiled = true;
     }
     if (Dsp) (*status_out) = AudioStatusMessage::Running;
     else (*status_out) = AudioStatusMessage::NoDsp;
+
+    return recompiled;
 }
 } // namespace FaustContext
 
@@ -218,6 +227,7 @@ void Audio::Run() {
             Update();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+        FaustContext::Destroy();
         Destroy();
     });
 }
@@ -229,8 +239,8 @@ void Audio::Stop() {
 
 void Audio::Update() {
     const bool is_initialized = Device.IsStarted();
-    if (is_initialized) FaustContext::Update(Faust, Device.SampleRate, &Status);
-    const bool needs_restart = NeedsRestart(); // Don't inline! Must run during every update.
+    const bool faust_recompiled = is_initialized && FaustContext::Update(Faust, Device.SampleRate, &Status);
+    const bool needs_restart = faust_recompiled || NeedsRestart(); // Don't inline! Must run during every update.
     if (Device.On && !is_initialized) {
         Init();
     } else if (!Device.On && is_initialized) {
@@ -491,7 +501,6 @@ void Audio::Graph::Init() {
 }
 
 void Audio::Graph::Destroy() {
-    FaustContext::Destroy();
     ma_data_source_node_uninit(&InputNode, nullptr);
     ma_audio_buffer_ref_uninit(&InputBuffer);
     ma_node_graph_uninit(&NodeGraph, nullptr); // Graph endpoint is already uninitialized in `Nodes.Uninit`.
