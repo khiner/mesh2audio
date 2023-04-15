@@ -1,6 +1,5 @@
 ## Next up
 
-- Add material controls for audio model
 - Add controls for tet mesh generation params (how fine grained etc)
 - Explore the effect of the mesh scale (uniform) on the bell model
   - Add scale control for dsp generation

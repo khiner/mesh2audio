@@ -20,6 +20,13 @@ struct Mesh {
         MeshType_Tetrahedral,
     };
 
+    // Defaults to aluminum.
+    struct MaterialProperties {
+        double YoungModulus{70E9};
+        double PoissonRatio{0.35};
+        double Density{2700};
+    };
+
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     Mesh(fs::path file_path);
     ~Mesh();
@@ -77,6 +84,15 @@ struct Mesh {
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
+
+    inline static std::map<std::string, MaterialProperties> MaterialPresets = {
+        {"Copper", {110e9f, 0.33f, 8600.0f}}, // 8900
+        {"Aluminum", {70e9f, 0.35f, 2700.0f}},
+        {"Steel", {200e9f, 0.3f, 8000.0f}},
+        {"Glass", {70e9f, 0.2f, 2500.0f}},
+        {"Wood", {10e9f, 0.3f, 500.0f}},
+    };
+    inline static MaterialProperties Material{MaterialPresets["Copper"]};
 
     fs::path FilePath; // Most recently loaded file path.
 

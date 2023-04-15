@@ -463,10 +463,10 @@ std::string Mesh::GenerateDsp() const {
 
     // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
-    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
     TetMesh VolumetricMesh{
         int(tet_vecs.size()), tet_vertices.data(), int(tet_indices.size() / 4), (int *)tet_indices.data(),
-        material.youngModulus, material.poissonRatio, material.density};
+        Material.YoungModulus, Material.PoissonRatio, Material.Density};
+
     return m2f::mesh2faust(
         &VolumetricMesh,
         "modalModel", // generated object name

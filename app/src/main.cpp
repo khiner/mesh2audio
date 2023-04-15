@@ -313,6 +313,28 @@ int main(int, char **) {
                                 GeneratorThread = std::thread([&] { mesh->CreateTetraheralMesh(); });
                             }
                         }
+                        if (has_tetrahedral_mesh) {
+                            ImGui::SeparatorText("Material properties");
+                            // Presets
+                            static std::string selected_preset = "Copper";
+                            if (ImGui::BeginCombo("Presets", selected_preset.c_str())) {
+                                for (const auto &[preset_name, material] : Mesh::MaterialPresets) {
+                                    bool is_selected = (preset_name == selected_preset);
+                                    if (ImGui::Selectable(preset_name.c_str(), is_selected)) {
+                                        selected_preset = preset_name;
+                                        mesh->Material = material;
+                                    }
+                                    if (is_selected) ImGui::SetItemDefaultFocus();
+                                }
+                                ImGui::EndCombo();
+                            }
+                            ImGui::Text("Young's modulus (Pa)");
+                            ImGui::InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::Text("Poisson's ratio");
+                            ImGui::InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                            ImGui::Text("Density (kg/m^3)");
+                            ImGui::InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        }
                         if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
                         if (ImGui::Button("Generate Faust DSP")) {
                             ImGui::OpenPopup(GenerateDspMsg);
