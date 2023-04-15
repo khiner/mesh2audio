@@ -300,12 +300,11 @@ int main(int, char **) {
                         ImGui::Text("File: %s", mesh->FilePath.c_str());
                         const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
                         if (has_tetrahedral_mesh) {
-                            if (!mesh->TetrahedralMeshBound) {
-                                if (ImGui::Button("Bind tetrahedral mesh")) mesh->BindTetrahedralMesh();
-                            } else {
-                                ImGui::TextUnformatted("Tetrahedral mesh bound: Yes");
-                            }
                             ImGui::TextUnformatted("Tetrahedral mesh: Yes");
+                            ImGui::TextUnformatted("View mesh type");
+                            ImGui::RadioButton("Triangular", &Mesh::ViewMeshType, Mesh::MeshType_Triangular);
+                            ImGui::SameLine();
+                            ImGui::RadioButton("Tetrahedral", &Mesh::ViewMeshType, Mesh::MeshType_Tetrahedral);
                         } else {
                             ImGui::TextUnformatted("Tetrahedral mesh: No");
                             if (ImGui::Button("Create tetrahedral mesh")) {

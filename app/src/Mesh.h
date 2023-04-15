@@ -13,20 +13,45 @@ struct ImVec2;
 // Currently, this class also handles things like camera and lighting.
 // If there were more than one mesh, we would move that stuff out of here.
 struct Mesh {
+    using Type = int;
+
+    enum Type_ {
+        MeshType_Triangular,
+        MeshType_Tetrahedral,
+    };
+
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     Mesh(fs::path file_path);
     ~Mesh();
 
-    void Render(int mode) const;
+    struct Data {
+        bool Empty() const { return Vertices.empty(); }
+
+        void Clear();
+        void Save(fs::path file_path) const; // Export the mesh to a .obj file.
+
+        void Flip(bool x, bool y, bool z);
+        void Rotate(const vec3 &axis, float angle);
+        void Scale(const vec3 &scale);
+        void Center();
+
+        void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
+        void ExtrudeProfile(const MeshProfile &profile);
+
+        vector<vec3> Vertices, Normals;
+        vector<unsigned int> Indices;
+        vec3 Min, Max; // The bounding box of the mesh.
+    };
+
+    void Render(int mode);
     void RenderProfile();
     void RenderProfileConfig();
-    void Save(fs::path file_path) const; // Export the mesh to a .obj file.
-    void BindTetrahedralMesh(); // Bind the volumetric mesh for rendering.
+    void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
 
-    int NumIndices() const { return Indices.size(); }
+    const Data &GetActiveData() const;
 
     void CreateTetraheralMesh();
-    bool HasTetrahedralMesh() const { return VolumetricMesh != nullptr; }
+    bool HasTetrahedralMesh() const { return !TetrahedralMesh.Empty(); }
 
     std::string GenerateDsp() const;
 
@@ -51,25 +76,24 @@ struct Mesh {
 
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
+    inline static Type ViewMeshType = MeshType_Triangular;
+
     fs::path FilePath; // Most recently loaded file path.
 
-    bool TetrahedralMeshBound = false;
 private:
     static void InitializeStatic(); // Initialize variables shared across all meshes.
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
-    void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
-    void Bind(); // Bind all buffers and set up vertex attributes. Also updates the bounding box.
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
+    struct Data TriangularMesh, TetrahedralMesh;
+    Type ActiveViewMeshType = MeshType_Triangular;
 
-    vector<vec3> Vertices, Normals;
-    vector<unsigned int> Indices;
     unsigned int VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
-    vec3 Min, Max; // The bounding box of the mesh.
 
-    std::unique_ptr<TetMesh> VolumetricMesh;
+    void Bind(); // Bind active mesh.
+    void Bind(const Data &data); // Bind mesh and set up vertex attributes.
 };

@@ -86,24 +86,15 @@ Mesh::Mesh(fs::path file_path) {
     if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
 
     FilePath = file_path; // Store the most recent file path.
-
-    glGenVertexArrays(1, &VertexArray);
-    glGenBuffers(1, &VertexBuffer);
-    glGenBuffers(1, &NormalBuffer);
-    glGenBuffers(1, &IndexBuffer);
-
     if (is_svg) {
-        Profile = std::make_unique<MeshProfile>(file_path);
+        Profile = std::make_unique<MeshProfile>(FilePath);
         ExtrudeProfile();
         return;
     }
 
-    VolumetricMesh.reset();
-    Profile.reset();
-
     FILE *fp;
-    fp = fopen(file_path.c_str(), "rb");
-    if (fp == nullptr) throw std::runtime_error("Error loading file: " + file_path.string());
+    fp = fopen(FilePath.c_str(), "rb");
+    if (fp == nullptr) throw std::runtime_error("Error loading file: " + FilePath.string());
 
     float x, y, z;
     int fx, fy, fz, ignore;
@@ -117,21 +108,22 @@ Mesh::Mesh(fs::path file_path) {
         c2 = fgetc(fp);
         if ((c1 == 'v') && (c2 == ' ')) {
             fscanf(fp, "%f %f %f", &x, &y, &z);
-            Vertices.push_back({x, y, z});
+            TriangularMesh.Vertices.push_back({x, y, z});
         } else if ((c1 == 'v') && (c2 == 'n')) {
             fscanf(fp, "%f %f %f", &x, &y, &z);
-            Normals.push_back(glm::normalize(vec3(x, y, z)));
+            TriangularMesh.Normals.push_back(glm::normalize(vec3(x, y, z)));
         } else if (c1 == 'f') {
             fscanf(fp, "%d//%d %d//%d %d//%d", &fx, &ignore, &fy, &ignore, &fz, &ignore);
-            Indices.push_back(fx - 1);
-            Indices.push_back(fy - 1);
-            Indices.push_back(fz - 1);
+            TriangularMesh.Indices.push_back(fx - 1);
+            TriangularMesh.Indices.push_back(fy - 1);
+            TriangularMesh.Indices.push_back(fz - 1);
         }
     }
     fclose(fp);
 
-    UpdateBounds();
-    Center();
+    TriangularMesh.UpdateBounds();
+    TriangularMesh.Center();
+    Bind();
 }
 
 Mesh::~Mesh() {
@@ -141,7 +133,53 @@ Mesh::~Mesh() {
     glDeleteVertexArrays(1, &VertexArray);
 }
 
+const Mesh::Data &Mesh::GetActiveData() const {
+    if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
+    return TetrahedralMesh;
+}
+
 void Mesh::Save(fs::path file_path) const {
+    const auto &data = GetActiveData();
+    data.Save(file_path);
+}
+
+void Mesh::Flip(bool x, bool y, bool z) {
+    TriangularMesh.Flip(x, y, z);
+    TetrahedralMesh.Flip(x, y, z);
+    Bind();
+}
+void Mesh::Rotate(const vec3 &axis, float angle) {
+    TriangularMesh.Rotate(axis, angle);
+    TetrahedralMesh.Rotate(axis, angle);
+    Bind();
+}
+void Mesh::Scale(const vec3 &scale) {
+    TriangularMesh.Scale(scale);
+    TetrahedralMesh.Scale(scale);
+    Bind();
+}
+void Mesh::Center() {
+    TriangularMesh.Center();
+    TetrahedralMesh.Center();
+    Bind();
+}
+void Mesh::ExtrudeProfile() {
+    if (Profile == nullptr) return;
+
+    TetrahedralMesh.Clear();
+    TriangularMesh.ExtrudeProfile(*Profile);
+    ActiveViewMeshType = MeshType_Triangular;
+    Bind();
+}
+
+void Mesh::Data::Clear() {
+    Vertices.clear();
+    Normals.clear();
+    Indices.clear();
+    Min = {};
+    Max = {};
+}
+void Mesh::Data::Save(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
     if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
 
@@ -160,8 +198,29 @@ void Mesh::Save(fs::path file_path) const {
 
     out.close();
 }
-
-void Mesh::UpdateBounds() {
+void Mesh::Data::Flip(bool x, bool y, bool z) {
+    const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
+    const vec3 center = (Min + Max) / 2.0f;
+    for (auto &vertex : Vertices) vertex = center + (vertex - center) * flip;
+    for (auto &normal : Normals) normal *= flip;
+    UpdateBounds();
+}
+void Mesh::Data::Rotate(const vec3 &axis, float angle) {
+    const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
+    for (auto &vertex : Vertices) vertex = rotation * vertex;
+    for (auto &normal : Normals) normal = rotation * normal;
+    UpdateBounds();
+}
+void Mesh::Data::Scale(const vec3 &scale) {
+    for (auto &vertex : Vertices) vertex *= scale;
+    UpdateBounds();
+}
+void Mesh::Data::Center() {
+    const vec3 center = (Min + Max) / 2.0f;
+    for (auto &vertex : Vertices) vertex -= center;
+    UpdateBounds();
+}
+void Mesh::Data::UpdateBounds() {
     // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
     Min = vec3(INFINITY, INFINITY, INFINITY);
     Max = vec3(-INFINITY, -INFINITY, -INFINITY);
@@ -174,72 +233,20 @@ void Mesh::UpdateBounds() {
         if (v.z > Max.z) Max.z = v.z;
     }
 }
-
-void Mesh::Bind() {
-    UpdateBounds();
-
-    glBindVertexArray(VertexArray);
-
-    // Bind vertices to layout location 0
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    // Bind normals to layout location 1
-    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-void Mesh::Flip(bool x, bool y, bool z) {
-    const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
-    const vec3 center = (Min + Max) / 2.0f;
-    for (auto &vertex : Vertices) vertex = center + (vertex - center) * flip;
-    for (auto &normal : Normals) normal *= flip;
-    Bind();
-}
-void Mesh::Rotate(const vec3 &axis, float angle) {
-    const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
-    for (auto &vertex : Vertices) vertex = rotation * vertex;
-    for (auto &normal : Normals) normal = rotation * normal;
-    Bind();
-}
-void Mesh::Scale(const vec3 &scale) {
-    for (auto &vertex : Vertices) vertex *= scale;
-    Bind();
-}
-
-void Mesh::Center() {
-    const vec3 center = (Min + Max) / 2.0f;
-    for (auto &vertex : Vertices) vertex -= center;
-    Bind();
-}
-
-void Mesh::ExtrudeProfile() {
-    if (Profile == nullptr || Profile->NumVertices() < 3) return;
-
-    VolumetricMesh.reset();
-    Vertices.clear();
-    Normals.clear();
-    Indices.clear();
+void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
+    Clear();
+    if (profile.NumVertices() < 3) return;
 
     // The profile vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
     // and last vertex corresponding the the bottom/inside of the surface.
     // If the profile is not closed (default), these top/bottom vertices will be connected in the middle of the extruded 3D mesh,
     // creating a continuous connected solid "bridge" between all rotated slices.
-    const vector<ImVec2> &profile_vertices = Profile->GetVertices();
+    const vector<ImVec2> &profile_vertices = profile.GetVertices();
+    const int slices = profile.NumRadialSlices;
+    const bool is_closed = profile.IsClosed();
+
     const int profile_size = profile_vertices.size();
-    const int slices = Profile->NumRadialSlices;
     const double angle_increment = 2.0 * M_PI / slices;
-    const bool is_closed = Profile->IsClosed();
     const int start_index = is_closed ? 0 : 1;
     const int end_index = profile_size - (is_closed ? 0 : 1);
     for (int slice = 0; slice < slices; slice++) {
@@ -309,7 +316,15 @@ void Mesh::UpdateCameraProjection(const ImVec2 &size) {
     CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
 }
 
-void Mesh::Render(int mode) const {
+void Mesh::Render(int mode) {
+    if (TetrahedralMesh.Empty() && ViewMeshType == MeshType_Tetrahedral) {
+        ViewMeshType = MeshType_Triangular;
+    }
+    if (ActiveViewMeshType != ViewMeshType) {
+        ActiveViewMeshType = ViewMeshType;
+        Bind();
+    }
+
     glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(CameraView * ObjectMatrix)[0][0]);
 
@@ -321,36 +336,38 @@ void Mesh::Render(int mode) const {
     glUniform4fv(specularcol, 1, Specular);
     glUniform1f(shininesscol, Shininess);
 
+    const auto &data = GetActiveData();
+    const int num_indices = data.Indices.size();
     glBindVertexArray(VertexArray);
     if (mode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
     if (mode == 1) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
     if (mode == 2) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
     if (mode == 3) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
         glUniform4fv(diffusecol, 1, black);
         glUniform4fv(specularcol, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
 
         glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, NumIndices(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
 }
@@ -364,14 +381,11 @@ void Mesh::RenderProfileConfig() {
     if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
     else if (Profile->RenderConfig()) ExtrudeProfile();
 }
-
+// Annoying global variable to store tet indices as returned by tetgen,
+// since we order indices differently in our mesh data.
 static vector<uint> tet_indices;
-static cinolib::Tetmesh tet_mesh;
-static vector<cinolib::vec3d> tet_vecs;
-// This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
-static vector<double> tet_vertices;
-
 void Mesh::CreateTetraheralMesh() {
+    static vector<cinolib::vec3d> tet_vecs;
     // Write to an obj file and read back into a cinolib tetmesh.
     fs::create_directory("tmp");
     const fs::path path = "tmp/tmp.obj";
@@ -379,58 +393,82 @@ void Mesh::CreateTetraheralMesh() {
     cinolib::Polygonmesh<> m(path.c_str());
     vector<uint> e_in;
     tetgen_wrap(m.vector_verts(), m.vector_polys(), e_in, "q", tet_vecs, tet_indices);
-    tet_mesh = cinolib::Tetmesh(tet_vecs, tet_indices);
     fs::remove(path); // Delete the temporary file.
 
-    tet_vertices.resize(tet_vecs.size() * 3);
-    for (size_t i = 0; i < tet_vecs.size(); i++) {
-        tet_vertices[i * 3 + 0] = tet_vecs[i][0];
-        tet_vertices[i * 3 + 1] = tet_vecs[i][1];
-        tet_vertices[i * 3 + 2] = tet_vecs[i][2];
-    }
-
-    // Convert the cinolib tetmesh to a VegaFEM tetmesh.
-    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
-    VolumetricMesh = std::make_unique<TetMesh>(
-        tet_vecs.size(), tet_vertices.data(), tet_indices.size() / 4, (int *)tet_indices.data(),
-        material.youngModulus, material.poissonRatio, material.density
-    );
-}
-
-void Mesh::BindTetrahedralMesh() {
-    Vertices.clear();
-    Normals.clear();
-    Indices.clear();
-
-    glGenVertexArrays(1, &VertexArray);
-    glGenBuffers(1, &VertexBuffer);
-    glGenBuffers(1, &NormalBuffer);
-    glGenBuffers(1, &IndexBuffer);
-
+    const cinolib::Tetmesh tet_mesh{tet_vecs, tet_indices};
+    TetrahedralMesh.Clear();
     // Bind vertices, normals, and indices to the tetrahedral mesh.
     for (size_t i = 0; i < tet_vecs.size(); i++) {
         const auto &v = tet_vecs[i];
         const float x = v[0], y = v[1], z = v[2];
         const float angle = atan2(z, x);
-        Vertices.push_back({x, y, z});
-        Normals.push_back({cos(angle), 0, sin(angle)});
+        TetrahedralMesh.Vertices.push_back({x, y, z});
+        TetrahedralMesh.Normals.push_back({cos(angle), 0, sin(angle)});
         // const auto &normal = tet_mesh.face_data(fid).normal;
         // Normals.push_back({normal.x(), normal.y(), normal.z()});
     }
     for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
         const auto &tes = tet_mesh.face_tessellation(fid);
         for (uint i = 0; i < tes.size(); ++i) {
-            Indices.push_back(tes.at(i));
+            TetrahedralMesh.Indices.push_back(tes.at(i));
         }
     }
+    TetrahedralMesh.UpdateBounds();
+    TetrahedralMesh.Center();
+    ViewMeshType = MeshType_Tetrahedral;
+}
 
-    UpdateBounds();
-    Center();
+void Mesh::Bind() {
+    const auto &data = GetActiveData();
+    Bind(data);
+}
+
+void Mesh::Bind(const Mesh::Data &data) {
+    glGenVertexArrays(1, &VertexArray);
+    glGenBuffers(1, &VertexBuffer);
+    glGenBuffers(1, &NormalBuffer);
+    glGenBuffers(1, &IndexBuffer);
+
+    glBindVertexArray(VertexArray);
+
+    // Bind vertices to layout location 0
+    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Vertices.size(), &data.Vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    // Bind normals to layout location 1
+    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Normals.size(), &data.Normals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * data.Indices.size(), &data.Indices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
 std::string Mesh::GenerateDsp() const {
+    // This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
+    static vector<double> tet_vertices;
+    const auto &tet_vecs = TetrahedralMesh.Vertices;
+    tet_vertices.resize(tet_vecs.size() * 3);
+    for (size_t i = 0; i < tet_vecs.size(); i++) {
+        tet_vertices[i * 3 + 0] = tet_vecs[i].x;
+        tet_vertices[i * 3 + 1] = tet_vecs[i].y;
+        tet_vertices[i * 3 + 2] = tet_vecs[i].z;
+    }
+
+    // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
+    // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
+    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
+    TetMesh VolumetricMesh{
+        int(tet_vecs.size()), tet_vertices.data(), int(tet_indices.size() / 4), (int *)tet_indices.data(),
+        material.youngModulus, material.poissonRatio, material.density};
     return m2f::mesh2faust(
-        VolumetricMesh.get(),
+        &VolumetricMesh,
         "modalModel", // generated object name
         false, // freq control activated
         20, // lowest mode freq
