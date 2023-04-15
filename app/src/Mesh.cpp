@@ -365,28 +365,36 @@ void Mesh::RenderProfileConfig() {
     else if (Profile->RenderConfig()) ExtrudeProfile();
 }
 
-static vector<cinolib::vec3d> v_out;
-static vector<uint> p_out;
-static cinolib::Tetmesh tetmesh;
+static vector<uint> tet_indices;
+static cinolib::Tetmesh tet_mesh;
+static vector<cinolib::vec3d> tet_vecs;
+// This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
+static vector<double> tet_vertices;
 
 void Mesh::CreateTetraheralMesh() {
+    // Write to an obj file and read back into a cinolib tetmesh.
     fs::create_directory("tmp");
     const fs::path path = "tmp/tmp.obj";
     Save(path);
     cinolib::Polygonmesh<> m(path.c_str());
     vector<uint> e_in;
-    tetgen_wrap(m.vector_verts(), m.vector_polys(), e_in, "q", v_out, p_out);
-    tetmesh = cinolib::Tetmesh(v_out, p_out);
+    tetgen_wrap(m.vector_verts(), m.vector_polys(), e_in, "q", tet_vecs, tet_indices);
+    tet_mesh = cinolib::Tetmesh(tet_vecs, tet_indices);
     fs::remove(path); // Delete the temporary file.
 
-    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
-    double vertices[v_out.size() * 3];
-    for (size_t i = 0; i < v_out.size(); i++) {
-        vertices[i * 3 + 0] = v_out[i][0];
-        vertices[i * 3 + 1] = v_out[i][1];
-        vertices[i * 3 + 2] = v_out[i][2];
+    tet_vertices.resize(tet_vecs.size() * 3);
+    for (size_t i = 0; i < tet_vecs.size(); i++) {
+        tet_vertices[i * 3 + 0] = tet_vecs[i][0];
+        tet_vertices[i * 3 + 1] = tet_vecs[i][1];
+        tet_vertices[i * 3 + 2] = tet_vecs[i][2];
     }
-    VolumetricMesh = std::make_unique<TetMesh>(v_out.size(), (double *)vertices, p_out.size() / 4, (int *)p_out.data(), material.youngModulus, material.poissonRatio, material.density);
+
+    // Convert the cinolib tetmesh to a VegaFEM tetmesh.
+    const m2f::MaterialProperties material{1.05E11, 0.33, 8600};
+    VolumetricMesh = std::make_unique<TetMesh>(
+        tet_vecs.size(), tet_vertices.data(), tet_indices.size() / 4, (int *)tet_indices.data(),
+        material.youngModulus, material.poissonRatio, material.density
+    );
 }
 
 void Mesh::BindTetrahedralMesh() {
@@ -400,17 +408,17 @@ void Mesh::BindTetrahedralMesh() {
     glGenBuffers(1, &IndexBuffer);
 
     // Bind vertices, normals, and indices to the tetrahedral mesh.
-    for (size_t i = 0; i < v_out.size(); i++) {
-        const auto &v = v_out[i];
+    for (size_t i = 0; i < tet_vecs.size(); i++) {
+        const auto &v = tet_vecs[i];
         const float x = v[0], y = v[1], z = v[2];
         const float angle = atan2(z, x);
         Vertices.push_back({x, y, z});
         Normals.push_back({cos(angle), 0, sin(angle)});
-        // const auto &normal = tetmesh.face_data(fid).normal;
+        // const auto &normal = tet_mesh.face_data(fid).normal;
         // Normals.push_back({normal.x(), normal.y(), normal.z()});
     }
-    for (uint fid = 0; fid < tetmesh.num_faces(); ++fid) {
-        const auto &tes = tetmesh.face_tessellation(fid);
+    for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
+        const auto &tes = tet_mesh.face_tessellation(fid);
         for (uint i = 0; i < tes.size(); ++i) {
             Indices.push_back(tes.at(i));
         }
