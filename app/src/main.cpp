@@ -144,6 +144,7 @@ int main(int, char **) {
     // Initialize file dialog & audio device.
     NFD_Init();
     Audio.Init();
+    Audio.Run();
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -481,10 +482,9 @@ int main(int, char **) {
             ImGui::PopStyleVar();
         }
 
-        Audio.Update();
         if (Windows.AudioDevice.Visible) {
             ImGui::Begin(Windows.AudioDevice.Name, &Windows.AudioDevice.Visible);
-            Audio.Device.Render();
+            Audio.Render();
             ImGui::End();
         }
         if (Windows.FaustCode.Visible) {
@@ -523,7 +523,7 @@ int main(int, char **) {
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
-    Audio.Destroy();
+    Audio.Stop();
     if (GeneratorThread.joinable()) GeneratorThread.join();
     NFD_Quit();
 

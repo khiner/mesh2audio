@@ -1,8 +1,10 @@
+#include <atomic>
 #include <filesystem>
 #include <fmt/core.h>
 #include <locale>
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #define MINIAUDIO_IMPLEMENTATION
@@ -52,7 +54,7 @@ static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
         static const int optimize_level = -1;
         dsp_factory = createDSPFactoryFromBoxes("FlowGrid", box, argc, argv, "", error_msg, optimize_level);
     }
-    if (!box && error_msg.empty()) error_msg = "`DSPToBoxes` returned no error but did not produce a result.";
+    if (!box && error_msg.empty()) error_msg = "Incomplete Faust code.";
 
     if (dsp_factory && error_msg.empty()) {
         Dsp = dsp_factory->createDSPInstance();
@@ -92,18 +94,22 @@ static bool NeedsRestart(const Audio::FaustState &faust) {
     return needs_restart;
 }
 
-static void Update(Audio::FaustState &faust, u32 sample_rate) {
+static void Update(Audio::FaustState &faust, u32 sample_rate, string *status_out) {
     // Faust setup is only dependent on the faust code.
     const bool is_faust_initialized = !faust.Code.empty() && faust.Error.empty();
     const bool faust_needs_restart = NeedsRestart(faust); // Don't inline! Must run during every update.
     if (!Dsp && is_faust_initialized) {
+        (*status_out) = AudioStatusMessage::Compiling;
         Init(faust, sample_rate);
     } else if (Dsp && !is_faust_initialized) {
         Destroy();
     } else if (faust_needs_restart) {
         Destroy();
+        (*status_out) = AudioStatusMessage::Compiling;
         Init(faust, sample_rate);
     }
+    if (Dsp) (*status_out) = AudioStatusMessage::Running;
+    else (*status_out) = AudioStatusMessage::NoDsp;
 }
 } // namespace FaustContext
 
@@ -133,6 +139,9 @@ const vector<u32> PrioritizedSampleRates = {std::begin(g_maStandardSampleRatePri
 static vector<ma_format> NativeFormats;
 static vector<u32> NativeSampleRates;
 
+static std::thread UpdateWorker;
+static std::atomic<bool> UpdateWorkerRunning = false;
+
 static const ma_device_id *GetDeviceId(IO io, string_view device_name) {
     for (const ma_device_info *info : DeviceInfos[io]) {
         if (info->name == device_name) return &(info->id);
@@ -157,6 +166,7 @@ void FaustProcess(ma_node *node, const float **const_bus_frames_in, ma_uint32 *f
 }
 
 void Audio::Init() {
+    Status = AudioStatusMessage::Initializing;
     for (const IO io : IO_All) {
         DeviceInfos[io].clear();
         DeviceNames[io].clear();
@@ -180,11 +190,13 @@ void Audio::Init() {
     }
 
     Device.Init();
-    FaustContext::Update(Faust, Device.SampleRate);
+    FaustContext::Update(Faust, Device.SampleRate, &Status);
     Graph.Init();
     Device.Start();
 
     NeedsRestart(); // xxx Updates cached values as side effect.
+
+    Status = AudioStatusMessage::Running;
     Update();
 }
 
@@ -195,11 +207,29 @@ void Audio::Destroy() {
 
     const int result = ma_context_uninit(&AudioContext);
     if (result != MA_SUCCESS) throw std::runtime_error(format("Error shutting down audio context: {}", result));
+
+    Status = AudioStatusMessage::Stopped;
+}
+
+void Audio::Run() {
+    UpdateWorkerRunning = true;
+    UpdateWorker = std::thread([&]() {
+        while (UpdateWorkerRunning) {
+            Update();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        Destroy();
+    });
+}
+
+void Audio::Stop() {
+    UpdateWorkerRunning = false;
+    UpdateWorker.join();
 }
 
 void Audio::Update() {
-    FaustContext::Update(Faust, Device.SampleRate);
     const bool is_initialized = Device.IsStarted();
+    if (is_initialized) FaustContext::Update(Faust, Device.SampleRate, &Status);
     const bool needs_restart = NeedsRestart(); // Don't inline! Must run during every update.
     if (Device.On && !is_initialized) {
         Init();
@@ -287,6 +317,32 @@ static string to_string(const IO io, const bool shorten = false) {
         case IO_Out: return shorten ? "out" : "output";
         case IO_None: return "none";
     }
+}
+
+void Audio::Render() {
+    if (Status == AudioStatusMessage::Initializing) {
+        TextUnformatted("Initializing...");
+        return;
+    }
+    if (Status == AudioStatusMessage::Compiling) {
+        TextUnformatted("Compiling...");
+        return;
+    }
+    if (!Faust.Error.empty()) {
+        TextUnformatted(Faust.Error.c_str());
+        return;
+    }
+    if (Status == AudioStatusMessage::NoDsp) {
+        TextUnformatted("No DSP");
+        return;
+    }
+
+    if (Status == AudioStatusMessage::Stopped) {
+        TextUnformatted("Stopped");
+    } else if (Status == AudioStatusMessage::Running) {
+        TextUnformatted("Running");
+    }
+    Device.Render();
 }
 
 void Audio::AudioDevice::Render() {
