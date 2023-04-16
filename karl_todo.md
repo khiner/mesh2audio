@@ -1,11 +1,20 @@
 ## Next up
 
+- Every time a tet mesh is generated, it is automatically saved to disk
+  - Most recent n (say 8) are saved, as (.obj, .jpg) pairs
+  - Just capture image right after tet mesh is loaded
+  - Scroll through all saved tet meshes, and click on image to restore it.
+- Link the generated dsp with the tet mesh used to generate it (the tet mesh active at dsp gen time)
+- Disable 'Generate DSP' button when tet mesh / dsp params are still the same as they were for the most recent dsp gen
+  - Add `DspGenDirty` flag to `Audio`
+- Add params to control all mesh2faust args
+- Excitation positions:
+  - Limit range of excitation position NumEntry
+  - Show excitation position points & labels on mesh, and do a little brightness animation when struck
+  - Hover & click directly on enabled excitation pos to strike
 - Add controls for tet mesh generation params (how fine grained etc)
 - Explore the effect of the mesh scale (uniform) on the bell model
   - Add scale control for dsp generation
-- Implement UI for the generated Faust code
-  - Make the text editor non-editable (read-only) by default
-  - Editing removes faust UI (which is specialized to assuming the default model dsp code)
 - Waveform & spectrogram
 - Calculate mode frequencies empirically for validation against known bell modes
 - Use axisymmetric solver (via file IO)

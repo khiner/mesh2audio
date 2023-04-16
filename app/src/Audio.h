@@ -15,9 +15,10 @@ static const string Stopped = "Stopped";
 
 struct Audio {
     struct FaustState {
-        string Code = R"(import("stdfaust.lib");
-process = ba.beat(240) : pm.djembe(60, 0.3, 0.4, 1);)";
+        string Code = "";
         string Error;
+
+        void Render() const;
     };
 
     struct AudioDevice {
@@ -32,7 +33,7 @@ process = ba.beat(240) : pm.djembe(60, 0.3, 0.4, 1);)";
         bool IsStarted() const;
 
         bool On = true;
-        bool Muted = true;
+        bool Muted = false;
         float Volume = 1.0; // Master volume. Corresponds to `ma_device_set_master_volume`.
         string InDeviceName, OutDeviceName;
         int InFormat, OutFormat;

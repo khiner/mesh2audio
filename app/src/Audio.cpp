@@ -20,6 +20,7 @@ using Sample = float;
 #include "imgui.h"
 
 #include "Audio.h"
+#include "FaustParams.h"
 
 using fmt::format;
 using std::string_view, std::vector;
@@ -35,6 +36,7 @@ static string Capitalize(string copy) {
 
 namespace FaustContext {
 static dsp *Dsp = nullptr;
+static std::unique_ptr<FaustParams> Ui;
 
 static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
     createLibContext();
@@ -61,21 +63,19 @@ static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
         if (!Dsp) error_msg = "Could not create Faust DSP.";
         else {
             Dsp->init(sample_rate);
-            // Ui = make_unique<FaustParams>();
-            // Dsp->buildUserInterface(Ui.get());
+            Ui = std::make_unique<FaustParams>();
+            Dsp->buildUserInterface(Ui.get());
         }
     }
 
     if (!error_msg.empty()) faust.Error = error_msg;
     else if (!faust.Error.empty()) faust.Error = "";
 
-    // OnBoxChange(box);
-    // OnUiChange(Ui.get());
+    OnUiChange(Ui.get());
 }
 
 static void Destroy() {
-    // OnBoxChange(nullptr);
-    // OnUiChange(nullptr);
+    OnUiChange(nullptr);
 
     if (Dsp) {
         delete Dsp;

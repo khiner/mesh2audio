@@ -42,7 +42,6 @@ static std::thread GeneratorThread; // Worker thread for generating tetrahedral 
 static string GeneratedDsp; // The most recently generated DSP code.
 
 // DSP code in addition to the model, to make it playable.
-// TODO after getting Faust UI working, replace `ba.beat(...)` with `gate`.
 // TODO deinterleave samples from Faust to miniaudio, then add "<: _,_" to the end of the dsp for stereo.
 static const string FaustInstrumentDsp = R"(
 
@@ -62,11 +61,18 @@ with{
   att = (1-hardness)*0.01+0.001;
 };
 
-process = hammer(ba.beat(24),hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
+process = hammer(gate,hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
 )";
 
 static char *GenerateTetMsg = "Generating tetrahedral mesh...";
 static char *GenerateDspMsg = "Generating DSP code...";
+
+static void PreparePopup() {
+    const auto &center = ImGui::GetMainViewport()->GetCenter();
+    const auto &popup_size = ImGui::GetMainViewport()->Size / 4;
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
+    ImGui::SetNextWindowSize(popup_size);
+}
 
 int main(int, char **) {
     // Setup SDL
@@ -206,9 +212,9 @@ int main(int, char **) {
         auto dockspace_id = ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
         if (ImGui::GetFrameCount() == 1) {
             auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
-            auto faust_code_node_id = ImGui::DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
+            auto audio_model_node_id = ImGui::DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
             ImGui::DockBuilderDockWindow(Windows.AudioDevice.Name, audio_node_id);
-            ImGui::DockBuilderDockWindow(Windows.FaustCode.Name, faust_code_node_id);
+            ImGui::DockBuilderDockWindow(Windows.AudioModel.Name, audio_model_node_id);
             auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
             ImGui::DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
             ImGui::DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
@@ -219,7 +225,6 @@ int main(int, char **) {
             ImGui::DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
             ImGui::DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
         }
-
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Load mesh", nullptr)) {
@@ -248,7 +253,7 @@ int main(int, char **) {
             }
             if (ImGui::BeginMenu("Windows")) {
                 ImGui::MenuItem(Windows.AudioDevice.Name, nullptr, &Windows.AudioDevice.Visible);
-                ImGui::MenuItem(Windows.FaustCode.Name, nullptr, &Windows.FaustCode.Visible);
+                ImGui::MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
                 ImGui::MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
                 ImGui::MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
                 ImGui::MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
@@ -270,10 +275,7 @@ int main(int, char **) {
                     if (mesh == nullptr) {
                         ImGui::Text("No mesh has been loaded.");
                     } else {
-                        const auto &center = ImGui::GetMainViewport()->GetCenter();
-                        const auto &popup_size = ImGui::GetMainViewport()->Size / 4;
-                        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
-                        ImGui::SetNextWindowSize(popup_size);
+                        PreparePopup();
                         if (ImGui::BeginPopupModal(GenerateTetMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                             const auto &ws = ImGui::GetWindowSize();
                             const float spinner_dim = std::min(ws.x, ws.y) / 2;
@@ -282,24 +284,8 @@ int main(int, char **) {
                             if (mesh->HasTetrahedralMesh()) ImGui::CloseCurrentPopup();
                             ImGui::EndPopup();
                         }
-                        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
-                        ImGui::SetNextWindowSize(popup_size);
-                        if (ImGui::BeginPopupModal(GenerateDspMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                            const auto &ws = ImGui::GetWindowSize();
-                            const float spinner_dim = std::min(ws.x, ws.y) / 2;
-                            ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
-                            ImSpinner::SpinnerWaveDots(GenerateDspMsg, spinner_dim / 2, 3);
-                            if (!GeneratedDsp.empty()) {
-                                Audio.Faust.Code = GeneratedDsp;
-                                GeneratedDsp = "";
-                                if (GeneratorThread.joinable()) GeneratorThread.join();
-                                ImGui::CloseCurrentPopup();
-                            }
-                            ImGui::EndPopup();
-                        }
                         ImGui::Text("File: %s", mesh->FilePath.c_str());
-                        const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
-                        if (has_tetrahedral_mesh) {
+                        if (mesh->HasTetrahedralMesh()) {
                             ImGui::TextUnformatted("Tetrahedral mesh: Yes");
                             ImGui::TextUnformatted("View mesh type");
                             ImGui::RadioButton("Triangular", &Mesh::ViewMeshType, Mesh::MeshType_Triangular);
@@ -313,40 +299,6 @@ int main(int, char **) {
                                 GeneratorThread = std::thread([&] { mesh->CreateTetraheralMesh(); });
                             }
                         }
-                        if (has_tetrahedral_mesh) {
-                            ImGui::SeparatorText("Material properties");
-                            // Presets
-                            static std::string selected_preset = "Copper";
-                            if (ImGui::BeginCombo("Presets", selected_preset.c_str())) {
-                                for (const auto &[preset_name, material] : Mesh::MaterialPresets) {
-                                    bool is_selected = (preset_name == selected_preset);
-                                    if (ImGui::Selectable(preset_name.c_str(), is_selected)) {
-                                        selected_preset = preset_name;
-                                        mesh->Material = material;
-                                    }
-                                    if (is_selected) ImGui::SetItemDefaultFocus();
-                                }
-                                ImGui::EndCombo();
-                            }
-                            ImGui::Text("Young's modulus (Pa)");
-                            ImGui::InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
-                            ImGui::Text("Poisson's ratio");
-                            ImGui::InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
-                            ImGui::Text("Density (kg/m^3)");
-                            ImGui::InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
-                        }
-                        if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
-                        if (ImGui::Button("Generate Faust DSP")) {
-                            ImGui::OpenPopup(GenerateDspMsg);
-                            if (GeneratorThread.joinable()) GeneratorThread.join();
-                            GeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
-                        }
-                        if (!has_tetrahedral_mesh) {
-                            ImGui::SameLine();
-                            ImGui::TextUnformatted("(Requires tetrahedral mesh)");
-                            ImGui::EndDisabled();
-                        }
-
                         ImGui::SeparatorText("Modify");
                         if (ImGui::Button("Center")) mesh->Center();
                         ImGui::Text("Flip");
@@ -508,9 +460,73 @@ int main(int, char **) {
             Audio.Render();
             ImGui::End();
         }
-        if (Windows.FaustCode.Visible) {
-            ImGui::Begin(Windows.FaustCode.Name, &Windows.FaustCode.Visible);
-            ImGui::InputTextMultiline("##Faust", &Audio.Faust.Code, ImGui::GetContentRegionAvail());
+        if (Windows.AudioModel.Visible) {
+            ImGui::Begin(Windows.AudioModel.Name, &Windows.AudioModel.Visible);
+
+            if (ImGui::BeginTabBar("Audio model")) {
+                if (ImGui::BeginTabItem("Model")) {
+                    const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
+                    if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
+                    if (ImGui::Button("Generate DSP")) {
+                        ImGui::OpenPopup(GenerateDspMsg);
+                        if (GeneratorThread.joinable()) GeneratorThread.join();
+                        GeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
+                    }
+                    PreparePopup();
+                    if (ImGui::BeginPopupModal(GenerateDspMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        const auto &ws = ImGui::GetWindowSize();
+                        const float spinner_dim = std::min(ws.x, ws.y) / 2;
+                        ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
+                        ImSpinner::SpinnerWaveDots(GenerateDspMsg, spinner_dim / 2, 3);
+                        if (!GeneratedDsp.empty()) {
+                            Audio.Faust.Code = GeneratedDsp;
+                            GeneratedDsp = "";
+                            if (GeneratorThread.joinable()) GeneratorThread.join();
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+                    if (!has_tetrahedral_mesh) {
+                        ImGui::SameLine();
+                        ImGui::TextUnformatted("Run |Mesh Controls|->|Mesh|->|Create tetrahedral mesh|.");
+                        ImGui::EndDisabled();
+                    }
+                    if (has_tetrahedral_mesh) {
+                        ImGui::SeparatorText("Material properties");
+                        // Presets
+                        static std::string selected_preset = "Copper";
+                        if (ImGui::BeginCombo("Presets", selected_preset.c_str())) {
+                            for (const auto &[preset_name, material] : Mesh::MaterialPresets) {
+                                bool is_selected = (preset_name == selected_preset);
+                                if (ImGui::Selectable(preset_name.c_str(), is_selected)) {
+                                    selected_preset = preset_name;
+                                    mesh->Material = material;
+                                }
+                                if (is_selected) ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        ImGui::Text("Young's modulus (Pa)");
+                        ImGui::InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        ImGui::Text("Poisson's ratio");
+                        ImGui::InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        ImGui::Text("Density (kg/m^3)");
+                        ImGui::InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                    }
+                    ImGui::EndTabItem();
+                }
+                if (!Audio.Faust.Code.empty()) {
+                    if (ImGui::BeginTabItem("Code")) {
+                        ImGui::Text(Audio.Faust.Code.c_str());
+                        ImGui::EndTabItem();
+                    }
+                    if (ImGui::BeginTabItem("Params")) {
+                        Audio.Faust.Render();
+                        ImGui::EndTabItem();
+                    }
+                }
+                ImGui::EndTabBar();
+            }
             ImGui::End();
         }
 

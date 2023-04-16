@@ -7,7 +7,7 @@ struct Window {
 
 struct WindowsState {
     Window AudioDevice{"Audio Device"};
-    Window FaustCode{"Faust Code"};
+    Window AudioModel{"Audio Model"};
     Window MeshControls{"Mesh Controls"};
     Window Mesh{"Mesh"};
     Window MeshProfile{"Mesh Profile"};
