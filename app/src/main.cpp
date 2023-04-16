@@ -34,6 +34,7 @@ static const mat4 Identity(1.f);
 
 static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 static string GeneratedDsp; // The most recently generated DSP code.
+static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 
 // DSP code in addition to the model, to make it playable.
 static const string FaustInstrumentDsp = R"(
@@ -325,14 +326,25 @@ int main(int, char **) {
         if (Windows.AudioModel.Visible) {
             Begin(Windows.AudioModel.Name, &Windows.AudioModel.Visible);
 
+            if (!DspTetMeshPath.empty()) {
+                const string name = Mesh::GetTetMeshName(DspTetMeshPath);
+                Text("Current DSP generated from tetrahedral mesh\ncreated at %s", name.c_str());
+            }
             if (BeginTabBar("Audio model")) {
                 if (BeginTabItem("Model")) {
-                    const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
+                    const bool has_tetrahedral_mesh = mesh->HasTetMesh();
                     if (!has_tetrahedral_mesh) BeginDisabled();
                     if (Button("Generate DSP")) {
                         OpenPopup(GenerateDspMsg.c_str());
                         if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
-                        DspGeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
+                        DspGeneratorThread = std::thread([&] {
+                            const string generated_dsp = mesh->GenerateDsp();
+                            if (!generated_dsp.empty()) {
+                                // Cache the path to the tet mesh that was used to generate the most recent DSP.
+                                DspTetMeshPath = mesh->TetMeshPath;
+                                GeneratedDsp = generated_dsp + FaustInstrumentDsp;
+                            }
+                        });
                     }
                     const auto &center = GetMainViewport()->GetCenter();
                     const auto &popup_size = GetMainViewport()->Size / 4;
@@ -353,7 +365,7 @@ int main(int, char **) {
                     }
                     if (!has_tetrahedral_mesh) {
                         SameLine();
-                        TextUnformatted("Run |Mesh Controls|->|Mesh|->|Create tetrahedral mesh|.");
+                        TextUnformatted("Run |Mesh Controls|->|Mesh|->|Generate tetrahedral mesh|.");
                         EndDisabled();
                     }
                     if (has_tetrahedral_mesh) {

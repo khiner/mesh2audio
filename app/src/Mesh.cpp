@@ -25,7 +25,7 @@
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 // std::cout << fmt::format("{}", duration) << std::endl;
 
-using std::string;
+using std::string, std::to_string;
 
 // Alias for epoch seconds.
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
@@ -143,7 +143,7 @@ Mesh::~Mesh() {
 
 const Mesh::Data &Mesh::GetActiveData() const {
     if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
-    return TetrahedralMesh;
+    return TetMesh;
 }
 
 void Mesh::Save(fs::path file_path) const {
@@ -153,28 +153,29 @@ void Mesh::Save(fs::path file_path) const {
 
 void Mesh::Flip(bool x, bool y, bool z) {
     TriangularMesh.Flip(x, y, z);
-    TetrahedralMesh.Flip(x, y, z);
+    TetMesh.Flip(x, y, z);
     Bind();
 }
 void Mesh::Rotate(const vec3 &axis, float angle) {
     TriangularMesh.Rotate(axis, angle);
-    TetrahedralMesh.Rotate(axis, angle);
+    TetMesh.Rotate(axis, angle);
     Bind();
 }
 void Mesh::Scale(const vec3 &scale) {
     TriangularMesh.Scale(scale);
-    TetrahedralMesh.Scale(scale);
+    TetMesh.Scale(scale);
     Bind();
 }
 void Mesh::Center() {
     TriangularMesh.Center();
-    TetrahedralMesh.Center();
+    TetMesh.Center();
     Bind();
 }
 void Mesh::ExtrudeProfile() {
     if (Profile == nullptr) return;
 
-    TetrahedralMesh.Clear();
+    TetMesh.Clear();
+    TetMeshPath.clear();
     TriangularMesh.ExtrudeProfile(*Profile);
     ActiveViewMeshType = MeshType_Triangular;
     Bind();
@@ -330,7 +331,7 @@ void Mesh::UpdateCameraProjection(const ImVec2 &size) {
 }
 
 void Mesh::Render() {
-    if (TetrahedralMesh.Empty() && ViewMeshType == MeshType_Tetrahedral) {
+    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
         ViewMeshType = MeshType_Triangular;
     }
     if (ActiveViewMeshType != ViewMeshType) {
@@ -392,56 +393,67 @@ static const int MaxSavedTetMeshes = 8;
 // Store flat tet indices, to convert to Vega tetmesh later.
 static vector<uint> tet_indices;
 
+static string FormatTime(seconds_t seconds) {
+    return fmt::format("{:%m-%d %H:%M:%S %Z}", seconds);
+}
+
+static seconds_t GetTimeFromPath(const fs::path &file_path) {
+    const string &filename = file_path.stem(); // Name without extension.
+    return seconds_t{std::chrono::seconds(std::stoi(filename))};
+}
+
+string Mesh::GetTetMeshName(fs::path file_path) {
+    return FormatTime(GetTimeFromPath(file_path));
+}
+
 static vector<seconds_t> GetSavedTetMeshTimes() {
     vector<seconds_t> saved_tet_mesh_times;
     for (const auto &entry : fs::directory_iterator(TetSaveDir)) {
-        const string filename = entry.path().stem(); // Name without extension.
-        const seconds_t seconds{std::chrono::seconds(std::stoi(filename))};
-        saved_tet_mesh_times.push_back(seconds);
+        saved_tet_mesh_times.push_back(GetTimeFromPath(entry.path()));
     }
-
     // Sort by most recent first.
     std::sort(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end(), std::greater<>());
     return saved_tet_mesh_times;
 }
 
-void Mesh::LoadTetMesh(fs::path file_path) {
-    vector<cinolib::vec3d> tet_vecs;
-    vector<vector<uint>> tet_polys;
-    read_MESH(file_path.c_str(), tet_vecs, tet_polys);
-    LoadTetMesh(tet_vecs, tet_polys);
-}
-
-void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
+void Mesh::LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
     const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
-    TetrahedralMesh.Clear();
-    TetrahedralMesh.Vertices.reserve(tet_vecs.size());
-    TetrahedralMesh.Normals.reserve(tet_vecs.size());
-    TetrahedralMesh.Indices.reserve(tet_mesh.num_faces() * 3);
+    TetMesh.Clear();
+    TetMesh.Vertices.reserve(tet_vecs.size());
+    TetMesh.Normals.reserve(tet_vecs.size());
+    TetMesh.Indices.reserve(tet_mesh.num_faces() * 3);
 
     // Bind vertices, normals, and indices to the tetrahedral mesh.
     for (size_t i = 0; i < tet_vecs.size(); i++) {
         const auto &v = tet_vecs[i];
         const float x = v[0], y = v[1], z = v[2];
         const float angle = atan2(z, x);
-        TetrahedralMesh.Vertices.push_back({x, y, z});
-        TetrahedralMesh.Normals.push_back({cos(angle), 0, sin(angle)});
+        TetMesh.Vertices.push_back({x, y, z});
+        TetMesh.Normals.push_back({cos(angle), 0, sin(angle)});
         // const auto &normal = tet_mesh.face_data(fid).normal;
         // Normals.push_back({normal.x(), normal.y(), normal.z()});
     }
     for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
         const auto &tes = tet_mesh.face_tessellation(fid);
         for (uint i = 0; i < tes.size(); ++i) {
-            TetrahedralMesh.Indices.push_back(tes.at(i));
+            TetMesh.Indices.push_back(tes.at(i));
         }
     }
-    TetrahedralMesh.UpdateBounds();
-    TetrahedralMesh.Center();
+    TetMesh.UpdateBounds();
+    TetMesh.Center();
+    TetMeshPath = file_path;
     ViewMeshType = MeshType_Tetrahedral;
     ActiveViewMeshType = MeshType_Triangular; // Force an automatic rebind on the next render (xxx crappy way of doing this).
 }
 
-void Mesh::CreateTetraheralMesh() {
+void Mesh::LoadTetMesh(fs::path file_path) {
+    vector<cinolib::vec3d> tet_vecs;
+    vector<vector<uint>> tet_polys;
+    read_MESH(file_path.c_str(), tet_vecs, tet_polys);
+    LoadTetMesh(file_path, tet_vecs, tet_polys);
+}
+
+void Mesh::GenerateTetMesh() {
     static vector<cinolib::vec3d> tet_vecs;
     // Write to an obj file and read back into a cinolib tetmesh.
     fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
@@ -452,21 +464,19 @@ void Mesh::CreateTetraheralMesh() {
     tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
     fs::remove(tmp_obj_path); // Delete the temporary file.
 
-    // Write the tet mesh to disk, deleting the oldest tet mesh if past the max save limit.
+    // Write the tet mesh to disk, deleting the oldest tet mesh(es) if this puts us past the max save limit.
     fs::create_directory(TetSaveDir);
-
     const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
-    if (saved_tet_mesh_times.size() >= MaxSavedTetMeshes) {
-        const seconds_t oldest_time = *std::min_element(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end());
-        fs::remove(TetSaveDir / (std::to_string(oldest_time.time_since_epoch().count()) + ".mesh"));
+    for (int delete_i = saved_tet_mesh_times.size() - 1; delete_i >= MaxSavedTetMeshes - 1; delete_i--) {
+        const seconds_t oldest_time = saved_tet_mesh_times.at(delete_i);
+        fs::remove(TetSaveDir / (to_string(oldest_time.time_since_epoch().count()) + ".mesh"));
     }
     const int epoch_seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    const string tet_mesh_name = TetSaveDir / (std::to_string(epoch_seconds) + ".mesh");
-
+    const fs::path file_path = TetSaveDir / (to_string(epoch_seconds) + ".mesh");
     const auto &tet_polys = cinolib::polys_from_serialized_vids(tet_indices, 4);
-    write_MESH(tet_mesh_name.c_str(), tet_vecs, tet_polys);
+    write_MESH(file_path.c_str(), tet_vecs, tet_polys);
 
-    LoadTetMesh(tet_vecs, tet_polys);
+    LoadTetMesh(file_path, tet_vecs, tet_polys);
 }
 
 void Mesh::Bind() {
@@ -502,9 +512,11 @@ void Mesh::Bind(const Mesh::Data &data) {
 }
 
 string Mesh::GenerateDsp() const {
+    if (!HasTetMesh()) return ""; // Tet mesh must be generated first.
+
     // This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
     static vector<double> tet_vertices;
-    const auto &tet_vecs = TetrahedralMesh.Vertices;
+    const auto &tet_vecs = TetMesh.Vertices;
     tet_vertices.resize(tet_vecs.size() * 3);
     for (size_t i = 0; i < tet_vecs.size(); i++) {
         tet_vertices[i * 3 + 0] = tet_vecs[i].x;
@@ -514,12 +526,12 @@ string Mesh::GenerateDsp() const {
 
     // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
-    TetMesh VolumetricMesh{
+    ::TetMesh volumetric_mesh{
         int(tet_vecs.size()), tet_vertices.data(), int(tet_indices.size() / 4), (int *)tet_indices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
     return m2f::mesh2faust(
-        &VolumetricMesh,
+        &volumetric_mesh,
         "modalModel", // generated object name
         false, // freq control activated
         20, // lowest mode freq
@@ -547,31 +559,36 @@ void Mesh::RenderConfig() {
                 const float spinner_dim = std::min(ws.x, ws.y) / 2;
                 SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
                 ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg.c_str(), spinner_dim / 2, 3);
-                if (HasTetrahedralMesh()) CloseCurrentPopup();
+                if (HasTetMesh()) CloseCurrentPopup();
                 EndPopup();
             }
             Text("File: %s", FilePath.c_str());
-            if (HasTetrahedralMesh()) {
-                TextUnformatted("Tetrahedral mesh: Yes");
+            if (HasTetMesh()) {
+                const string name = GetTetMeshName(TetMeshPath);
+                Text(
+                    "Current tetrahedral mesh:\n\tGenerated: %s\n\tVertices: %lu\n\tIndices: %lu",
+                    name.c_str(), TetMesh.Vertices.size(), TetMesh.Indices.size()
+                );
                 TextUnformatted("View mesh type");
-                RadioButton("Triangular", &Mesh::ViewMeshType, Mesh::MeshType_Triangular);
+                RadioButton("Triangular", &ViewMeshType, MeshType_Triangular);
                 SameLine();
-                RadioButton("Tetrahedral", &Mesh::ViewMeshType, Mesh::MeshType_Tetrahedral);
+                RadioButton("Tetrahedral", &ViewMeshType, MeshType_Tetrahedral);
             } else {
-                TextUnformatted("Tetrahedral mesh: No");
-                if (Button("Create tetrahedral mesh")) {
+                TextUnformatted("No tetrahedral mesh loaded");
+                if (Button("Generate tetrahedral mesh")) {
                     OpenPopup(GenerateTetMsg.c_str());
                     if (GeneratorThread.joinable()) GeneratorThread.join();
-                    GeneratorThread = std::thread([&] { CreateTetraheralMesh(); });
+                    GeneratorThread = std::thread([&] { GenerateTetMesh(); });
                 }
             }
             // Dropdown to select from saved tet meshes and load.
             if (BeginCombo("Saved tet meshes", nullptr)) {
                 const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
+                if (saved_tet_mesh_times.empty()) TextUnformatted("No saved tet meshes");
                 for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
-                    const string formatted_time = fmt::format("{:%m-%d %H:%M:%S %Z}", tet_mesh_time);
+                    const string formatted_time = FormatTime(tet_mesh_time);
                     if (Selectable(formatted_time.c_str(), false)) {
-                        LoadTetMesh(TetSaveDir / (std::to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
+                        LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
                     }
                 }
                 EndCombo();
@@ -596,16 +613,16 @@ void Mesh::RenderConfig() {
             if (Button("Z##Rotate")) Rotate({0, 0, 1}, 90);
 
             SeparatorText("Render mode");
-            RadioButton("Smooth", &RenderMode, Mesh::RenderType_Smooth);
+            RadioButton("Smooth", &RenderMode, RenderType_Smooth);
             SameLine();
-            RadioButton("Lines", &RenderMode, Mesh::RenderType_Lines);
-            RadioButton("Point cloud", &RenderMode, Mesh::RenderType_Points);
+            RadioButton("Lines", &RenderMode, RenderType_Lines);
+            RadioButton("Point cloud", &RenderMode, RenderType_Points);
             SameLine();
-            RadioButton("Mesh", &RenderMode, Mesh::RenderType_Mesh);
+            RadioButton("Mesh", &RenderMode, RenderType_Mesh);
             NewLine();
             SeparatorText("Gizmo");
-            Checkbox("Show gizmo", &Mesh::ShowGizmo);
-            if (Mesh::ShowGizmo) {
+            Checkbox("Show gizmo", &ShowGizmo);
+            if (ShowGizmo) {
                 const string interaction_text = "Interaction: " +
                     string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
                                ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
@@ -614,13 +631,13 @@ void Mesh::RenderConfig() {
                                                                                                          "Not interacting");
                 TextUnformatted(interaction_text.c_str());
 
-                if (IsKeyPressed(ImGuiKey_T)) Mesh::GizmoOp = ImGuizmo::TRANSLATE;
-                if (IsKeyPressed(ImGuiKey_R)) Mesh::GizmoOp = ImGuizmo::ROTATE;
-                if (IsKeyPressed(ImGuiKey_S)) Mesh::GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Translate (T)", Mesh::GizmoOp == ImGuizmo::TRANSLATE)) Mesh::GizmoOp = ImGuizmo::TRANSLATE;
-                if (RadioButton("Rotate (R)", Mesh::GizmoOp == ImGuizmo::ROTATE)) Mesh::GizmoOp = ImGuizmo::ROTATE;
-                if (RadioButton("Scale (S)", Mesh::GizmoOp == ImGuizmo::SCALE)) Mesh::GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Universal", Mesh::GizmoOp == ImGuizmo::UNIVERSAL)) Mesh::GizmoOp = ImGuizmo::UNIVERSAL;
+                if (IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
+                if (IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
+                if (IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
+                if (RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
+                if (RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
                 Checkbox("Bound sizing", &ShowBounds);
             }
             EndTabItem();
@@ -637,14 +654,14 @@ void Mesh::RenderConfig() {
 
             float camera_distance = CameraDistance;
             if (SliderFloat("Distance", &camera_distance, .1f, 10.f)) {
-                Mesh::SetCameraDistance(camera_distance);
+                SetCameraDistance(camera_distance);
             }
             EndTabItem();
         }
         if (BeginTabItem("Lighing")) {
             SeparatorText("Colors");
             Checkbox("Custom colors", &CustomColor);
-            if (Mesh::CustomColor) {
+            if (CustomColor) {
                 ColorEdit3("Ambient", &Ambient[0]);
                 ColorEdit3("Diffusion", &Diffusion[0]);
                 ColorEdit3("Specular", &Specular[0]);

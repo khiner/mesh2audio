@@ -70,10 +70,11 @@ struct Mesh {
     const Data &GetActiveData() const;
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
-    void CreateTetraheralMesh();
+    void GenerateTetMesh();
     void LoadTetMesh(fs::path file_path);
-    void LoadTetMesh(const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
-    bool HasTetrahedralMesh() const { return !TetrahedralMesh.Empty(); }
+    void LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
+    bool HasTetMesh() const { return !TetMeshPath.empty(); }
+    static std::string GetTetMeshName(fs::path file_path);
 
     std::string GenerateDsp() const;
 
@@ -104,6 +105,8 @@ struct Mesh {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
 
+    fs::path TetMeshPath; // Path to the current loaded tet mesh.
+
     inline static std::map<std::string, MaterialProperties> MaterialPresets = {
         {"Copper", {110e9f, 0.33f, 8600.0f}}, // 8900
         {"Aluminum", {70e9f, 0.35f, 2700.0f}},
@@ -124,7 +127,7 @@ private:
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
-    struct Data TriangularMesh, TetrahedralMesh;
+    struct Data TriangularMesh, TetMesh;
     Type ActiveViewMeshType = MeshType_Triangular;
 
     unsigned int VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
