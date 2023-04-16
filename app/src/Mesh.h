@@ -4,6 +4,8 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
+#include <cinolib/geometry/vec_mat.h>
+
 #include "MeshProfile.h"
 
 #include "ImGuizmo.h"
@@ -69,6 +71,8 @@ struct Mesh {
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void CreateTetraheralMesh();
+    void LoadTetMesh(fs::path file_path);
+    void LoadTetMesh(const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
     bool HasTetrahedralMesh() const { return !TetrahedralMesh.Empty(); }
 
     std::string GenerateDsp() const;

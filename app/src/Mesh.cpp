@@ -1,5 +1,6 @@
 #include "Mesh.h"
 
+#include <fstream>
 #include <iomanip>
 #include <thread>
 
@@ -9,24 +10,25 @@
 
 #include "imspinner.h"
 
-#include <fstream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include <cinolib/geometry/vec_mat.h>
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
 
 #include "Shader.h"
 
-// #include <fmt/chrono.h>
+#include <fmt/chrono.h>
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 // std::cout << fmt::format("{}", duration) << std::endl;
 
 using std::string;
+
+// Alias for epoch seconds.
+using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
 
 static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes.
 
@@ -390,37 +392,28 @@ static const int MaxSavedTetMeshes = 8;
 // Store flat tet indices, to convert to Vega tetmesh later.
 static vector<uint> tet_indices;
 
-void Mesh::CreateTetraheralMesh() {
-    // todo:
-    // - Scroll through all saved tet meshes by timestamp, and click timestampe to restore
-
-    static vector<cinolib::vec3d> tet_vecs;
-    static vector<vector<uint>> tet_polys;
-    // Write to an obj file and read back into a cinolib tetmesh.
-    fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
-    const fs::path tmp_obj_path = TempDir / "tmp.obj";
-    Save(tmp_obj_path);
-    cinolib::Polygonmesh<> poly_mesh(tmp_obj_path.c_str());
-    vector<uint> edges_in; // Not used.
-    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
-    fs::remove(tmp_obj_path); // Delete the temporary file.
-
-    // Write the tet mesh to disk, deleting the oldest tet mesh if past the max save limit.
-    fs::create_directory(TetSaveDir);
-    vector<int> saved_tet_mesh_times;
-    for (const auto &entry : fs::directory_iterator()) {
+static vector<seconds_t> GetSavedTetMeshTimes() {
+    vector<seconds_t> saved_tet_mesh_times;
+    for (const auto &entry : fs::directory_iterator(TetSaveDir)) {
         const string filename = entry.path().stem(); // Name without extension.
-        saved_tet_mesh_times.push_back(std::stoi(filename));
+        const seconds_t seconds{std::chrono::seconds(std::stoi(filename))};
+        saved_tet_mesh_times.push_back(seconds);
     }
-    if (saved_tet_mesh_times.size() >= MaxSavedTetMeshes) {
-        const int oldest_time = *std::min_element(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end());
-        fs::remove(TetSaveDir / (std::to_string(oldest_time) + ".mesh"));
-    }
-    const int epoch_seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    const string tet_mesh_name = TetSaveDir / (std::to_string(epoch_seconds) + ".mesh");
-    write_MESH(tet_mesh_name.c_str(), tet_vecs, cinolib::polys_from_serialized_vids(tet_indices, 4));
 
-    const cinolib::Tetmesh tet_mesh{tet_vecs, tet_indices};
+    // Sort by most recent first.
+    std::sort(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end(), std::greater<>());
+    return saved_tet_mesh_times;
+}
+
+void Mesh::LoadTetMesh(fs::path file_path) {
+    vector<cinolib::vec3d> tet_vecs;
+    vector<vector<uint>> tet_polys;
+    read_MESH(file_path.c_str(), tet_vecs, tet_polys);
+    LoadTetMesh(tet_vecs, tet_polys);
+}
+
+void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
+    const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
     TetrahedralMesh.Clear();
     TetrahedralMesh.Vertices.reserve(tet_vecs.size());
     TetrahedralMesh.Normals.reserve(tet_vecs.size());
@@ -445,6 +438,35 @@ void Mesh::CreateTetraheralMesh() {
     TetrahedralMesh.UpdateBounds();
     TetrahedralMesh.Center();
     ViewMeshType = MeshType_Tetrahedral;
+    ActiveViewMeshType = MeshType_Triangular; // Force an automatic rebind on the next render (xxx crappy way of doing this).
+}
+
+void Mesh::CreateTetraheralMesh() {
+    static vector<cinolib::vec3d> tet_vecs;
+    // Write to an obj file and read back into a cinolib tetmesh.
+    fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
+    const fs::path tmp_obj_path = TempDir / "tmp.obj";
+    Save(tmp_obj_path);
+    cinolib::Polygonmesh<> poly_mesh(tmp_obj_path.c_str());
+    vector<uint> edges_in; // Not used.
+    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
+    fs::remove(tmp_obj_path); // Delete the temporary file.
+
+    // Write the tet mesh to disk, deleting the oldest tet mesh if past the max save limit.
+    fs::create_directory(TetSaveDir);
+
+    const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
+    if (saved_tet_mesh_times.size() >= MaxSavedTetMeshes) {
+        const seconds_t oldest_time = *std::min_element(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end());
+        fs::remove(TetSaveDir / (std::to_string(oldest_time.time_since_epoch().count()) + ".mesh"));
+    }
+    const int epoch_seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const string tet_mesh_name = TetSaveDir / (std::to_string(epoch_seconds) + ".mesh");
+
+    const auto &tet_polys = cinolib::polys_from_serialized_vids(tet_indices, 4);
+    write_MESH(tet_mesh_name.c_str(), tet_vecs, tet_polys);
+
+    LoadTetMesh(tet_vecs, tet_polys);
 }
 
 void Mesh::Bind() {
@@ -516,7 +538,6 @@ using namespace ImGui;
 void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
-            // Duplicated in main, but eh.
             const auto &center = GetMainViewport()->GetCenter();
             const auto &popup_size = GetMainViewport()->Size / 4;
             SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
@@ -544,6 +565,18 @@ void Mesh::RenderConfig() {
                     GeneratorThread = std::thread([&] { CreateTetraheralMesh(); });
                 }
             }
+            // Dropdown to select from saved tet meshes and load.
+            if (BeginCombo("Saved tet meshes", nullptr)) {
+                const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
+                for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
+                    const string formatted_time = fmt::format("{:%m-%d %H:%M:%S %Z}", tet_mesh_time);
+                    if (Selectable(formatted_time.c_str(), false)) {
+                        LoadTetMesh(TetSaveDir / (std::to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
+                    }
+                }
+                EndCombo();
+            }
+
             SeparatorText("Modify");
             if (Button("Center")) Center();
             Text("Flip");
