@@ -44,6 +44,7 @@ struct MeshProfile {
 
     // If true, the last vertex will be connected to the first vertex.
     // If true, and if the x pos of the first or last vertex is not zero, the extruded mesh will have a hole in the middle.
+    // Note: Leaving this param, but not making it configurable, since leaving a hole in the middle doesn't seem to work with tetgen.
     inline static bool ClosePath{false};
 
 private:

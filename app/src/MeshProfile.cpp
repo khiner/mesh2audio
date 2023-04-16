@@ -142,7 +142,7 @@ bool MeshProfile::RenderConfig() {
     bool modified = ImGui::SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("Curve tol.", &CurveTolerance, 0.00001f, 0.5f, "%.5f", ImGuiSliderFlags_Logarithmic);
     modified |= ImGui::SliderFloat("X-Offset", &OffsetX, 0, 1.f);
-    modified |= ImGui::Checkbox("Close path", &ClosePath);
+    // modified |= ImGui::Checkbox("Close path", &ClosePath); // Leaving holes doesn't work well with tetgen.
 
     ImGui::NewLine();
     ImGui::Checkbox("Path", &ShowPath);
