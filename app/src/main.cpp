@@ -397,7 +397,7 @@ int main(int, char **) {
                         TextUnformatted(Audio.Faust.Code.c_str());
                         EndTabItem();
                     }
-                    if (BeginTabItem("Params")) {
+                    if (BeginTabItem("Control")) {
                         Audio.Faust.Render();
                         EndTabItem();
                     }

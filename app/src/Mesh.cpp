@@ -386,13 +386,6 @@ void Mesh::Render() {
     glBindVertexArray(0);
 }
 
-static const fs::path TempDir = "tmp";
-static const fs::path TetSaveDir = "saved_tet_meshes";
-static const int MaxSavedTetMeshes = 8;
-
-// Store flat tet indices, to convert to Vega tetmesh later.
-static vector<uint> tet_indices;
-
 static string FormatTime(seconds_t seconds) {
     return fmt::format("{:%m-%d %H:%M:%S %Z}", seconds);
 }
@@ -406,6 +399,10 @@ string Mesh::GetTetMeshName(fs::path file_path) {
     return FormatTime(GetTimeFromPath(file_path));
 }
 
+static const fs::path TempDir = "tmp";
+static const fs::path TetSaveDir = "saved_tet_meshes";
+static const int MaxSavedTetMeshes = 8;
+
 static vector<seconds_t> GetSavedTetMeshTimes() {
     vector<seconds_t> saved_tet_mesh_times;
     for (const auto &entry : fs::directory_iterator(TetSaveDir)) {
@@ -415,6 +412,10 @@ static vector<seconds_t> GetSavedTetMeshTimes() {
     std::sort(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end(), std::greater<>());
     return saved_tet_mesh_times;
 }
+
+// Store most recently loaded flat tet indices, to convert to Vega tetmesh later.
+// xxx shouldn't be managed globally.
+static vector<uint> tet_indices;
 
 void Mesh::LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
     const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
@@ -450,6 +451,8 @@ void Mesh::LoadTetMesh(fs::path file_path) {
     vector<cinolib::vec3d> tet_vecs;
     vector<vector<uint>> tet_polys;
     read_MESH(file_path.c_str(), tet_vecs, tet_polys);
+
+    tet_indices = cinolib::serialized_vids_from_polys(tet_polys);
     LoadTetMesh(file_path, tet_vecs, tet_polys);
 }
 
