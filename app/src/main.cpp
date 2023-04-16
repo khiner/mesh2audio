@@ -35,7 +35,6 @@ static std::unique_ptr<Mesh> mesh;
 static ImGuizmo::OPERATION GizmoOp(ImGuizmo::TRANSLATE);
 static const mat4 Identity(1.f);
 
-static int RenderMode = 0;
 static bool ShowCameraGizmo = true, ShowGrid = false, ShowMeshGizmo = false, ShowBounds = false;
 
 static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes and DSP code.
@@ -317,12 +316,12 @@ int main(int, char **) {
                         if (ImGui::Button("Z##Rotate")) mesh->Rotate({0, 0, 1}, 90);
 
                         ImGui::SeparatorText("Render mode");
-                        ImGui::RadioButton("Smooth", &RenderMode, 0);
+                        ImGui::RadioButton("Smooth", &mesh->RenderMode, Mesh::RenderType_Smooth);
                         ImGui::SameLine();
-                        ImGui::RadioButton("Lines", &RenderMode, 1);
-                        ImGui::RadioButton("Point cloud", &RenderMode, 2);
+                        ImGui::RadioButton("Lines", &mesh->RenderMode, Mesh::RenderType_Lines);
+                        ImGui::RadioButton("Point cloud", &mesh->RenderMode, Mesh::RenderType_Points);
                         ImGui::SameLine();
-                        ImGui::RadioButton("Mesh", &RenderMode, 3);
+                        ImGui::RadioButton("Mesh", &mesh->RenderMode, Mesh::RenderType_Mesh);
                         ImGui::NewLine();
                         ImGui::SeparatorText("Gizmo");
                         ImGui::Checkbox("Show gizmo", &ShowMeshGizmo);
@@ -410,7 +409,7 @@ int main(int, char **) {
             if (mesh != nullptr && content_region.x > 0 && content_region.y > 0) {
                 const auto bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
                 gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
-                mesh->Render(RenderMode);
+                mesh->Render();
                 unsigned int texture_id = gl_canvas.Render();
                 ImGui::Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
             }

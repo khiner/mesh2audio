@@ -17,16 +17,15 @@
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
 
-// #include <cinolib/string_utilities.h>
-// #include <cinolib/stl_container_utilities.h>
-
 // #include <fmt/chrono.h>
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 // std::cout << fmt::format("{}", duration) << std::endl;
 
-static const vec3 center = {0.f, 0.f, 0.f}, up = {0.f, 1.f, 0.f};
+using std::string;
+
+static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 static bool StaticInitialized = false;
 static GLuint projectionPos, modelviewPos;
@@ -59,7 +58,7 @@ void Mesh::InitializeStatic() {
     static float x_angle = M_PI / 10; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
     static float y_angle = M_PI / 2 - M_PI / 10; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
     static vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
-    CameraView = glm::lookAt(eye * CameraDistance, center, up);
+    CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
     static GLuint vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
     static GLuint fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
@@ -181,7 +180,7 @@ void Mesh::Data::Clear() {
 }
 void Mesh::Data::Save(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
-    if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
+    if (!out.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
 
     out << std::setprecision(10);
     for (const vec3 &v : Vertices) {
@@ -314,14 +313,14 @@ void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
 void Mesh::SetCameraDistance(float distance) {
     // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
     const vec3 eye = glm::inverse(CameraView)[3];
-    CameraView = glm::lookAt(eye * (distance / CameraDistance), center, up);
+    CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
     CameraDistance = distance;
 }
 void Mesh::UpdateCameraProjection(const ImVec2 &size) {
     CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
 }
 
-void Mesh::Render(int mode) {
+void Mesh::Render() {
     if (TetrahedralMesh.Empty() && ViewMeshType == MeshType_Tetrahedral) {
         ViewMeshType = MeshType_Triangular;
     }
@@ -344,21 +343,21 @@ void Mesh::Render(int mode) {
     const auto &data = GetActiveData();
     const int num_indices = data.Indices.size();
     glBindVertexArray(VertexArray);
-    if (mode == 0) {
+    if (RenderMode == 0) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (mode == 1) {
+    if (RenderMode == 1) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (mode == 2) {
+    if (RenderMode == 2) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (mode == 3) {
+    if (RenderMode == 3) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -386,19 +385,43 @@ void Mesh::RenderProfileConfig() {
     if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
     else if (Profile->RenderConfig()) ExtrudeProfile();
 }
-// Annoying global variable to store tet indices as returned by tetgen,
-// since we order indices differently in our mesh data.
+
+static const fs::path TempDir = "tmp";
+static const fs::path TetSaveDir = "saved_tet_meshes";
+static const int MaxSavedTetMeshes = 8;
+
+// Store flat tet indices, to convert to Vega tetmesh later.
 static vector<uint> tet_indices;
+
 void Mesh::CreateTetraheralMesh() {
+    // todo:
+    // - Scroll through all saved tet meshes by timestamp, and click timestampe to restore
+
     static vector<cinolib::vec3d> tet_vecs;
+    static vector<vector<uint>> tet_polys;
     // Write to an obj file and read back into a cinolib tetmesh.
-    fs::create_directory("tmp"); // Create the temporary directory if it doesn't exist.
-    const fs::path obj_path = "tmp/tmp.obj";
-    Save(obj_path);
-    cinolib::Polygonmesh<> m(obj_path.c_str());
+    fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
+    const fs::path tmp_obj_path = TempDir / "tmp.obj";
+    Save(tmp_obj_path);
+    cinolib::Polygonmesh<> poly_mesh(tmp_obj_path.c_str());
     vector<uint> edges_in; // Not used.
-    tetgen_wrap(m.vector_verts(), m.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
-    fs::remove(obj_path); // Delete the temporary file.
+    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
+    fs::remove(tmp_obj_path); // Delete the temporary file.
+
+    // Write the tet mesh to disk, deleting the oldest tet mesh if past the max save limit.
+    fs::create_directory(TetSaveDir);
+    vector<int> saved_tet_mesh_times;
+    for (const auto &entry : fs::directory_iterator()) {
+        const string filename = entry.path().stem(); // Name without extension.
+        saved_tet_mesh_times.push_back(std::stoi(filename));
+    }
+    if (saved_tet_mesh_times.size() >= MaxSavedTetMeshes) {
+        const int oldest_time = *std::min_element(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end());
+        fs::remove(TetSaveDir / (std::to_string(oldest_time) + ".mesh"));
+    }
+    const int epoch_seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const string tet_mesh_name = TetSaveDir / (std::to_string(epoch_seconds) + ".mesh");
+    write_MESH(tet_mesh_name.c_str(), tet_vecs, cinolib::polys_from_serialized_vids(tet_indices, 4));
 
     const cinolib::Tetmesh tet_mesh{tet_vecs, tet_indices};
     TetrahedralMesh.Clear();
@@ -459,7 +482,7 @@ void Mesh::Bind(const Mesh::Data &data) {
     glBindVertexArray(0);
 }
 
-std::string Mesh::GenerateDsp() const {
+string Mesh::GenerateDsp() const {
     // This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
     static vector<double> tet_vertices;
     const auto &tet_vecs = TetrahedralMesh.Vertices;

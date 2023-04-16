@@ -1,9 +1,5 @@
 ## Next up
 
-- Every time a tet mesh is generated, it is automatically saved to disk
-  - Most recent n (say 8) are saved, as (.obj, .jpg) pairs
-  - Just capture image right after tet mesh is loaded
-  - Scroll through all saved tet meshes, and click on image to restore it.
 - Link the generated dsp with the tet mesh used to generate it (the tet mesh active at dsp gen time)
 - Disable 'Generate DSP' button when tet mesh / dsp params are still the same as they were for the most recent dsp gen
   - Add `DspGenDirty` flag to `Audio`

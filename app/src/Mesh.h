@@ -20,6 +20,14 @@ struct Mesh {
         MeshType_Tetrahedral,
     };
 
+    enum RenderType_ {
+        RenderType_Smooth,
+        RenderType_Lines,
+        RenderType_Points,
+        RenderType_Mesh
+    };
+    using RenderType = int;
+
     // Defaults to aluminum.
     struct MaterialProperties {
         double YoungModulus{70E9};
@@ -50,13 +58,14 @@ struct Mesh {
         vec3 Min, Max; // The bounding box of the mesh.
     };
 
-    void Render(int mode);
+    void Render();
     void RenderProfile();
     void RenderProfileConfig();
     void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
 
     const Data &GetActiveData() const;
 
+    // Every time a tet mesh is generated, it is automatically saved to disk.
     void CreateTetraheralMesh();
     bool HasTetrahedralMesh() const { return !TetrahedralMesh.Empty(); }
 
@@ -70,7 +79,9 @@ struct Mesh {
     static void SetCameraDistance(float distance);
     static void UpdateCameraProjection(const ImVec2 &size);
 
-    static const int NumLights = 5;
+    inline static const int NumLights = 5;
+
+    inline static RenderType RenderMode = RenderType_Smooth;
     inline static float Ambient[4] = {0.05, 0.05, 0.05, 1};
     inline static float Diffusion[4] = {0.2, 0.2, 0.2, 1};
     inline static float Specular[4] = {0.5, 0.5, 0.5, 1};
