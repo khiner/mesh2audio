@@ -42,7 +42,6 @@ static std::thread GeneratorThread; // Worker thread for generating tetrahedral 
 static string GeneratedDsp; // The most recently generated DSP code.
 
 // DSP code in addition to the model, to make it playable.
-// TODO deinterleave samples from Faust to miniaudio, then add "<: _,_" to the end of the dsp for stereo.
 static const string FaustInstrumentDsp = R"(
 
 exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);

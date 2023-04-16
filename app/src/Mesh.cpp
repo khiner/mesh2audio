@@ -244,11 +244,17 @@ void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
     const vector<ImVec2> &profile_vertices = profile.GetVertices();
     const int slices = profile.NumRadialSlices;
     const bool is_closed = profile.IsClosed();
-
     const int profile_size = profile_vertices.size();
-    const double angle_increment = 2.0 * M_PI / slices;
     const int start_index = is_closed ? 0 : 1;
     const int end_index = profile_size - (is_closed ? 0 : 1);
+    const int profile_size_no_connect = end_index - start_index;
+    const int num_vertices = slices * profile_size_no_connect + (is_closed ? 0 : 2);
+    const int num_indices = slices * (profile_size_no_connect + (is_closed ? -1 : 0)) * 6;
+    Vertices.reserve(num_vertices);
+    Normals.reserve(num_vertices);
+    Indices.reserve(num_indices);
+
+    const double angle_increment = 2.0 * M_PI / slices;
     for (int slice = 0; slice < slices; slice++) {
         const double angle = slice * angle_increment;
         const double c = cos(angle);
@@ -268,7 +274,6 @@ void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
     }
 
     // Compute indices for the triangles.
-    const int profile_size_no_connect = end_index - start_index;
     for (int slice = 0; slice < slices; slice++) {
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const int base_index = slice * profile_size_no_connect + i;
@@ -387,16 +392,20 @@ static vector<uint> tet_indices;
 void Mesh::CreateTetraheralMesh() {
     static vector<cinolib::vec3d> tet_vecs;
     // Write to an obj file and read back into a cinolib tetmesh.
-    fs::create_directory("tmp");
-    const fs::path path = "tmp/tmp.obj";
-    Save(path);
-    cinolib::Polygonmesh<> m(path.c_str());
-    vector<uint> e_in;
-    tetgen_wrap(m.vector_verts(), m.vector_polys(), e_in, "q", tet_vecs, tet_indices);
-    fs::remove(path); // Delete the temporary file.
+    fs::create_directory("tmp"); // Create the temporary directory if it doesn't exist.
+    const fs::path obj_path = "tmp/tmp.obj";
+    Save(obj_path);
+    cinolib::Polygonmesh<> m(obj_path.c_str());
+    vector<uint> edges_in; // Not used.
+    tetgen_wrap(m.vector_verts(), m.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
+    fs::remove(obj_path); // Delete the temporary file.
 
     const cinolib::Tetmesh tet_mesh{tet_vecs, tet_indices};
     TetrahedralMesh.Clear();
+    TetrahedralMesh.Vertices.reserve(tet_vecs.size());
+    TetrahedralMesh.Normals.reserve(tet_vecs.size());
+    TetrahedralMesh.Indices.reserve(tet_mesh.num_faces() * 3);
+
     // Bind vertices, normals, and indices to the tetrahedral mesh.
     for (size_t i = 0; i < tet_vecs.size(); i++) {
         const auto &v = tet_vecs[i];
