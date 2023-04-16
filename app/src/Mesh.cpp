@@ -1,21 +1,24 @@
 #include "Mesh.h"
 
 #include <iomanip>
+#include <thread>
 
 // mesh2faust/vega
 #include "mesh2faust.h"
 #include "tetMesher.h"
+
+#include "imspinner.h"
 
 #include <fstream>
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "Shader.h"
-
 #include <cinolib/geometry/vec_mat.h>
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
+
+#include "Shader.h"
 
 // #include <fmt/chrono.h>
 // auto start = std::chrono::high_resolution_clock::now();
@@ -24,6 +27,8 @@
 // std::cout << fmt::format("{}", duration) << std::endl;
 
 using std::string;
+
+static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes.
 
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
@@ -130,6 +135,8 @@ Mesh::~Mesh() {
     glDeleteBuffers(1, &NormalBuffer);
     glDeleteBuffers(1, &VertexBuffer);
     glDeleteVertexArrays(1, &VertexArray);
+
+    if (GeneratorThread.joinable()) GeneratorThread.join();
 }
 
 const Mesh::Data &Mesh::GetActiveData() const {
@@ -376,16 +383,6 @@ void Mesh::Render() {
     glBindVertexArray(0);
 }
 
-void Mesh::RenderProfile() {
-    if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
-    else if (Profile->Render()) ExtrudeProfile();
-}
-
-void Mesh::RenderProfileConfig() {
-    if (Profile == nullptr) ImGui::Text("The current mesh was not loaded from a 2D profile.");
-    else if (Profile->RenderConfig()) ExtrudeProfile();
-}
-
 static const fs::path TempDir = "tmp";
 static const fs::path TetSaveDir = "saved_tet_meshes";
 static const int MaxSavedTetMeshes = 8;
@@ -510,4 +507,148 @@ string Mesh::GenerateDsp() const {
         {}, // specific excitation positions
         10 // number of excitation positions (default is max: -1)
     );
+}
+
+static string GenerateTetMsg = "Generating tetrahedral mesh...";
+
+using namespace ImGui;
+
+void Mesh::RenderConfig() {
+    if (BeginTabBar("MeshConfigTabBar")) {
+        if (BeginTabItem("Mesh")) {
+            // Duplicated in main, but eh.
+            const auto &center = GetMainViewport()->GetCenter();
+            const auto &popup_size = GetMainViewport()->Size / 4;
+            SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
+            SetNextWindowSize(popup_size);
+            if (BeginPopupModal(GenerateTetMsg.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto &ws = GetWindowSize();
+                const float spinner_dim = std::min(ws.x, ws.y) / 2;
+                SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
+                ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg.c_str(), spinner_dim / 2, 3);
+                if (HasTetrahedralMesh()) CloseCurrentPopup();
+                EndPopup();
+            }
+            Text("File: %s", FilePath.c_str());
+            if (HasTetrahedralMesh()) {
+                TextUnformatted("Tetrahedral mesh: Yes");
+                TextUnformatted("View mesh type");
+                RadioButton("Triangular", &Mesh::ViewMeshType, Mesh::MeshType_Triangular);
+                SameLine();
+                RadioButton("Tetrahedral", &Mesh::ViewMeshType, Mesh::MeshType_Tetrahedral);
+            } else {
+                TextUnformatted("Tetrahedral mesh: No");
+                if (Button("Create tetrahedral mesh")) {
+                    OpenPopup(GenerateTetMsg.c_str());
+                    if (GeneratorThread.joinable()) GeneratorThread.join();
+                    GeneratorThread = std::thread([&] { CreateTetraheralMesh(); });
+                }
+            }
+            SeparatorText("Modify");
+            if (Button("Center")) Center();
+            Text("Flip");
+            SameLine();
+            if (Button("X##Flip")) Flip(true, false, false);
+            SameLine();
+            if (Button("Y##Flip")) Flip(false, true, false);
+            SameLine();
+            if (Button("Z##Flip")) Flip(false, false, true);
+
+            Text("Rotate 90 deg.");
+            SameLine();
+            if (Button("X##Rotate")) Rotate({1, 0, 0}, 90);
+            SameLine();
+            if (Button("Y##Rotate")) Rotate({0, 1, 0}, 90);
+            SameLine();
+            if (Button("Z##Rotate")) Rotate({0, 0, 1}, 90);
+
+            SeparatorText("Render mode");
+            RadioButton("Smooth", &RenderMode, Mesh::RenderType_Smooth);
+            SameLine();
+            RadioButton("Lines", &RenderMode, Mesh::RenderType_Lines);
+            RadioButton("Point cloud", &RenderMode, Mesh::RenderType_Points);
+            SameLine();
+            RadioButton("Mesh", &RenderMode, Mesh::RenderType_Mesh);
+            NewLine();
+            SeparatorText("Gizmo");
+            Checkbox("Show gizmo", &Mesh::ShowGizmo);
+            if (Mesh::ShowGizmo) {
+                const string interaction_text = "Interaction: " +
+                    string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
+                               ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
+                               ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
+                               ImGuizmo::IsOver()                                                      ? "Hovered" :
+                                                                                                         "Not interacting");
+                TextUnformatted(interaction_text.c_str());
+
+                if (IsKeyPressed(ImGuiKey_T)) Mesh::GizmoOp = ImGuizmo::TRANSLATE;
+                if (IsKeyPressed(ImGuiKey_R)) Mesh::GizmoOp = ImGuizmo::ROTATE;
+                if (IsKeyPressed(ImGuiKey_S)) Mesh::GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Translate (T)", Mesh::GizmoOp == ImGuizmo::TRANSLATE)) Mesh::GizmoOp = ImGuizmo::TRANSLATE;
+                if (RadioButton("Rotate (R)", Mesh::GizmoOp == ImGuizmo::ROTATE)) Mesh::GizmoOp = ImGuizmo::ROTATE;
+                if (RadioButton("Scale (S)", Mesh::GizmoOp == ImGuizmo::SCALE)) Mesh::GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Universal", Mesh::GizmoOp == ImGuizmo::UNIVERSAL)) Mesh::GizmoOp = ImGuizmo::UNIVERSAL;
+                Checkbox("Bound sizing", &ShowBounds);
+            }
+            EndTabItem();
+        }
+        if (BeginTabItem("Mesh profile")) {
+            RenderProfileConfig();
+            EndTabItem();
+        }
+        if (BeginTabItem("Camera")) {
+            Checkbox("Show gizmo", &ShowCameraGizmo);
+            SameLine();
+            Checkbox("Grid", &ShowGrid);
+            SliderFloat("FOV", &fov, 20.f, 110.f);
+
+            float camera_distance = CameraDistance;
+            if (SliderFloat("Distance", &camera_distance, .1f, 10.f)) {
+                Mesh::SetCameraDistance(camera_distance);
+            }
+            EndTabItem();
+        }
+        if (BeginTabItem("Lighing")) {
+            SeparatorText("Colors");
+            Checkbox("Custom colors", &CustomColor);
+            if (Mesh::CustomColor) {
+                ColorEdit3("Ambient", &Ambient[0]);
+                ColorEdit3("Diffusion", &Diffusion[0]);
+                ColorEdit3("Specular", &Specular[0]);
+                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
+            } else {
+                for (int i = 1; i < 3; i++) {
+                    Ambient[i] = Ambient[0];
+                    Diffusion[i] = Diffusion[0];
+                    Specular[i] = Specular[0];
+                }
+                SliderFloat("Ambient", &Ambient[0], 0.0f, 1.0f);
+                SliderFloat("Diffusion", &Diffusion[0], 0.0f, 1.0f);
+                SliderFloat("Specular", &Specular[0], 0.0f, 1.0f);
+                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
+            }
+
+            SeparatorText("Lights");
+            for (int i = 0; i < NumLights; i++) {
+                Separator();
+                PushID(i);
+                Text("Light %d", i + 1);
+                SliderFloat3("Positions", &LightPositions[4 * i], -25.0f, 25.0f);
+                ColorEdit3("Color", &LightColors[4 * i]);
+                PopID();
+            }
+            EndTabItem();
+        }
+        EndTabBar();
+    }
+}
+
+void Mesh::RenderProfile() {
+    if (Profile == nullptr) Text("The current mesh was not loaded from a 2D profile.");
+    else if (Profile->Render()) ExtrudeProfile();
+}
+
+void Mesh::RenderProfileConfig() {
+    if (Profile == nullptr) Text("The current mesh was not loaded from a 2D profile.");
+    else if (Profile->RenderConfig()) ExtrudeProfile();
 }

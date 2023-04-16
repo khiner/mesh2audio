@@ -6,6 +6,7 @@
 
 #include "MeshProfile.h"
 
+#include "ImGuizmo.h"
 using glm::vec3, glm::mat4;
 
 struct ImVec2;
@@ -59,6 +60,7 @@ struct Mesh {
     };
 
     void Render();
+    void RenderConfig();
     void RenderProfile();
     void RenderProfileConfig();
     void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
@@ -89,6 +91,8 @@ struct Mesh {
     inline static float LightColors[NumLights * 4] = {0.0f};
     inline static float Shininess = 10;
     inline static bool CustomColor = false;
+    inline static bool ShowCameraGizmo = true, ShowGrid = false, ShowGizmo = false, ShowBounds = false;
+    inline static ImGuizmo::OPERATION GizmoOp{ImGuizmo::TRANSLATE};
 
     inline static mat4 ObjectMatrix{1.f}, CameraView, CameraProjection;
 

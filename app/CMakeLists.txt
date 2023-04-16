@@ -41,7 +41,6 @@ include_directories(
     lib/miniaudio
     lib/fmt/include
     lib/faust/architecture
-    lib/imgui/misc/cpp
     lib/ImGuizmo
     lib/nanosvg/src
     ${Mesh2FaustDir}/src

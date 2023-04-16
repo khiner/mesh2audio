@@ -6,11 +6,9 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
-#include "ImGuizmo.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
-#include "imgui_stdlib.h"
 #include "implot.h"
 #include "imspinner.h"
 #include <SDL.h>
@@ -32,12 +30,9 @@ static WindowsState Windows;
 
 static std::unique_ptr<Mesh> mesh;
 
-static ImGuizmo::OPERATION GizmoOp(ImGuizmo::TRANSLATE);
 static const mat4 Identity(1.f);
 
-static bool ShowCameraGizmo = true, ShowGrid = false, ShowMeshGizmo = false, ShowBounds = false;
-
-static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes and DSP code.
+static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 static string GeneratedDsp; // The most recently generated DSP code.
 
 // DSP code in addition to the model, to make it playable.
@@ -62,15 +57,9 @@ with{
 process = hammer(gate,hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
 )";
 
-static char *GenerateTetMsg = "Generating tetrahedral mesh...";
-static char *GenerateDspMsg = "Generating DSP code...";
+static string GenerateDspMsg = "Generating DSP code...";
 
-static void PreparePopup() {
-    const auto &center = ImGui::GetMainViewport()->GetCenter();
-    const auto &popup_size = ImGui::GetMainViewport()->Size / 4;
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
-    ImGui::SetNextWindowSize(popup_size);
-}
+using namespace ImGui;
 
 int main(int, char **) {
     // Setup SDL
@@ -116,10 +105,10 @@ int main(int, char **) {
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    CreateContext();
     ImPlot::CreateContext();
 
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO &io = GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
@@ -129,10 +118,10 @@ int main(int, char **) {
     io.IniFilename = nullptr; // Disable ImGui's .ini file saving
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    StyleColorsDark();
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-    ImGuiStyle &style = ImGui::GetStyle();
+    ImGuiStyle &style = GetStyle();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
@@ -151,7 +140,7 @@ int main(int, char **) {
     Audio.Run();
 
     // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
     // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
     // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
@@ -205,27 +194,27 @@ int main(int, char **) {
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
+        NewFrame();
 
-        auto dockspace_id = ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
-        if (ImGui::GetFrameCount() == 1) {
-            auto audio_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
-            auto audio_model_node_id = ImGui::DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
-            ImGui::DockBuilderDockWindow(Windows.AudioDevice.Name, audio_node_id);
-            ImGui::DockBuilderDockWindow(Windows.AudioModel.Name, audio_model_node_id);
-            auto demo_node_id = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
-            ImGui::DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
-            ImGui::DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
+        auto dockspace_id = DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+        if (GetFrameCount() == 1) {
+            auto audio_node_id = DockBuilderSplitNode(dockspace_id, ImGuiDir_Down, 0.3f, nullptr, &dockspace_id);
+            auto audio_model_node_id = DockBuilderSplitNode(audio_node_id, ImGuiDir_Right, 0.5f, nullptr, &audio_node_id);
+            DockBuilderDockWindow(Windows.AudioDevice.Name, audio_node_id);
+            DockBuilderDockWindow(Windows.AudioModel.Name, audio_model_node_id);
+            auto demo_node_id = DockBuilderSplitNode(dockspace_id, ImGuiDir_Right, 0.3f, nullptr, &dockspace_id);
+            DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
+            DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
             auto mesh_node_id = dockspace_id;
-            auto mesh_controls_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.4f, nullptr, &mesh_node_id);
-            auto mesh_profile_node_id = ImGui::DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.8f, nullptr, &mesh_node_id);
-            ImGui::DockBuilderDockWindow(Windows.MeshControls.Name, mesh_controls_node_id);
-            ImGui::DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
-            ImGui::DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
+            auto mesh_controls_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.4f, nullptr, &mesh_node_id);
+            auto mesh_profile_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.8f, nullptr, &mesh_node_id);
+            DockBuilderDockWindow(Windows.MeshControls.Name, mesh_controls_node_id);
+            DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
+            DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
         }
-        if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("Load mesh", nullptr)) {
+        if (BeginMainMenuBar()) {
+            if (BeginMenu("File")) {
+                if (MenuItem("Load mesh", nullptr)) {
                     nfdchar_t *file_path;
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
@@ -236,7 +225,7 @@ int main(int, char **) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
-                if (ImGui::MenuItem("Export mesh as obj", nullptr, false, mesh != nullptr)) {
+                if (MenuItem("Export mesh as obj", nullptr, false, mesh != nullptr)) {
                     nfdchar_t *save_path;
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}};
                     nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
@@ -247,293 +236,171 @@ int main(int, char **) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
-                ImGui::EndMenu();
+                EndMenu();
             }
-            if (ImGui::BeginMenu("Windows")) {
-                ImGui::MenuItem(Windows.AudioDevice.Name, nullptr, &Windows.AudioDevice.Visible);
-                ImGui::MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
-                ImGui::MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
-                ImGui::MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
-                ImGui::MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
-                ImGui::MenuItem(Windows.ImGuiDemo.Name, nullptr, &Windows.ImGuiDemo.Visible);
-                ImGui::MenuItem(Windows.ImPlotDemo.Name, nullptr, &Windows.ImPlotDemo.Visible);
-                ImGui::EndMenu();
+            if (BeginMenu("Windows")) {
+                MenuItem(Windows.AudioDevice.Name, nullptr, &Windows.AudioDevice.Visible);
+                MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
+                MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
+                MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
+                MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
+                MenuItem(Windows.ImGuiDemo.Name, nullptr, &Windows.ImGuiDemo.Visible);
+                MenuItem(Windows.ImPlotDemo.Name, nullptr, &Windows.ImPlotDemo.Visible);
+                EndMenu();
             }
-            ImGui::EndMainMenuBar();
+            EndMainMenuBar();
         }
 
-        if (Windows.ImGuiDemo.Visible) ImGui::ShowDemoWindow(&Windows.ImGuiDemo.Visible);
+        if (Windows.ImGuiDemo.Visible) ShowDemoWindow(&Windows.ImGuiDemo.Visible);
         if (Windows.ImPlotDemo.Visible) ImPlot::ShowDemoWindow(&Windows.ImPlotDemo.Visible);
 
         if (Windows.MeshControls.Visible) {
-            ImGui::Begin(Windows.MeshControls.Name, &Windows.MeshControls.Visible);
-
-            if (ImGui::BeginTabBar("MeshControlsTabBar")) {
-                if (ImGui::BeginTabItem("Mesh")) {
-                    if (mesh == nullptr) {
-                        ImGui::Text("No mesh has been loaded.");
-                    } else {
-                        PreparePopup();
-                        if (ImGui::BeginPopupModal(GenerateTetMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                            const auto &ws = ImGui::GetWindowSize();
-                            const float spinner_dim = std::min(ws.x, ws.y) / 2;
-                            ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
-                            ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg, spinner_dim / 2, 3);
-                            if (mesh->HasTetrahedralMesh()) ImGui::CloseCurrentPopup();
-                            ImGui::EndPopup();
-                        }
-                        ImGui::Text("File: %s", mesh->FilePath.c_str());
-                        if (mesh->HasTetrahedralMesh()) {
-                            ImGui::TextUnformatted("Tetrahedral mesh: Yes");
-                            ImGui::TextUnformatted("View mesh type");
-                            ImGui::RadioButton("Triangular", &Mesh::ViewMeshType, Mesh::MeshType_Triangular);
-                            ImGui::SameLine();
-                            ImGui::RadioButton("Tetrahedral", &Mesh::ViewMeshType, Mesh::MeshType_Tetrahedral);
-                        } else {
-                            ImGui::TextUnformatted("Tetrahedral mesh: No");
-                            if (ImGui::Button("Create tetrahedral mesh")) {
-                                ImGui::OpenPopup(GenerateTetMsg);
-                                if (GeneratorThread.joinable()) GeneratorThread.join();
-                                GeneratorThread = std::thread([&] { mesh->CreateTetraheralMesh(); });
-                            }
-                        }
-                        ImGui::SeparatorText("Modify");
-                        if (ImGui::Button("Center")) mesh->Center();
-                        ImGui::Text("Flip");
-                        ImGui::SameLine();
-                        if (ImGui::Button("X##Flip")) mesh->Flip(true, false, false);
-                        ImGui::SameLine();
-                        if (ImGui::Button("Y##Flip")) mesh->Flip(false, true, false);
-                        ImGui::SameLine();
-                        if (ImGui::Button("Z##Flip")) mesh->Flip(false, false, true);
-
-                        ImGui::Text("Rotate 90 deg.");
-                        ImGui::SameLine();
-                        if (ImGui::Button("X##Rotate")) mesh->Rotate({1, 0, 0}, 90);
-                        ImGui::SameLine();
-                        if (ImGui::Button("Y##Rotate")) mesh->Rotate({0, 1, 0}, 90);
-                        ImGui::SameLine();
-                        if (ImGui::Button("Z##Rotate")) mesh->Rotate({0, 0, 1}, 90);
-
-                        ImGui::SeparatorText("Render mode");
-                        ImGui::RadioButton("Smooth", &mesh->RenderMode, Mesh::RenderType_Smooth);
-                        ImGui::SameLine();
-                        ImGui::RadioButton("Lines", &mesh->RenderMode, Mesh::RenderType_Lines);
-                        ImGui::RadioButton("Point cloud", &mesh->RenderMode, Mesh::RenderType_Points);
-                        ImGui::SameLine();
-                        ImGui::RadioButton("Mesh", &mesh->RenderMode, Mesh::RenderType_Mesh);
-                        ImGui::NewLine();
-                        ImGui::SeparatorText("Gizmo");
-                        ImGui::Checkbox("Show gizmo", &ShowMeshGizmo);
-                        if (ShowMeshGizmo) {
-                            const string interaction_text = "Interaction: " +
-                                string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
-                                           ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
-                                           ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
-                                           ImGuizmo::IsOver()                                                      ? "Hovered" :
-                                                                                                                     "Not interacting");
-                            ImGui::Text(interaction_text.c_str());
-
-                            if (ImGui::IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
-                            if (ImGui::IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
-                            if (ImGui::IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
-                            if (ImGui::RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
-                            if (ImGui::RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
-                            if (ImGui::RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
-                            if (ImGui::RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
-                            ImGui::Checkbox("Bound sizing", &ShowBounds);
-                        }
-                    }
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Mesh profile")) {
-                    if (mesh != nullptr) mesh->RenderProfileConfig();
-                    else ImGui::Text("No mesh has been loaded.");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Camera")) {
-                    ImGui::Checkbox("Show gizmo", &ShowCameraGizmo);
-                    ImGui::SameLine();
-                    ImGui::Checkbox("Grid", &ShowGrid);
-                    ImGui::SliderFloat("FOV", &Mesh::fov, 20.f, 110.f);
-
-                    float cameraDistance = Mesh::CameraDistance;
-                    if (ImGui::SliderFloat("Distance", &cameraDistance, .1f, 10.f)) {
-                        Mesh::SetCameraDistance(cameraDistance);
-                    }
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Lighing")) {
-                    ImGui::SeparatorText("Colors");
-                    ImGui::Checkbox("Custom colors", &Mesh::CustomColor);
-                    if (Mesh::CustomColor) {
-                        ImGui::ColorEdit3("Ambient", &Mesh::Ambient[0]);
-                        ImGui::ColorEdit3("Diffusion", &Mesh::Diffusion[0]);
-                        ImGui::ColorEdit3("Specular", &Mesh::Specular[0]);
-                        ImGui::SliderFloat("Shininess", &Mesh::Shininess, 0.0f, 150.0f);
-                    } else {
-                        for (int i = 1; i < 3; i++) {
-                            Mesh::Ambient[i] = Mesh::Ambient[0];
-                            Mesh::Diffusion[i] = Mesh::Diffusion[0];
-                            Mesh::Specular[i] = Mesh::Specular[0];
-                        }
-                        ImGui::SliderFloat("Ambient", &Mesh::Ambient[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Diffusion", &Mesh::Diffusion[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Specular", &Mesh::Specular[0], 0.0f, 1.0f);
-                        ImGui::SliderFloat("Shininess", &Mesh::Shininess, 0.0f, 150.0f);
-                    }
-
-                    ImGui::SeparatorText("Lights");
-                    for (int i = 0; i < Mesh::NumLights; i++) {
-                        ImGui::Separator();
-                        ImGui::PushID(i);
-                        ImGui::Text("Light %d", i + 1);
-                        ImGui::SliderFloat3("Positions", &Mesh::LightPositions[4 * i], -25.0f, 25.0f);
-                        ImGui::ColorEdit3("Color", &Mesh::LightColors[4 * i]);
-                        ImGui::PopID();
-                    }
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
+            Begin(Windows.MeshControls.Name, &Windows.MeshControls.Visible);
+            if (mesh == nullptr) {
+                Text("No mesh has been loaded.");
+            } else {
+                mesh->RenderConfig();
             }
-
-            ImGui::End();
+            End();
         }
 
         if (Windows.Mesh.Visible) {
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-            ImGui::Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
+            PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+            Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
-            const auto content_region = ImGui::GetContentRegionAvail();
+            const auto content_region = GetContentRegionAvail();
             Mesh::UpdateCameraProjection(content_region);
             if (mesh != nullptr && content_region.x > 0 && content_region.y > 0) {
-                const auto bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+                const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
                 gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
                 mesh->Render();
                 unsigned int texture_id = gl_canvas.Render();
-                ImGui::Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
+                Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
             }
-            if (ShowMeshGizmo || ShowCameraGizmo || ShowGrid) {
+            if (Mesh::ShowGizmo || Mesh::ShowCameraGizmo || Mesh::ShowGrid) {
                 ImGuizmo::BeginFrame();
                 ImGuizmo::SetDrawlist();
                 ImGuizmo::SetOrthographic(false);
-                ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y + ImGui::GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
+                ImGuizmo::SetRect(GetWindowPos().x, GetWindowPos().y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
             }
-            if (ShowGrid) {
+            if (Mesh::ShowGrid) {
                 ImGuizmo::DrawGrid(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Identity[0][0], 100.f);
             }
-            if (ShowMeshGizmo) {
+            if (Mesh::ShowGizmo) {
                 // This is how you would draw a test cube:
                 // ImGuizmo::DrawCubes(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Mesh::ObjectMatrix[0][0], 1);
                 ImGuizmo::Manipulate(
-                    &Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &Mesh::ObjectMatrix[0][0], nullptr,
-                    nullptr, ShowBounds ? Mesh::Bounds : nullptr, nullptr
+                    &Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], Mesh::GizmoOp, ImGuizmo::LOCAL, &Mesh::ObjectMatrix[0][0], nullptr,
+                    nullptr, Mesh::ShowBounds ? Mesh::Bounds : nullptr, nullptr
                 );
             }
-            if (ShowCameraGizmo) {
+            if (Mesh::ShowCameraGizmo) {
                 static const float view_manipulate_size = 128;
-                const auto viewManipulatePos = ImGui::GetWindowPos() +
+                const auto viewManipulatePos = GetWindowPos() +
                     ImVec2{
-                        ImGui::GetWindowContentRegionMax().x - view_manipulate_size,
-                        ImGui::GetWindowContentRegionMin().y,
+                        GetWindowContentRegionMax().x - view_manipulate_size,
+                        GetWindowContentRegionMin().y,
                     };
                 ImGuizmo::ViewManipulate(&Mesh::CameraView[0][0], Mesh::CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
             }
-            ImGui::End();
-            ImGui::PopStyleVar();
+            End();
+            PopStyleVar();
         }
         if (Windows.MeshProfile.Visible) {
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-            ImGui::Begin(Windows.MeshProfile.Name, &Windows.MeshProfile.Visible);
+            PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+            Begin(Windows.MeshProfile.Name, &Windows.MeshProfile.Visible);
 
             if (mesh != nullptr) mesh->RenderProfile();
-            else ImGui::Text("No mesh has been loaded.");
+            else Text("No mesh has been loaded.");
 
-            ImGui::End();
-            ImGui::PopStyleVar();
+            End();
+            PopStyleVar();
         }
 
         if (Windows.AudioDevice.Visible) {
-            ImGui::Begin(Windows.AudioDevice.Name, &Windows.AudioDevice.Visible);
+            Begin(Windows.AudioDevice.Name, &Windows.AudioDevice.Visible);
             Audio.Render();
-            ImGui::End();
+            End();
         }
         if (Windows.AudioModel.Visible) {
-            ImGui::Begin(Windows.AudioModel.Name, &Windows.AudioModel.Visible);
+            Begin(Windows.AudioModel.Name, &Windows.AudioModel.Visible);
 
-            if (ImGui::BeginTabBar("Audio model")) {
-                if (ImGui::BeginTabItem("Model")) {
+            if (BeginTabBar("Audio model")) {
+                if (BeginTabItem("Model")) {
                     const bool has_tetrahedral_mesh = mesh->HasTetrahedralMesh();
-                    if (!has_tetrahedral_mesh) ImGui::BeginDisabled();
-                    if (ImGui::Button("Generate DSP")) {
-                        ImGui::OpenPopup(GenerateDspMsg);
-                        if (GeneratorThread.joinable()) GeneratorThread.join();
-                        GeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
+                    if (!has_tetrahedral_mesh) BeginDisabled();
+                    if (Button("Generate DSP")) {
+                        OpenPopup(GenerateDspMsg.c_str());
+                        if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
+                        DspGeneratorThread = std::thread([&] { GeneratedDsp = mesh->GenerateDsp() + FaustInstrumentDsp; });
                     }
-                    PreparePopup();
-                    if (ImGui::BeginPopupModal(GenerateDspMsg, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                        const auto &ws = ImGui::GetWindowSize();
+                    const auto &center = GetMainViewport()->GetCenter();
+                    const auto &popup_size = GetMainViewport()->Size / 4;
+                    SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
+                    SetNextWindowSize(popup_size);
+                    if (BeginPopupModal(GenerateDspMsg.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        const auto &ws = GetWindowSize();
                         const float spinner_dim = std::min(ws.x, ws.y) / 2;
-                        ImGui::SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, ImGui::GetTextLineHeight()));
-                        ImSpinner::SpinnerWaveDots(GenerateDspMsg, spinner_dim / 2, 3);
+                        SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
+                        ImSpinner::SpinnerWaveDots(GenerateDspMsg.c_str(), spinner_dim / 2, 3);
                         if (!GeneratedDsp.empty()) {
                             Audio.Faust.Code = GeneratedDsp;
                             GeneratedDsp = "";
-                            if (GeneratorThread.joinable()) GeneratorThread.join();
-                            ImGui::CloseCurrentPopup();
+                            if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
+                            CloseCurrentPopup();
                         }
-                        ImGui::EndPopup();
+                        EndPopup();
                     }
                     if (!has_tetrahedral_mesh) {
-                        ImGui::SameLine();
-                        ImGui::TextUnformatted("Run |Mesh Controls|->|Mesh|->|Create tetrahedral mesh|.");
-                        ImGui::EndDisabled();
+                        SameLine();
+                        TextUnformatted("Run |Mesh Controls|->|Mesh|->|Create tetrahedral mesh|.");
+                        EndDisabled();
                     }
                     if (has_tetrahedral_mesh) {
-                        ImGui::SeparatorText("Material properties");
+                        SeparatorText("Material properties");
                         // Presets
                         static std::string selected_preset = "Copper";
-                        if (ImGui::BeginCombo("Presets", selected_preset.c_str())) {
+                        if (BeginCombo("Presets", selected_preset.c_str())) {
                             for (const auto &[preset_name, material] : Mesh::MaterialPresets) {
                                 bool is_selected = (preset_name == selected_preset);
-                                if (ImGui::Selectable(preset_name.c_str(), is_selected)) {
+                                if (Selectable(preset_name.c_str(), is_selected)) {
                                     selected_preset = preset_name;
                                     mesh->Material = material;
                                 }
-                                if (is_selected) ImGui::SetItemDefaultFocus();
+                                if (is_selected) SetItemDefaultFocus();
                             }
-                            ImGui::EndCombo();
+                            EndCombo();
                         }
-                        ImGui::Text("Young's modulus (Pa)");
-                        ImGui::InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
-                        ImGui::Text("Poisson's ratio");
-                        ImGui::InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
-                        ImGui::Text("Density (kg/m^3)");
-                        ImGui::InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        Text("Young's modulus (Pa)");
+                        InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        Text("Poisson's ratio");
+                        InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        Text("Density (kg/m^3)");
+                        InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                     }
-                    ImGui::EndTabItem();
+                    EndTabItem();
                 }
                 if (!Audio.Faust.Code.empty()) {
-                    if (ImGui::BeginTabItem("Code")) {
-                        ImGui::Text(Audio.Faust.Code.c_str());
-                        ImGui::EndTabItem();
+                    if (BeginTabItem("Code")) {
+                        TextUnformatted(Audio.Faust.Code.c_str());
+                        EndTabItem();
                     }
-                    if (ImGui::BeginTabItem("Params")) {
+                    if (BeginTabItem("Params")) {
                         Audio.Faust.Render();
-                        ImGui::EndTabItem();
+                        EndTabItem();
                     }
                 }
-                ImGui::EndTabBar();
+                EndTabBar();
             }
-            ImGui::End();
+            End();
         }
 
         // Rendering
-        ImGui::Render();
+        Render();
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui_ImplOpenGL3_RenderDrawData(GetDrawData());
 
         // Update and Render additional Platform Windows
         // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
@@ -541,8 +408,8 @@ int main(int, char **) {
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
             SDL_Window *backup_current_window = SDL_GL_GetCurrentWindow();
             SDL_GLContext backup_current_context = SDL_GL_GetCurrentContext();
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
+            UpdatePlatformWindows();
+            RenderPlatformWindowsDefault();
             SDL_GL_MakeCurrent(backup_current_window, backup_current_context);
         }
 
@@ -556,10 +423,10 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImPlot::DestroyContext();
-    ImGui::DestroyContext();
+    DestroyContext();
 
     Audio.Stop();
-    if (GeneratorThread.joinable()) GeneratorThread.join();
+    if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
     NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);
