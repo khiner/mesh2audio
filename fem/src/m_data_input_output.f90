@@ -33,6 +33,14 @@ contains
         call getarg(3, arg)       !< gets poissons ratio
         read(arg, *) nu
 
+        if (debug == 1) then
+            print*, ""
+            print*, "Material Properties"
+            print*, "     Youngs Modulus: ", ym
+            print*, "     Poisson's Ratio: ", nu
+            print*, ""
+        end if
+
         open (unit = 1, file = trim(filename)//".obj", iostat=io)
 
         !< read raw data
@@ -123,10 +131,8 @@ contains
 
         do i = 1,Ndofs
             do j = 1,Ndofs
-                if (j < Ndofs) then
-                    write(1,"(F16.8,A)",advance="no") S(i,j), ','
-                else
-                    write(1,"(F16.8)") S(i,j)
+                if (abs(S(i,j)) > 1e-10) then
+                    write(1,"(I6,A,I6,A,F32.8)") i, ",", j, ",", S(i,j)
                 end if
             end do
         end do
@@ -134,15 +140,13 @@ contains
         close(1)
 
         !< Write Mass Matrix
-        f = trim(filename)//"M_out"
+        f = trim(filename)//"_M.out"
         open(1, file = trim(f), iostat = io)
 
         do i = 1,Ndofs
             do j = 1,Ndofs
-                if (j < Ndofs) then
-                    write(1,"(F16.8,A)",advance="no") M(i,j), ','
-                else
-                    write(1,"(F16.8)") M(i,j)
+                if (abs(M(i,j)) > 1e-10) then
+                    write(1,"(I6,A,I6,A,F32.8)") i, ",", j, ",", M(i,j)
                 end if
             end do
         end do
