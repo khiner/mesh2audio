@@ -38,10 +38,10 @@ bool MeshProfile::IsClosed() const {
 
 using namespace ImGui;
 
-// Index of the currently selected anchor point, along with the positions of the anchor and its two corresponding
-// control points at the time of drag initiation.
-static int ActiveAnchorPoint = -1, SelectedAnchorPoint = -1;
-static ImVec2 SelectedDragInitPositions[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}}; // (Only the first point uses the fourth element.)
+// Index of the currently selected control point, along with its position and the positions of its two corresponding
+// control points at the time of drag initiation (used if the selected control point is also an anchor point).
+static int ActiveAnchorPoint = -1, SelectedControlPoint = -1, HoveredControlPoint = -1;
+static ImVec2 SelectedDragInitPositions[4] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}}; // (The fourth element only applies to the first anchor point.)
 
 void MeshProfile::DrawControlPoint(size_t i, const ImVec2 &offset, float scale) const {
     if (i < 0 || i >= ControlPoints.size()) return;
@@ -57,8 +57,22 @@ void MeshProfile::DrawControlPoint(size_t i, const ImVec2 &offset, float scale) 
     dl->PathStroke(ControlColorU32, 0, ControlLineThickness);
 
     // Draw the control points.
-    dl->AddCircleFilled(GetControlPoint(i + 1, offset, scale), ControlPointRadius, ControlColorU32);
-    dl->AddCircleFilled(GetControlPoint(i + 2, offset, scale), ControlPointRadius, ControlColorU32);
+    for (size_t j = i + 1; j <= i + 2; j++) {
+        const bool is_active = ActiveAnchorPoint == int(j) || HoveredControlPoint == int(j);
+        const bool is_selected = SelectedControlPoint == int(j);
+        const float radius = is_active || is_selected ? ControlPointRadius + ControlLineThickness : ControlPointRadius;
+        const auto &cp = GetControlPoint(j, offset, scale);
+        dl->AddCircleFilled(cp, radius, ControlColorU32);
+        if (is_selected) {
+            dl->AddCircle(cp, radius + ControlLineThickness, GetColorU32(ImGuiCol_ButtonActive), 0, ControlLineThickness);
+        }
+    }
+}
+
+static int GetAnchorPoint(int control_point) {
+    if (control_point % 3 == 0) return control_point;
+    if ((control_point - 1) % 3 == 0) return control_point - 1;
+    if ((control_point + 1) % 3 == 0) return control_point + 1;
 }
 
 // Render the current 2D profile as a closed line shape (using ImGui).
@@ -73,27 +87,10 @@ bool MeshProfile::Render() {
     const float scale = draw_size.y;
     if (scale <= 0) return false;
 
-    auto *dl = GetWindowDrawList();
-    const float curr_tol = dl->_Data->CurveTessellationTol; // Save current tolerance to restore later.
-    dl->_Data->CurveTessellationTol = CurveTolerance;
-    if (ShowPath) {
-        // Bezier path has already been calculated, so just push it to the draw list's path.
-        for (size_t i = 0; i < Vertices.size(); i++) dl->_Path.push_back(GetVertex(i, offset, scale));
-        if (ClosePath) dl->PathLineTo(GetVertex(0, offset, scale));
-        dl->PathStroke(PathLineColorU32, 0, PathLineThickness);
-    }
-    if (ShowControlPoints) {
-        for (size_t i = 0; i < num_ctrl - 1; i += 3) {
-            DrawControlPoint(i, offset, scale);
-        }
-    } else if (SelectedAnchorPoint != -1) {
-        // If the control points are hidden, but an anchor point is selected, draw the control points for that anchor.
-        DrawControlPoint(SelectedAnchorPoint - 3, offset, scale);
-        DrawControlPoint(SelectedAnchorPoint, offset, scale);
-    }
-
+    // Interaction pass.
     bool modified = false;
-    if (ShowAnchorPoints) {
+    HoveredControlPoint = -1;
+    if (ShowAnchorPoints || ShowControlPoints) {
         if (ActiveAnchorPoint > -1 && ActiveAnchorPoint < int(num_ctrl)) {
             const auto &drag_delta = GetMouseDragDelta() / scale;
             if (drag_delta.x != 0 || drag_delta.y != 0) {
@@ -103,8 +100,12 @@ bool MeshProfile::Render() {
                 new_anchor_pos.y = std::clamp(new_anchor_pos.y, 0.f, draw_size.y / scale);
                 const auto &pos_delta = new_anchor_pos - SelectedDragInitPositions[0];
                 ControlPoints[ActiveAnchorPoint] = new_anchor_pos;
-                ControlPoints[ActiveAnchorPoint == 0 ? num_ctrl - 1 : ActiveAnchorPoint - 1] = SelectedDragInitPositions[1] + pos_delta;
-                ControlPoints[ActiveAnchorPoint + 1] = SelectedDragInitPositions[2] + pos_delta;
+                if (ActiveAnchorPoint % 3 == 0) {
+                    // Anchors drag their corresponding control points.
+                    ControlPoints[ActiveAnchorPoint == 0 ? num_ctrl - 1 : ActiveAnchorPoint - 1] = SelectedDragInitPositions[1] + pos_delta;
+                    ControlPoints[ActiveAnchorPoint + 1] = SelectedDragInitPositions[2] + pos_delta;
+                }
+
                 if (ActiveAnchorPoint == 0) ControlPoints[num_ctrl - 2] = SelectedDragInitPositions[3] + pos_delta;
 
                 modified = true;
@@ -116,40 +117,66 @@ bool MeshProfile::Render() {
         const auto &io = GetIO();
         const bool mouse_clicked = IsMouseClicked(0);
         const ImVec2 radius_area{AnchorPointRadius, AnchorPointRadius};
-        int hovered_anchor_point = -1;
-        for (size_t i = 0; i < num_ctrl - 1; i += 3) {
+        for (size_t i = 0; i < num_ctrl - 1; i++) {
+            // todo not correct for non-anchor cps
+            const bool is_visible = ShowControlPoints || (ShowAnchorPoints && i % 3 == 0) || (SelectedControlPoint != -1 && std::abs(int(i) - GetAnchorPoint(SelectedControlPoint)) < 5);
+            if (!is_visible) continue;
+
             const auto &cp = GetControlPoint(i, offset, scale);
             const ImRect cp_rect = {cp - radius_area, cp + radius_area};
             if (cp_rect.Contains(io.MousePos)) {
                 if (mouse_clicked) {
-                    ActiveAnchorPoint = SelectedAnchorPoint = i;
+                    ActiveAnchorPoint = SelectedControlPoint = i;
 
                     SelectedDragInitPositions[0] = ControlPoints[i];
                     SelectedDragInitPositions[1] = ControlPoints[i == 0 ? num_ctrl - 1 : i - 1];
                     SelectedDragInitPositions[2] = ControlPoints[i + 1];
                     if (i == 0) SelectedDragInitPositions[3] = ControlPoints[num_ctrl - 2]; // Control points of first anchor wrap around.
                 } else {
-                    hovered_anchor_point = i;
+                    HoveredControlPoint = i;
                 }
-                break;
+                if (HoveredControlPoint % 3 == 0 || ActiveAnchorPoint % 3 == 0) break; // Handle clicking/hovering overlapping points in favor of anchor points.
             }
         }
+        // Clicking outside of an anchor point deselects it.
+        if (mouse_clicked && ActiveAnchorPoint == -1) SelectedControlPoint = -1;
+    }
+
+    // Draw pass.
+    auto *dl = GetWindowDrawList();
+
+    const float curr_tol = dl->_Data->CurveTessellationTol; // Save current tolerance to restore later.
+    dl->_Data->CurveTessellationTol = CurveTolerance;
+    if (ShowPath) {
+        // Bezier path has already been calculated, so just push it to the draw list's path.
+        for (size_t i = 0; i < Vertices.size(); i++) dl->_Path.push_back(GetVertex(i, offset, scale));
+        if (ClosePath) dl->PathLineTo(GetVertex(0, offset, scale));
+        dl->PathStroke(PathLineColorU32, 0, PathLineThickness);
+    }
+    dl->_Data->CurveTessellationTol = curr_tol; // Restore previous tolerance.
+
+    if (ShowControlPoints) {
+        for (size_t i = 0; i < num_ctrl - 1; i += 3) {
+            DrawControlPoint(i, offset, scale);
+        }
+    } else if (SelectedControlPoint != -1) {
+        const int ap = GetAnchorPoint(SelectedControlPoint);
+        // If the control points are hidden, but an anchor point is selected, draw the control points for that anchor.
+        DrawControlPoint(ap - 3, offset, scale);
+        DrawControlPoint(ap, offset, scale);
+    }
+    if (ShowAnchorPoints) {
         for (size_t i = 0; i < num_ctrl - 1; i += 3) {
             const auto &cp = GetControlPoint(i, offset, scale);
-            const bool is_selected = SelectedAnchorPoint == int(i);
-            const bool is_active = ActiveAnchorPoint == int(i) || hovered_anchor_point == int(i);
+            const bool is_active = ActiveAnchorPoint == int(i) || HoveredControlPoint == int(i);
+            const bool is_selected = SelectedControlPoint == int(i);
             dl->AddCircleFilled(cp, AnchorPointRadius, is_active ? GetColorU32(ImGuiCol_ButtonHovered) : AnchorFillColorU32);
             dl->AddCircle(cp, AnchorPointRadius, AnchorStrokeColorU32, 0, AnchorStrokeThickness);
             if (is_selected) {
                 dl->AddCircle(cp, AnchorPointRadius + AnchorStrokeThickness, GetColorU32(ImGuiCol_ButtonActive), 0, AnchorStrokeThickness);
             }
         }
-
-        // Clicking outside of an anchor point deselects it.
-        if (mouse_clicked && ActiveAnchorPoint == -1) SelectedAnchorPoint = -1;
     }
-
-    dl->_Data->CurveTessellationTol = curr_tol;
 
     if (modified) CreateVertices();
     return modified;
@@ -157,6 +184,7 @@ bool MeshProfile::Render() {
 
 bool MeshProfile::RenderConfig() {
     Text("SVG file: %s", SvgFilePath.c_str());
+    if (SelectedControlPoint != -1) Text("Selected anchor point: %d", SelectedControlPoint);
 
     // If either of these parameters change, we need to regenerate the mesh.
     SeparatorText("Resolution");
