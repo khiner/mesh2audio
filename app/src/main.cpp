@@ -16,7 +16,6 @@
 #include <nfd.h>
 
 #include "Audio.h"
-#include "GlCanvas.h"
 #include "Mesh.h"
 #include "Window.h"
 
@@ -36,12 +35,10 @@ static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 static string GeneratedDsp; // The most recently generated DSP code.
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 
-// DSP code in addition to the model, to make it playable.
+// DSP code in addition to the model, to be appended to make it playable.
 static const string FaustInstrumentDsp = R"(
 
 exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);
-exSpread = hslider("exSpread",0,0,1,0.01) : ba.sAndH(gate);
-t60Scaler = hslider("t60",1,0,100,0.01) : ba.sAndH(gate);
 t60Decay = hslider("t60Decay",0.75,0,1,0.01) : ba.sAndH(gate);
 t60Slope = hslider("t60Slope",2,1,6,0.01) : ba.sAndH(gate);
 hammerHardness = hslider("hammerHardness",0.9,0,1,0.01) : ba.sAndH(gate);
@@ -167,7 +164,6 @@ int main(int, char **) {
     // mesh.ExtrudeProfile(100);
 
     glEnable(GL_DEPTH_TEST);
-    static GlCanvas gl_canvas;
 
     // Main loop
     bool done = false;
@@ -269,15 +265,9 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
+            if (mesh != nullptr ) mesh->Render();
+
             const auto content_region = GetContentRegionAvail();
-            Mesh::UpdateCameraProjection(content_region);
-            if (mesh != nullptr && content_region.x > 0 && content_region.y > 0) {
-                const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-                gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
-                mesh->Render();
-                unsigned int texture_id = gl_canvas.Render();
-                Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
-            }
             if (Mesh::ShowGizmo || Mesh::ShowCameraGizmo || Mesh::ShowGrid) {
                 ImGuizmo::BeginFrame();
                 ImGuizmo::SetDrawlist();

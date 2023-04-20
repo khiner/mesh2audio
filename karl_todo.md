@@ -14,4 +14,3 @@
 - Calculate mode frequencies empirically for validation against known bell modes
 - Use axisymmetric solver (via file IO)
   - Add a toggle between the tet mesh vs axisymmetric audio model
-- Mouse wheel camera zoom

@@ -1,5 +1,6 @@
 #include "Mesh.h"
 
+#include <fmt/chrono.h>
 #include <fstream>
 #include <iomanip>
 #include <thread>
@@ -17,9 +18,9 @@
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
 
+#include "GlCanvas.h"
 #include "Shader.h"
 
-#include <fmt/chrono.h>
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -29,6 +30,8 @@ using std::string, std::to_string;
 
 // Alias for epoch seconds.
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
+
+static GlCanvas gl_canvas;
 
 static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes.
 
@@ -242,6 +245,7 @@ void Mesh::Data::UpdateBounds() {
         if (v.z > Max.z) Max.z = v.z;
     }
 }
+
 void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
     Clear();
     if (profile.NumVertices() < 3) return;
@@ -330,15 +334,39 @@ void Mesh::UpdateCameraProjection(const ImVec2 &size) {
     CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
 }
 
-void Mesh::Render() {
-    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
-        ViewMeshType = MeshType_Triangular;
-    }
-    if (ActiveViewMeshType != ViewMeshType) {
-        ActiveViewMeshType = ViewMeshType;
-        Bind();
-    }
+void Mesh::Bind() {
+    const auto &data = GetActiveData();
+    Bind(data);
+}
 
+void Mesh::Bind(const Mesh::Data &data) {
+    glGenVertexArrays(1, &VertexArray);
+    glGenBuffers(1, &VertexBuffer);
+    glGenBuffers(1, &NormalBuffer);
+    glGenBuffers(1, &IndexBuffer);
+
+    glBindVertexArray(VertexArray);
+
+    // Bind vertices to layout location 0
+    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Vertices.size(), &data.Vertices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    // Bind normals to layout location 1
+    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Normals.size(), &data.Normals[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * data.Indices.size(), &data.Indices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void Mesh::DrawGl() const {
     glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(CameraView * ObjectMatrix)[0][0]);
 
@@ -482,38 +510,6 @@ void Mesh::GenerateTetMesh() {
     LoadTetMesh(file_path, tet_vecs, tet_polys);
 }
 
-void Mesh::Bind() {
-    const auto &data = GetActiveData();
-    Bind(data);
-}
-
-void Mesh::Bind(const Mesh::Data &data) {
-    glGenVertexArrays(1, &VertexArray);
-    glGenBuffers(1, &VertexBuffer);
-    glGenBuffers(1, &NormalBuffer);
-    glGenBuffers(1, &IndexBuffer);
-
-    glBindVertexArray(VertexArray);
-
-    // Bind vertices to layout location 0
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Vertices.size(), &data.Vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    // Bind normals to layout location 1
-    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Normals.size(), &data.Normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * data.Indices.size(), &data.Indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
 string Mesh::GenerateDsp() const {
     if (!HasTetMesh()) return ""; // Tet mesh must be generated first.
 
@@ -549,6 +545,29 @@ string Mesh::GenerateDsp() const {
 static string GenerateTetMsg = "Generating tetrahedral mesh...";
 
 using namespace ImGui;
+
+void Mesh::Render() {
+    const auto &io = ImGui::GetIO();
+    if (io.MouseWheel != 0) {
+        SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
+    }
+    const auto content_region = GetContentRegionAvail();
+    UpdateCameraProjection(content_region);
+    if (content_region.x > 0 && content_region.y > 0) {
+        const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
+        gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+        if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
+            ViewMeshType = MeshType_Triangular;
+        }
+        if (ActiveViewMeshType != ViewMeshType) {
+            ActiveViewMeshType = ViewMeshType;
+            Bind();
+        }
+        DrawGl();
+        unsigned int texture_id = gl_canvas.Render();
+        Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
+    }
+}
 
 void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {

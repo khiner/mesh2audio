@@ -134,4 +134,5 @@ private:
 
     void Bind(); // Bind active mesh.
     void Bind(const Data &data); // Bind mesh and set up vertex attributes.
+    void DrawGl() const; // Draw the active mesh to the OpenGL context.
 };
