@@ -72,7 +72,7 @@ struct Mesh {
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
     void LoadTetMesh(fs::path file_path);
-    void LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
+    void LoadTetMesh(const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
     bool HasTetMesh() const { return !TetMeshPath.empty(); }
     static std::string GetTetMeshName(fs::path file_path);
 

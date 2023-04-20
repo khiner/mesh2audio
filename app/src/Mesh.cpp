@@ -441,16 +441,11 @@ static vector<seconds_t> GetSavedTetMeshTimes() {
     return saved_tet_mesh_times;
 }
 
-// Store most recently loaded flat tet indices, to convert to Vega tetmesh later.
-// xxx shouldn't be managed globally.
-static vector<uint> tet_indices;
-
-void Mesh::LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
-    const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
+void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
     TetMesh.Clear();
     TetMesh.Vertices.reserve(tet_vecs.size());
     TetMesh.Normals.reserve(tet_vecs.size());
-    TetMesh.Indices.reserve(tet_mesh.num_faces() * 3);
+    TetMesh.Indices.reserve(tet_polys.size() * 12);
 
     // Bind vertices, normals, and indices to the tetrahedral mesh.
     for (size_t i = 0; i < tet_vecs.size(); i++) {
@@ -462,15 +457,25 @@ void Mesh::LoadTetMesh(fs::path file_path, const vector<cinolib::vec3d> &tet_vec
         // const auto &normal = tet_mesh.face_data(fid).normal;
         // Normals.push_back({normal.x(), normal.y(), normal.z()});
     }
-    for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
-        const auto &tes = tet_mesh.face_tessellation(fid);
-        for (uint i = 0; i < tes.size(); ++i) {
-            TetMesh.Indices.push_back(tes.at(i));
+    for (const auto &p : tet_polys) {
+        // Turn tetrahedron into 4 triangles with element-relative indices:
+        // 0, 1, 2; 3, 0, 1; 2, 3, 0; 1, 2, 3;
+        for (int j = 0; j < 12; j++) {
+            TetMesh.Indices.push_back(p[j % 4]);
         }
     }
+    // Creating a `cinolib::Tetmesh` resolves redundant faces, which creates much fewer indices.
+    // However, it's very slow.
+    // const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
+    // for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
+    //     const auto &tes = tet_mesh.face_tessellation(fid);
+    //     for (uint i = 0; i < tes.size(); ++i) {
+    //         TetMesh.Indices.push_back(tes.at(i));
+    //     }
+    // }
+
     TetMesh.UpdateBounds();
     TetMesh.Center();
-    TetMeshPath = file_path;
     ViewMeshType = MeshType_Tetrahedral;
     ActiveViewMeshType = MeshType_Triangular; // Force an automatic rebind on the next render (xxx crappy way of doing this).
 }
@@ -479,13 +484,14 @@ void Mesh::LoadTetMesh(fs::path file_path) {
     vector<cinolib::vec3d> tet_vecs;
     vector<vector<uint>> tet_polys;
     read_MESH(file_path.c_str(), tet_vecs, tet_polys);
-
-    tet_indices = cinolib::serialized_vids_from_polys(tet_polys);
-    LoadTetMesh(file_path, tet_vecs, tet_polys);
+    LoadTetMesh(tet_vecs, tet_polys);
+    TetMeshPath = file_path;
 }
 
 void Mesh::GenerateTetMesh() {
     static vector<cinolib::vec3d> tet_vecs;
+    static vector<uint> tet_indices;
+
     // Write to an obj file and read back into a cinolib tetmesh.
     fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
     const fs::path tmp_obj_path = TempDir / "tmp.obj";
@@ -507,7 +513,8 @@ void Mesh::GenerateTetMesh() {
     const auto &tet_polys = cinolib::polys_from_serialized_vids(tet_indices, 4);
     write_MESH(file_path.c_str(), tet_vecs, tet_polys);
 
-    LoadTetMesh(file_path, tet_vecs, tet_polys);
+    LoadTetMesh(tet_vecs, tet_polys);
+    TetMeshPath = file_path;
 }
 
 string Mesh::GenerateDsp() const {
@@ -526,7 +533,7 @@ string Mesh::GenerateDsp() const {
     // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
     ::TetMesh volumetric_mesh{
-        int(tet_vecs.size()), tet_vertices.data(), int(tet_indices.size() / 4), (int *)tet_indices.data(),
+        int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.Indices.size() / 4), (int *)TetMesh.Indices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
     return m2f::mesh2faust(
@@ -548,7 +555,7 @@ using namespace ImGui;
 
 void Mesh::Render() {
     const auto &io = ImGui::GetIO();
-    if (io.MouseWheel != 0) {
+    if (IsWindowHovered() && io.MouseWheel != 0) {
         SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
