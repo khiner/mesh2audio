@@ -39,8 +39,13 @@ static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent
 static const string FaustInstrumentDsp = R"(
 
 exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);
-t60Decay = hslider("t60Decay",0.75,0,1,0.01) : ba.sAndH(gate);
-t60Slope = hslider("t60Slope",2,1,6,0.01) : ba.sAndH(gate);
+t60Scale = hslider("t60[tooltip: Resonance duration (s) of the lowest mode.]",30,0,100,0.01) : ba.sAndH(gate);
+
+t60Decay = hslider("t60 Decay[tooltip: Decay of modes as a function of their frequency, in t60 units.
+At 1, the t60 of the highest mode will be close to 0 seconds.]",1,0,1,0.01) : ba.sAndH(gate);
+
+t60Slope = hslider("t60 Slope[tooltip: Power of the function used to compute the decay of modes t60 in function of their frequency.
+At 1, decay is linear. At 2, decay slope has degree 2, etc.]",3,1,6,0.01) : ba.sAndH(gate);
 hammerHardness = hslider("hammerHardness",0.9,0,1,0.01) : ba.sAndH(gate);
 hammerSize = hslider("hammerSize",0.3,0,1,0.01) : ba.sAndH(gate);
 gain = hslider("gain",0.1,0,1,0.01);
@@ -52,7 +57,7 @@ with{
   att = (1-hardness)*0.01+0.001;
 };
 
-process = hammer(gate,hammerHardness,hammerSize) : modalModel(exPos,30,1,3)*gain;
+process = hammer(gate,hammerHardness,hammerSize) : modalModel(exPos,t60Scale,t60Decay,t60Slope)*gain;
 )";
 
 static string GenerateDspMsg = "Generating DSP code...";
@@ -265,7 +270,7 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
-            if (mesh != nullptr ) mesh->Render();
+            if (mesh != nullptr) mesh->Render();
 
             const auto content_region = GetContentRegionAvail();
             if (Mesh::ShowGizmo || Mesh::ShowCameraGizmo || Mesh::ShowGrid) {

@@ -43,6 +43,16 @@ void DrawUiItem(const FaustParams::Item &item) {
             EndCombo();
         }
     }
+    if (item.tooltip) {
+        SameLine();
+        TextDisabled("(?)");
+        if (IsItemHovered() && BeginTooltip()) {
+            PushTextWrapPos(GetFontSize() * 35);
+            TextUnformatted(item.tooltip);
+            PopTextWrapPos();
+            EndTooltip();
+        }
+    }
 }
 
 void Audio::FaustState::Render() const {
