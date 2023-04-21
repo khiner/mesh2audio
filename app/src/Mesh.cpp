@@ -539,7 +539,7 @@ string Mesh::GenerateDsp() const {
     return m2f::mesh2faust(
         &volumetric_mesh,
         "modalModel", // generated object name
-        false, // freq control activated
+        true, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq
         20, // number of synthesized modes (default is 20)
