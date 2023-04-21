@@ -43,6 +43,7 @@ include_directories(
     lib/faust/architecture
     lib/ImGuizmo
     lib/nanosvg/src
+    lib/earcut/include/mapbox
     ${Mesh2FaustDir}/src
 )
 

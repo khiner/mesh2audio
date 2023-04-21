@@ -26,6 +26,8 @@ struct MeshProfile {
     // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
     const vector<ImVec2> &GetVertices() const { return Vertices; }
 
+    void SaveTesselation(fs::path file_path) const; // Export the tesselation to a 2D .obj file.
+
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).
 
@@ -33,13 +35,14 @@ struct MeshProfile {
     inline static int NumRadialSlices{100};
     inline static float CurveTolerance{0.0001f};
 
-    inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false};
+    inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false}, ShowTesselation{false};
     inline static float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
-    inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1};
-    inline static ImU32 PathLineColorU32 =  ImGui::ColorConvertFloat4ToU32(PathLineColor),
+    inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1}, TesselationStrokeColor = {1, 0.65, 0, 1};
+    inline static ImU32 PathLineColorU32 = ImGui::ColorConvertFloat4ToU32(PathLineColor),
                         AnchorFillColorU32 = ImGui::ColorConvertFloat4ToU32(AnchorFillColor),
                         AnchorStrokeColorU32 = ImGui::ColorConvertFloat4ToU32(AnchorStrokeColor),
-                        ControlColorU32 = ImGui::ColorConvertFloat4ToU32(ControlColor);
+                        ControlColorU32 = ImGui::ColorConvertFloat4ToU32(ControlColor),
+                        TesselationStrokeColorU32 = ImGui::ColorConvertFloat4ToU32(TesselationStrokeColor);
     inline static float AnchorPointRadius{6}, ControlPointRadius{3};
 
     // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
@@ -53,6 +56,8 @@ struct MeshProfile {
 
 private:
     void CreateVertices();
+    void Tesselate();
+
     ImRect CalcBounds(); // Calculate current bounds based on control points. Note: original bounds cached in `OriginalBounds`.
 
     // Used internally for calculating window-relative draw positions.
@@ -66,4 +71,6 @@ private:
 
     vector<ImVec2> ControlPoints;
     vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
+
+    vector<uint> TesselationIndices;
 };

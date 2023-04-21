@@ -174,6 +174,7 @@ void Mesh::Center() {
     TetMesh.Center();
     Bind();
 }
+
 void Mesh::ExtrudeProfile() {
     if (Profile == nullptr) return;
 
@@ -191,6 +192,7 @@ void Mesh::Data::Clear() {
     Min = {};
     Max = {};
 }
+
 void Mesh::Data::Save(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
     if (!out.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
@@ -210,6 +212,7 @@ void Mesh::Data::Save(fs::path file_path) const {
 
     out.close();
 }
+
 void Mesh::Data::Flip(bool x, bool y, bool z) {
     const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
     const vec3 center = (Min + Max) / 2.0f;
@@ -232,6 +235,7 @@ void Mesh::Data::Center() {
     for (auto &vertex : Vertices) vertex -= center;
     UpdateBounds();
 }
+
 void Mesh::Data::UpdateBounds() {
     // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
     Min = vec3(INFINITY, INFINITY, INFINITY);

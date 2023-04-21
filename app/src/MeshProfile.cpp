@@ -178,6 +178,15 @@ bool MeshProfile::Render() {
         }
     }
 
+    if (ShowTesselation) {
+        for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
+            for (int j = 0; j < 3; j++) {
+                dl->_Path.push_back(GetVertex(TesselationIndices[i + j], offset, scale));
+            }
+            dl->PathStroke(TesselationStrokeColorU32, 0, 1);
+        }
+    }
+
     if (modified) CreateVertices();
     return modified;
 }
@@ -195,10 +204,16 @@ bool MeshProfile::RenderConfig() {
 
     NewLine();
     Checkbox("Path", &ShowPath);
+    SameLine();
+    Checkbox("Tesselation", &ShowTesselation);
     if (ShowPath) {
         SeparatorText("Path");
         SliderFloat("Stroke weight##Path", &PathLineThickness, 0.5f, 5.f);
         if (ColorEdit4("Color##Path", (float *)&PathLineColor)) PathLineColorU32 = ColorConvertFloat4ToU32(PathLineColor);
+    }
+    if (ShowTesselation) {
+        SeparatorText("Tesselation");
+        if (ColorEdit4("Color##Tesselation", (float *)&TesselationStrokeColor)) TesselationStrokeColorU32 = ColorConvertFloat4ToU32(TesselationStrokeColor);
     }
 
     if (AnchorPointRadius < ControlPointRadius) AnchorPointRadius = ControlPointRadius;
@@ -263,6 +278,8 @@ void MeshProfile::CreateVertices() {
     for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
 
     dl.PathClear();
+
+    Tesselate();
 }
 
 ImRect MeshProfile::CalcBounds() {
@@ -281,4 +298,33 @@ ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale)
 }
 ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
     return Vertices[i] * scale + offset;
+}
+
+#include <fstream>
+
+void MeshProfile::SaveTesselation(fs::path file_path) const {
+    std::ofstream out(file_path.c_str());
+    if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
+
+    out << "# Vertices: " << Vertices.size() << "\n";
+    out << "# Faces: " << TesselationIndices.size() / 3 << "\n";
+
+    out << std::setprecision(10);
+    for (const ImVec2 &v : Vertices) {
+        out << "v " << v.x << " " << v.y << " " << 0 << "\n";
+    }
+    for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
+        out << "f ";
+        for (int j = 0; j < 3; j++) out << TesselationIndices[i + j] + 1 << " ";
+        out << "\n";
+    }
+    out.close();
+}
+
+#include "earcut.hpp"
+
+void MeshProfile::Tesselate() {
+    vector<vector<std::array<float, 2>>> polygon{{}};
+    for (const auto &v : Vertices) polygon[0].push_back({v.x, v.y});
+    TesselationIndices = mapbox::earcut<uint>(polygon);
 }

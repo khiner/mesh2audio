@@ -239,6 +239,17 @@ int main(int, char **) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
+                if (MenuItem("Export profile as obj", nullptr, false, mesh != nullptr && mesh->HasProfile())) {
+                    nfdchar_t *save_path;
+                    nfdfilteritem_t filter[] = {{"Mesh profile object", "obj"}};
+                    nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
+                    if (result == NFD_OKAY) {
+                        mesh->SaveProfile(save_path);
+                        NFD_FreePath(save_path);
+                    } else if (result != NFD_CANCEL) {
+                        std::cerr << "Error: " << NFD_GetError() << '\n';
+                    }
+                }
                 EndMenu();
             }
             if (BeginMenu("Windows")) {

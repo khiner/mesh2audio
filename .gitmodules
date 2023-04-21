@@ -36,3 +36,6 @@
 [submodule "app/lib/cinolib"]
 	path = app/lib/cinolib
 	url = git@github.com:mlivesu/cinolib.git
+[submodule "app/lib/earcut"]
+	path = app/lib/earcut
+	url = git@github.com:mapbox/earcut.hpp.git

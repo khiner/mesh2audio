@@ -67,6 +67,9 @@ struct Mesh {
     void RenderProfileConfig();
     void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
 
+    bool HasProfile() const { return Profile != nullptr; }
+    void SaveProfile(fs::path file_path) const { if (Profile != nullptr) Profile->SaveTesselation(file_path); }
+
     const Data &GetActiveData() const;
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
