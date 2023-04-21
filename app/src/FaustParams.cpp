@@ -27,7 +27,8 @@ void DrawUiItem(const FaustParams::Item &item) {
         if (InputInt(label, &value, int(item.step))) *item.zone = Real(value);
     } else if (type == ItemType_Knob || type == ItemType_HSlider || type == ItemType_VSlider || type == ItemType_HBargraph || type == ItemType_VBargraph) {
         auto value = float(*item.zone);
-        if (SliderFloat(label, &value, float(item.min), float(item.max))) *item.zone = Real(value);
+        ImGuiSliderFlags flags = item.logscale ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None;
+        if (SliderFloat(label, &value, float(item.min), float(item.max), nullptr, flags)) *item.zone = Real(value);
     } else if (type == ItemType_HRadioButtons || type == ItemType_VRadioButtons) {
     } else if (type == ItemType_Menu) {
         auto value = float(*item.zone);

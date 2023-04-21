@@ -38,7 +38,7 @@ static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent
 // DSP code in addition to the model, to be appended to make it playable.
 static const string FaustInstrumentDsp = R"(
 
-freq = nentry("Frequency[tooltip: Fundamental frequency of the model]",220,60,8000,1) : ba.sAndH(gate);
+freq = hslider("Frequency[scale:log][tooltip: Fundamental frequency of the model]",220,60,8000,1) : ba.sAndH(gate);
 exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);
 t60Scale = hslider("t60[tooltip: Resonance duration (s) of the lowest mode.]",30,0,100,0.01) : ba.sAndH(gate);
 
