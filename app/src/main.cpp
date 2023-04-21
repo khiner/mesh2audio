@@ -154,7 +154,7 @@ int main(int, char **) {
     // ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     // IM_ASSERT(font != NULL);
 
-    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "std.svg");
+    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "bell" / "std.svg");
     // Alternatively, we could initialize with a mesh obj file:
     // mesh = std::make_unique<Mesh>(fs::path("res") / "obj" / "bell" / "english.obj");
 
