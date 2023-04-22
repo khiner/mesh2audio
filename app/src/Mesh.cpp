@@ -553,27 +553,16 @@ string Mesh::GenerateDsp() const {
     );
 }
 
-static string GenerateTetMsg = "Generating tetrahedral mesh...";
+static const string GenerateTetMsg = "Generating tetrahedral mesh...";
+static constexpr float VertexHoverRadius = 5.f;
+static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHoverRadius;
 
 using namespace ImGui;
-ImVec2 WorldToScreenSpace(const vec4 &vertex, const mat4 &view, const mat4 &projection, const ImVec2 &windowPos, const ImVec2 &contentRegion) {
-    const vec4 pos_clip_space = projection * view * vertex;
-    return {
-        ((pos_clip_space.x / pos_clip_space.w) * 0.5f + 0.5f) * contentRegion.x + windowPos.x,
-        (1.0f - ((pos_clip_space.y / pos_clip_space.w) * 0.5f + 0.5f)) * contentRegion.y + windowPos.y,
-    };
-}
-
-bool IsMouseHoveringOverVertex(const ImVec2 &mouse_pos, const ImVec2 &vertex_pos, float radius) {
-    const float distance = sqrt(pow(mouse_pos.x - vertex_pos.x, 2) + pow(mouse_pos.y - vertex_pos.y, 2));
-    return distance <= radius;
-}
-
-static constexpr float VertexHoverRadius = 5.0f; // Adjust this value based on the desired sensitivity
 
 void Mesh::Render() {
     const auto &io = ImGui::GetIO();
-    if (IsWindowHovered() && io.MouseWheel != 0) {
+    const bool window_hovered = IsWindowHovered();
+    if (window_hovered && io.MouseWheel != 0) {
         SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
@@ -594,17 +583,20 @@ void Mesh::Render() {
         unsigned int texture_id = gl_canvas.Render();
         Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
 
-        // Transform each vertex position to screen space and check if the mouse is hovering over it.
-        const auto &mouse_pos = io.MousePos;
-        const auto &window_pos = GetWindowPos();
-        const auto &data = GetActiveData();
         HoveringVertexIndex = -1;
-        for (const auto index : data.Indices) {
-            const auto &vertex = data.Vertices[index];
-            vec4 vertex_world_space{vertex.x, vertex.y, vertex.z, 1.0f};
-            const auto vertex_screen_space = WorldToScreenSpace(vertex_world_space, CameraView, CameraProjection, window_pos, content_region);
-            if (IsMouseHoveringOverVertex(mouse_pos, vertex_screen_space, VertexHoverRadius)) {
-                HoveringVertexIndex = index;
+        if (window_hovered) {
+            // Transform each vertex position to screen space and check if the mouse is hovering over it.
+            const auto &mouse_pos = io.MousePos;
+            const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
+            const auto &data = GetActiveData();
+            const auto &view_projection = CameraProjection * CameraView;
+            for (size_t i = 0; i < data.Vertices.size(); i++) {
+                const auto &v = data.Vertices[i];
+                const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
+                const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
+                const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
+                const float distance_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
+                if (distance_squared <= VertexHoverRadiusSquared) HoveringVertexIndex = i;
             }
         }
     }
