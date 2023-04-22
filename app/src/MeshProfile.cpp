@@ -150,7 +150,8 @@ void MeshProfile::DrawControlPoint(size_t i, const ImVec2 &offset, float scale) 
 static int GetAnchorPoint(int control_point) {
     if (control_point % 3 == 0) return control_point;
     if ((control_point - 1) % 3 == 0) return control_point - 1;
-    if ((control_point + 1) % 3 == 0) return control_point + 1;
+    if ((control_point - 2) % 3 == 0) return control_point - 2;
+    return control_point + 1;
 }
 
 // Render the current 2D profile as a closed line shape (using ImGui).
@@ -261,6 +262,7 @@ bool MeshProfile::Render() {
             for (int j = 0; j < 3; j++) {
                 dl->_Path.push_back(GetVertex(TesselationIndices[i + j], offset, scale));
             }
+            dl->_Path.push_back(GetVertex(TesselationIndices[i], offset, scale)); // Close the triangle.
             dl->PathStroke(TesselationStrokeColorU32, 0, 1);
         }
     }
