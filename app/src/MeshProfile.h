@@ -7,7 +7,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-using std::vector;
+using std::string, std::vector;
 
 namespace fs = std::filesystem;
 
@@ -27,6 +27,7 @@ struct MeshProfile {
     const vector<ImVec2> &GetVertices() const { return Vertices; }
 
     void SaveTesselation(fs::path file_path) const; // Export the tesselation to a 2D .obj file.
+    string GenerateDspAxisymmetric() const;
 
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).

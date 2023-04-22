@@ -620,7 +620,10 @@ void Mesh::RenderConfig() {
                 const float spinner_dim = std::min(ws.x, ws.y) / 2;
                 SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
                 ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg.c_str(), spinner_dim / 2, 3);
-                if (HasTetMesh()) CloseCurrentPopup();
+                if (HasTetMesh()) {
+                    if (GeneratorThread.joinable()) GeneratorThread.join();
+                    CloseCurrentPopup();
+                }
                 EndPopup();
             }
             Text("File: %s", FilePath.c_str());

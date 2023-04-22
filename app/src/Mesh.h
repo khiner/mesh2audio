@@ -6,6 +6,7 @@
 
 #include <cinolib/geometry/vec_mat.h>
 
+#include "Material.h"
 #include "MeshProfile.h"
 
 #include "ImGuizmo.h"
@@ -30,13 +31,6 @@ struct Mesh {
         RenderType_Mesh
     };
     using RenderType = int;
-
-    // Defaults to aluminum.
-    struct MaterialProperties {
-        double YoungModulus{70E9};
-        double PoissonRatio{0.35};
-        double Density{2700};
-    };
 
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     Mesh(fs::path file_path);
@@ -68,7 +62,9 @@ struct Mesh {
     void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
 
     bool HasProfile() const { return Profile != nullptr; }
-    void SaveProfile(fs::path file_path) const { if (Profile != nullptr) Profile->SaveTesselation(file_path); }
+    void SaveProfile(fs::path file_path) const {
+        if (Profile != nullptr) Profile->SaveTesselation(file_path);
+    }
 
     const Data &GetActiveData() const;
 
@@ -80,6 +76,9 @@ struct Mesh {
     static std::string GetTetMeshName(fs::path file_path);
 
     std::string GenerateDsp() const;
+    std::string GenerateDspAxisymmetric() const {
+        return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : "";
+    }
 
     void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
     void Rotate(const vec3 &axis, float angle);
@@ -111,16 +110,6 @@ struct Mesh {
     inline static int HoveringVertexIndex = -1;
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
-
-    inline static std::map<std::string, MaterialProperties> MaterialPresets = {
-        {"Copper", {110e9f, 0.33f, 8600.0f}}, // 8900
-        {"Aluminum", {70e9f, 0.35f, 2700.0f}},
-        {"Steel", {200e9f, 0.3f, 8000.0f}},
-        {"Glass", {70e9f, 0.2f, 2500.0f}},
-        {"Wood", {10e9f, 0.3f, 500.0f}},
-    };
-    inline static MaterialProperties Material{MaterialPresets["Copper"]};
-
     fs::path FilePath; // Most recently loaded file path.
 
 private:

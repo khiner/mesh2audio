@@ -1,7 +1,14 @@
 #include "MeshProfile.h"
 
 #define NANOSVG_IMPLEMENTATION // Expands implementation
+#include "mesh2faust.h"
 #include "nanosvg.h"
+
+#include <fmt/format.h>
+#include <fstream>
+
+#include "Eigen/SparseCore"
+#include "Material.h"
 
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
@@ -28,6 +35,77 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     }
 
     CreateVertices();
+}
+
+static Eigen::SparseMatrix<double> ReadSparseMatrix(const fs::path &file_path) {
+    std::ifstream input_file(file_path);
+    if (!input_file.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
+
+    vector<Eigen::Triplet<double>> K_triplets;
+    string line;
+    while (std::getline(input_file, line)) {
+        std::istringstream line_stream(line);
+        unsigned int i, j;
+        double entry;
+        string comma;
+        line_stream >> i >> comma >> j >> comma >> entry;
+
+        // Decrement indices by 1 since Eigen uses 0-based indexing.
+        K_triplets.emplace_back(i - 1, j - 1, entry);
+    }
+
+    input_file.close();
+
+    // Find matrix dimensions.
+    int num_rows = 0, num_cols = 0;
+    for (const auto &triplet : K_triplets) {
+        num_rows = std::max(num_rows, triplet.row() + 1);
+        num_cols = std::max(num_cols, triplet.col() + 1);
+    }
+
+    Eigen::SparseMatrix<double> matrix(num_rows, num_cols);
+    matrix.setFromTriplets(K_triplets.begin(), K_triplets.end());
+
+    return matrix;
+}
+
+static const fs::path TesselationDir = fs::path("./") / "profile_tesselation";
+
+string MeshProfile::GenerateDspAxisymmetric() const {
+    // Write the profile to an obj file.
+    const auto fem_dir = fs::path("./") / ".." / ".." / "fem";
+    fs::create_directory(TesselationDir); // Create the tesselation dir if it doesn't exist.
+    const auto obj_path = TesselationDir / SvgFilePath.filename().replace_extension(".obj");
+    SaveTesselation(obj_path);
+
+    // Execute the `fem` program to generate the mass/stiffness matrices.
+    fs::path obj_path_no_extension = obj_path;
+    obj_path_no_extension = obj_path_no_extension.replace_extension("");
+    const string fem_cmd = fmt::format("{} {} {} {}", (fem_dir / "fem").string(), obj_path_no_extension.string(), Material.YoungModulus, Material.PoissonRatio);
+    int result = std::system(fem_cmd.c_str());
+    if (result != 0) throw std::runtime_error("Error executing fem command.");
+
+    const auto M = ReadSparseMatrix(obj_path_no_extension.string() + "_M.out");
+    const auto K = ReadSparseMatrix(obj_path_no_extension.string() + "_K.out");
+
+    static const int num_vertices = 4;
+    static const int vertex_dim = 2;
+    return m2f::mesh2faust(
+        M,
+        K,
+        num_vertices,
+        vertex_dim,
+        "modalModel", // generated object name
+        true, // freq control activated
+        20, // lowest mode freq
+        10000, // highest mode freq
+        16, // number of synthesized modes (default is 20)
+        16, // number of modes to be computed for the finite element analysis (default is 100)
+        {}, // specific excitation positions
+        4, // number of excitation positions (default is max: -1)
+        false,
+        true
+    );
 }
 
 static constexpr float Epsilon = 1e-6f;
@@ -194,7 +272,6 @@ bool MeshProfile::Render() {
 bool MeshProfile::RenderConfig() {
     Text("SVG file: %s", SvgFilePath.c_str());
     if (SelectedControlPoint != -1) Text("Selected anchor point: %d", SelectedControlPoint);
-
     // If either of these parameters change, we need to regenerate the mesh.
     SeparatorText("Resolution");
     bool modified = SliderInt("Radial seg.", &NumRadialSlices, 3, 200, nullptr, ImGuiSliderFlags_Logarithmic);

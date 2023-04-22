@@ -24,44 +24,14 @@
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
 #endif
 
-static Audio Audio;
 static WindowsState Windows;
 
 static std::unique_ptr<Mesh> mesh;
 
 static const mat4 Identity(1.f);
 
-static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
-static string GeneratedDsp; // The most recently generated DSP code.
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
-
-// DSP code in addition to the model, to be appended to make it playable.
-static const string FaustInstrumentDsp = R"(
-
-freq = hslider("Frequency[scale:log][tooltip: Fundamental frequency of the model]",220,60,8000,1) : ba.sAndH(gate);
-exPos = nentry("exPos",0,0,6,1) : ba.sAndH(gate);
-t60Scale = hslider("t60[tooltip: Resonance duration (s) of the lowest mode.]",30,0,100,0.01) : ba.sAndH(gate);
-
-t60Decay = hslider("t60 Decay[tooltip: Decay of modes as a function of their frequency, in t60 units.
-At 1, the t60 of the highest mode will be close to 0 seconds.]",1,0,1,0.01) : ba.sAndH(gate);
-
-t60Slope = hslider("t60 Slope[tooltip: Power of the function used to compute the decay of modes t60 in function of their frequency.
-At 1, decay is linear. At 2, decay slope has degree 2, etc.]",3,1,6,0.01) : ba.sAndH(gate);
-hammerHardness = hslider("hammerHardness",0.9,0,1,0.01) : ba.sAndH(gate);
-hammerSize = hslider("hammerSize",0.3,0,1,0.01) : ba.sAndH(gate);
-gain = hslider("gain",0.1,0,1,0.01);
-gate = button("gate");
-
-hammer(trig,hardness,size) = en.ar(att,att,trig)*no.noise : fi.lowpass(3,ctoff)
-with{
-  ctoff = (1-size)*9500+500;
-  att = (1-hardness)*0.01+0.001;
-};
-
-process = hammer(gate,hammerHardness,hammerSize) : modalModel(freq,exPos,t60Scale,t60Decay,t60Slope)*gain;
-)";
-
-static string GenerateDspMsg = "Generating DSP code...";
+static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 
 using namespace ImGui;
 
@@ -340,16 +310,33 @@ int main(int, char **) {
             if (BeginTabBar("Audio model")) {
                 if (BeginTabItem("Model")) {
                     const bool has_tetrahedral_mesh = mesh->HasTetMesh();
+                    const bool has_profile = mesh->HasProfile();
                     if (!has_tetrahedral_mesh) BeginDisabled();
-                    if (Button("Generate DSP")) {
+                    const bool generate_tet_dsp = Button("Generate DSP");
+                    if (!has_tetrahedral_mesh) {
+                        SameLine();
+                        TextUnformatted("Run |Mesh Controls|->|Mesh|->|Generate tetrahedral mesh|.");
+                        EndDisabled();
+                    }
+                    if (!has_profile) BeginDisabled();
+                    const bool generate_axisymmetric_dsp = Button("Generate axisymmetric DSP");
+                    if (!has_profile) {
+                        SameLine();
+                        TextUnformatted("Run |File|->|Open mesh| and select an SVG file.");
+                        EndDisabled();
+                    }
+                    if (generate_tet_dsp || generate_axisymmetric_dsp) {
                         OpenPopup(GenerateDspMsg.c_str());
                         if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
                         DspGeneratorThread = std::thread([&] {
-                            const string generated_dsp = mesh->GenerateDsp();
+                            const string generated_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
                             if (!generated_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;
                                 GeneratedDsp = generated_dsp + FaustInstrumentDsp;
+                            } else {
+                                DspTetMeshPath = "";
+                                GeneratedDsp = "process = _;";
                             }
                         });
                     }
@@ -370,32 +357,27 @@ int main(int, char **) {
                         }
                         EndPopup();
                     }
-                    if (!has_tetrahedral_mesh) {
-                        SameLine();
-                        TextUnformatted("Run |Mesh Controls|->|Mesh|->|Generate tetrahedral mesh|.");
-                        EndDisabled();
-                    }
-                    if (has_tetrahedral_mesh) {
+                    if (has_tetrahedral_mesh || has_profile) {
                         SeparatorText("Material properties");
                         // Presets
                         static std::string selected_preset = "Copper";
                         if (BeginCombo("Presets", selected_preset.c_str())) {
-                            for (const auto &[preset_name, material] : Mesh::MaterialPresets) {
+                            for (const auto &[preset_name, material] : MaterialPresets) {
                                 bool is_selected = (preset_name == selected_preset);
                                 if (Selectable(preset_name.c_str(), is_selected)) {
                                     selected_preset = preset_name;
-                                    mesh->Material = material;
+                                    Material = material;
                                 }
                                 if (is_selected) SetItemDefaultFocus();
                             }
                             EndCombo();
                         }
                         Text("Young's modulus (Pa)");
-                        InputDouble("##Young's modulus", &mesh->Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        InputDouble("##Young's modulus", &Material.YoungModulus, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                         Text("Poisson's ratio");
-                        InputDouble("##Poisson's ratio", &mesh->Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        InputDouble("##Poisson's ratio", &Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                         Text("Density (kg/m^3)");
-                        InputDouble("##Density", &mesh->Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        InputDouble("##Density", &Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                     }
                     EndTabItem();
                 }
