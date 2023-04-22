@@ -11,6 +11,13 @@ using std::string, std::vector;
 
 namespace fs = std::filesystem;
 
+enum TesselationMode_ {
+    TesselationMode_CDT, // Constrained Delaunay Triangulation
+    TesselationMode_Earcut, // Ear clipping
+};
+
+using TesselationMode = int;
+
 struct MeshProfile {
     explicit MeshProfile(fs::path svg_file_path); // Load a 2D profile from a .svg file.
 
@@ -36,6 +43,7 @@ struct MeshProfile {
     inline static int NumRadialSlices{100};
     inline static float CurveTolerance{0.0001f};
 
+    inline static TesselationMode TessMode = TesselationMode_CDT;
     inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false}, ShowTesselation{false};
     inline static float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
     inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1}, TesselationStrokeColor = {1, 0.65, 0, 1};
@@ -73,5 +81,6 @@ private:
     vector<ImVec2> ControlPoints;
     vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
 
+    vector<ImVec2> TesselationVertices;
     vector<uint> TesselationIndices;
 };

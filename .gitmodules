@@ -39,3 +39,6 @@
 [submodule "app/lib/earcut"]
 	path = app/lib/earcut
 	url = git@github.com:mapbox/earcut.hpp.git
+[submodule "app/lib/CDT"]
+	path = app/lib/CDT
+	url = git@github.com:artem-ogre/CDT.git

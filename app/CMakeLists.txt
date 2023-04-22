@@ -44,6 +44,7 @@ include_directories(
     lib/ImGuizmo
     lib/nanosvg/src
     lib/earcut/include/mapbox
+    lib/CDT/CDT/include
     ${Mesh2FaustDir}/src
 )
 

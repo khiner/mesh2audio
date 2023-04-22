@@ -68,3 +68,5 @@ include_directories(faust/compiler/generator/c)
 include_directories(faust/compiler/generator/cpp)
 add_subdirectory(faust/build EXCLUDE_FROM_ALL)
 target_compile_definitions(dynamiclib PUBLIC LLVM_BUILD_UNIVERSAL=1)
+
+add_subdirectory(CDT/CDT)

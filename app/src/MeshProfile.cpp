@@ -260,9 +260,10 @@ bool MeshProfile::Render() {
     if (ShowTesselation) {
         for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
             for (int j = 0; j < 3; j++) {
-                dl->_Path.push_back(GetVertex(TesselationIndices[i + j], offset, scale));
+                const ImVec2 vertex = TesselationVertices[TesselationIndices[i + j]];
+                dl->_Path.push_back(vertex * scale + offset);
             }
-            dl->_Path.push_back(GetVertex(TesselationIndices[i], offset, scale)); // Close the triangle.
+            dl->_Path.push_back(dl->_Path[0]); // Close triangle path.
             dl->PathStroke(TesselationStrokeColorU32, 0, 1);
         }
     }
@@ -292,6 +293,11 @@ bool MeshProfile::RenderConfig() {
     }
     if (ShowTesselation) {
         SeparatorText("Tesselation");
+        TextUnformatted("Tesselation mode");
+        if (RadioButton("Constrained Delaunay triangulation", &TessMode, TesselationMode_CDT) ||
+            RadioButton("Ear clipping", &TessMode, TesselationMode_Earcut)) {
+            CreateVertices();
+        }
         if (ColorEdit4("Color##Tesselation", (float *)&TesselationStrokeColor)) TesselationStrokeColorU32 = ColorConvertFloat4ToU32(TesselationStrokeColor);
     }
 
@@ -385,11 +391,11 @@ void MeshProfile::SaveTesselation(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
     if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
 
-    out << "# Vertices: " << Vertices.size() << "\n";
+    out << "# Vertices: " << TesselationVertices.size() << "\n";
     out << "# Faces: " << TesselationIndices.size() / 3 << "\n";
 
     out << std::setprecision(10);
-    for (const ImVec2 &v : Vertices) {
+    for (const ImVec2 &v : TesselationVertices) {
         out << "v " << v.x << " " << v.y << " " << 0 << "\n";
     }
     for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
@@ -400,10 +406,42 @@ void MeshProfile::SaveTesselation(fs::path file_path) const {
     out.close();
 }
 
+#include "CDT.h"
 #include "earcut.hpp"
 
 void MeshProfile::Tesselate() {
-    vector<vector<std::array<float, 2>>> polygon{{}};
-    for (const auto &v : Vertices) polygon[0].push_back({v.x, v.y});
-    TesselationIndices = mapbox::earcut<uint>(polygon);
+    TesselationVertices.clear();
+    TesselationIndices.clear();
+    if (TessMode == TesselationMode_Earcut) {
+        vector<vector<std::array<float, 2>>> polygon{{}};
+        TesselationVertices.reserve(Vertices.size());
+        for (const auto &v : Vertices) {
+            // Earcut does not introduce new vertices - it only assigns indices to existing vertices.
+            // We could special-case on Earcut mode when drawing to use the profile vertices instead of copying them,
+            // but copying to handle both cases the same way is simpler.
+            TesselationVertices.push_back(v);
+            polygon[0].push_back({v.x, v.y});
+        }
+        TesselationIndices = mapbox::earcut<uint>(polygon);
+    } else { // CDT
+        CDT::Triangulation<float> cdt;
+        cdt.insertVertices(
+            Vertices.begin(), Vertices.end(),
+            [](const ImVec2 &p) { return p.x; },
+            [](const ImVec2 &p) { return p.y; }
+        );
+        vector<CDT::Edge> edges;
+        for (size_t i = 0; i < Vertices.size(); i++) {
+            edges.emplace_back(i, (i + 1) % Vertices.size());
+        }
+        cdt.insertEdges(edges);
+        cdt.eraseOuterTriangles();
+
+        TesselationVertices.reserve(cdt.vertices.size());
+        TesselationIndices.reserve(cdt.triangles.size() * 3);
+        for (const auto &v : cdt.vertices) TesselationVertices.push_back({v.x, v.y});
+        for (const auto &triangle : cdt.triangles) {
+            for (const auto v_index : triangle.vertices) TesselationIndices.push_back(v_index);
+        }
+    }
 }
