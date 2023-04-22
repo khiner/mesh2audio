@@ -9,7 +9,7 @@
 #include "MeshProfile.h"
 
 #include "ImGuizmo.h"
-using glm::vec3, glm::mat4;
+using glm::vec3, glm::vec4, glm::mat4;
 
 struct ImVec2;
 
@@ -107,6 +107,8 @@ struct Mesh {
     inline static float CameraDistance = 4, fov = 27;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
+
+    inline static int HoveringVertexIndex = -1;
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
 

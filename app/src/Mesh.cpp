@@ -556,6 +556,20 @@ string Mesh::GenerateDsp() const {
 static string GenerateTetMsg = "Generating tetrahedral mesh...";
 
 using namespace ImGui;
+ImVec2 WorldToScreenSpace(const vec4 &vertex, const mat4 &view, const mat4 &projection, const ImVec2 &windowPos, const ImVec2 &contentRegion) {
+    const vec4 pos_clip_space = projection * view * vertex;
+    return {
+        ((pos_clip_space.x / pos_clip_space.w) * 0.5f + 0.5f) * contentRegion.x + windowPos.x,
+        (1.0f - ((pos_clip_space.y / pos_clip_space.w) * 0.5f + 0.5f)) * contentRegion.y + windowPos.y,
+    };
+}
+
+bool IsMouseHoveringOverVertex(const ImVec2 &mouse_pos, const ImVec2 &vertex_pos, float radius) {
+    const float distance = sqrt(pow(mouse_pos.x - vertex_pos.x, 2) + pow(mouse_pos.y - vertex_pos.y, 2));
+    return distance <= radius;
+}
+
+static constexpr float VertexHoverRadius = 5.0f; // Adjust this value based on the desired sensitivity
 
 void Mesh::Render() {
     const auto &io = ImGui::GetIO();
@@ -575,14 +589,36 @@ void Mesh::Render() {
             Bind();
         }
         DrawGl();
+
+        // Render the mesh to an OpenGl texture and display it.
         unsigned int texture_id = gl_canvas.Render();
         Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
+
+        // Transform each vertex position to screen space and check if the mouse is hovering over it.
+        const auto &mouse_pos = io.MousePos;
+        const auto &window_pos = GetWindowPos();
+        const auto &data = GetActiveData();
+        HoveringVertexIndex = -1;
+        for (const auto index : data.Indices) {
+            const auto &vertex = data.Vertices[index];
+            vec4 vertex_world_space{vertex.x, vertex.y, vertex.z, 1.0f};
+            const auto vertex_screen_space = WorldToScreenSpace(vertex_world_space, CameraView, CameraProjection, window_pos, content_region);
+            if (IsMouseHoveringOverVertex(mouse_pos, vertex_screen_space, VertexHoverRadius)) {
+                HoveringVertexIndex = index;
+            }
+        }
     }
 }
 
 void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
+            if (HoveringVertexIndex != -1) {
+                const auto &data = GetActiveData();
+                const auto &vertex = data.Vertices[HoveringVertexIndex];
+                Text("Hovering vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveringVertexIndex, vertex.x, vertex.y, vertex.z);
+            }
+
             const auto &center = GetMainViewport()->GetCenter();
             const auto &popup_size = GetMainViewport()->Size / 4;
             SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
