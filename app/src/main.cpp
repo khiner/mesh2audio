@@ -32,6 +32,10 @@ static const mat4 Identity(1.f);
 
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
+static string GeneratedDsp; // The most recently generated DSP code.
+static string GenerateDspMsg = "Generating DSP code...";
+
+::Audio Audio{};
 
 using namespace ImGui;
 
@@ -312,7 +316,7 @@ int main(int, char **) {
                     const bool has_tetrahedral_mesh = mesh->HasTetMesh();
                     const bool has_profile = mesh->HasProfile();
                     if (!has_tetrahedral_mesh) BeginDisabled();
-                    const bool generate_tet_dsp = Button("Generate DSP");
+                    const bool generate_tet_dsp = Button("Generate 3D DSP");
                     if (!has_tetrahedral_mesh) {
                         SameLine();
                         TextUnformatted("Run |Mesh Controls|->|Mesh|->|Generate tetrahedral mesh|.");
