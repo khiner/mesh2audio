@@ -294,9 +294,10 @@ bool MeshProfile::RenderConfig() {
     if (ShowTesselation) {
         SeparatorText("Tesselation");
         TextUnformatted("Tesselation mode");
-        if (RadioButton("Constrained Delaunay triangulation", &TessMode, TesselationMode_CDT) ||
-            RadioButton("Ear clipping", &TessMode, TesselationMode_Earcut)) {
-            CreateVertices();
+        modified |= RadioButton("Constrained Delaunay triangulation", &TessMode, TesselationMode_CDT) ||
+            RadioButton("Ear clipping", &TessMode, TesselationMode_Earcut);
+        if (TessMode == TesselationMode_CDT) {
+            modified |= SliderInt("Random points", &NumRandomTesselationPoints, 0, 100);
         }
         if (ColorEdit4("Color##Tesselation", (float *)&TesselationStrokeColor)) TesselationStrokeColorU32 = ColorConvertFloat4ToU32(TesselationStrokeColor);
     }
@@ -408,6 +409,55 @@ void MeshProfile::SaveTesselation(fs::path file_path) const {
 
 #include "CDT.h"
 #include "earcut.hpp"
+#include <random>
+
+static float triangle_area(const CDT::Triangle &triangle, const CDT::Triangulation<float> &cdt) {
+    const auto &indices = triangle.vertices;
+    const auto &a = cdt.vertices[indices[0]];
+    const auto &b = cdt.vertices[indices[1]];
+    const auto &c = cdt.vertices[indices[2]];
+    return abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) * 0.5);
+}
+
+static std::mt19937 rng{std::random_device{}()};
+static ImVec2 toImVec2(const CDT::V2d<float> &v) { return {v.x, v.y}; }
+
+// Generate random points inside the triangulated polygon, weighting placement by triangle area.
+vector<ImVec2> GenerateRandomPointsInsidePolygon(CDT::Triangulation<float> &cdt, uint num_points) {
+    vector<ImVec2> points(num_points);
+
+    const auto &triangles = cdt.triangles;
+    vector<float> areas(triangles.size());
+    float total_area = 0.0f;
+    for (size_t i = 0; i < triangles.size(); ++i) {
+        const auto &triangle = triangles[i];
+        total_area += triangle_area(triangle, cdt);
+        areas[i] = total_area;
+    }
+    std::uniform_real_distribution<float> area_dist(0.0f, total_area);
+    std::uniform_real_distribution<float> coord_dist(0.0f, 1.0f);
+
+    for (uint i = 0; i < num_points; ++i) {
+        const float r = area_dist(rng);
+        size_t tri_idx = distance(areas.begin(), lower_bound(areas.begin(), areas.end(), r));
+        const auto &triangle = triangles[tri_idx];
+        const auto &indices = triangle.vertices;
+        const auto a = toImVec2(cdt.vertices[indices[0]]);
+        const auto b = toImVec2(cdt.vertices[indices[1]]);
+        const auto c = toImVec2(cdt.vertices[indices[2]]);
+
+        // Generate a random point inside the triangle.
+        float u = coord_dist(rng);
+        float v = coord_dist(rng);
+        if (u + v > 1.0f) {
+            u = 1.0f - u;
+            v = 1.0f - v;
+        }
+        points[i] = a * (1.0f - u - v) + b * u + c * v;
+    }
+
+    return points;
+}
 
 void MeshProfile::Tesselate() {
     TesselationVertices.clear();
@@ -427,8 +477,8 @@ void MeshProfile::Tesselate() {
         CDT::Triangulation<float> cdt;
         cdt.insertVertices(
             Vertices.begin(), Vertices.end(),
-            [](const ImVec2 &p) { return p.x; },
-            [](const ImVec2 &p) { return p.y; }
+            [](const auto &p) { return p.x; },
+            [](const auto &p) { return p.y; }
         );
         vector<CDT::Edge> edges;
         for (size_t i = 0; i < Vertices.size(); i++) {
@@ -436,6 +486,23 @@ void MeshProfile::Tesselate() {
         }
         cdt.insertEdges(edges);
         cdt.eraseOuterTriangles();
+        if (NumRandomTesselationPoints > 0) {
+            const auto random_points = GenerateRandomPointsInsidePolygon(cdt, NumRandomTesselationPoints);
+            // We can't insert more points, so we have to create a new triangulation.
+            cdt = {};
+            cdt.insertVertices(
+                Vertices.begin(), Vertices.end(),
+                [](const auto &p) { return p.x; },
+                [](const auto &p) { return p.y; }
+            );
+            cdt.insertVertices(
+                random_points.begin(), random_points.end(),
+                [](const auto &p) { return p.x; },
+                [](const auto &p) { return p.y; }
+            );
+            cdt.insertEdges(edges);
+            cdt.eraseOuterTriangles();
+        }
 
         TesselationVertices.reserve(cdt.vertices.size());
         TesselationIndices.reserve(cdt.triangles.size() * 3);

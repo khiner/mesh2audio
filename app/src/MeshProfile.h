@@ -44,6 +44,8 @@ struct MeshProfile {
     inline static float CurveTolerance{0.0001f};
 
     inline static TesselationMode TessMode = TesselationMode_CDT;
+    inline static int NumRandomTesselationPoints{0}; // Only used for CDT mode.
+
     inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false}, ShowTesselation{false};
     inline static float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
     inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1}, TesselationStrokeColor = {1, 0.65, 0, 1};
