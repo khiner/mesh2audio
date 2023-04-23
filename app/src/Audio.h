@@ -45,6 +45,11 @@ struct Audio {
         void Destroy();
     };
 
+    struct ModelController {
+        static void TriggerDown(int excite_pos);
+        static void TriggerUp();
+    };
+
     void Render();
 
     void Init();

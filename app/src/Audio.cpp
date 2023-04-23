@@ -53,7 +53,6 @@ with{
 process = hammer(gate,hammerHardness,hammerSize) : modalModel(freq,exPos,t60Scale,t60Decay,t60Slope)*gain;
 )";
 
-
 static string Capitalize(string copy) {
     if (copy.empty()) return "";
 
@@ -531,4 +530,16 @@ void Audio::Graph::Destroy() {
     ma_data_source_node_uninit(&InputNode, nullptr);
     ma_audio_buffer_ref_uninit(&InputBuffer);
     ma_node_graph_uninit(&NodeGraph, nullptr); // Graph endpoint is already uninitialized in `Nodes.Uninit`.
+}
+
+void Audio::ModelController::TriggerDown(int excite_pos) {
+    if (excite_pos < 0 || FaustContext::Ui == nullptr) return;
+
+    FaustContext::Ui->setItemValue("exPos", float(excite_pos));
+    FaustContext::Ui->setItemValue("gate", 1.f);
+}
+void Audio::ModelController::TriggerUp() {
+    if (FaustContext::Ui == nullptr) return;
+
+    FaustContext::Ui->setItemValue("gate", 0.f);
 }

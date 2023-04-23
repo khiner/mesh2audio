@@ -85,7 +85,6 @@ public:
         groups.pop();
         if (popLabel()) {
             computeShortNames();
-            for (const auto &it : fFullPaths) index_for_shortname[fFull2Short[it]] = index_for_path[it];
         }
     }
 
@@ -137,6 +136,14 @@ public:
     void declare(Real *zone, const char *key, const char *value) override {
         MetaDataUI::declare(zone, key, value);
     }
+
+    void setItemValue(const char *label, Real value) {
+        if (zone_for_label.contains(label)) {
+            Real *zone = zone_for_label[label];
+            *zone = value;
+        }
+    }
+
     Item ui{ItemType_None, ""};
     map<const Real *, NamesAndValues> names_and_values;
 
@@ -145,19 +152,15 @@ private:
         Item item{type, label, zone, min, max, init, step, fTooltip.contains(zone) ? fTooltip.at(zone).c_str() : nullptr};
         if (fLogSet.contains(zone)) item.logscale = true;
         activeGroup().items.push_back(item);
-        const int index = int(ui.items.size() - 1);
         string path = buildPath(label);
         fFullPaths.push_back(path);
-        index_for_path[path] = index;
-        index_for_label[label] = index;
+        zone_for_label[label] = zone;
     }
 
     Item &activeGroup() { return groups.empty() ? ui : *groups.top(); }
 
     std::stack<Item *> groups{};
-    map<string, int> index_for_label{};
-    map<string, int> index_for_shortname{};
-    map<string, int> index_for_path{};
+    std::map<string, Real *> zone_for_label{};
 };
 
 void OnUiChange(FaustParams *);

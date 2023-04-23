@@ -108,6 +108,7 @@ struct Mesh {
     inline static Type ViewMeshType = MeshType_Triangular;
 
     inline static int HoveredVertexIndex = -1;
+    inline static int NumExciteVertices = 10;
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
