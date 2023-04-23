@@ -375,6 +375,15 @@ void Mesh::Bind(const Mesh::Data &data) {
     glBindVertexArray(0);
 }
 
+static void InterpolateColors(GLfloat a[], GLfloat b[], float interpolation, GLfloat result[]) {
+    for (int i = 0; i < 4; i++) {
+        result[i] = a[i] * (1.0 - interpolation) + b[i] * interpolation;
+    }
+}
+static void SetColor(GLfloat to[], GLfloat result[]) {
+    for (int i = 0; i < 4; i++) result[i] = to[i];
+}
+
 void Mesh::DrawGl() const {
     glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(CameraView * ObjectMatrix)[0][0]);
@@ -421,14 +430,24 @@ void Mesh::DrawGl() const {
     glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
 
     if (!ExciteVertexIndices.empty()) {
-        for (const int ExciteVertexIndex : ExciteVertexIndices) {
-            // Set the point size and color for the excitable vertex
-            glPointSize(5.0);
-            GLfloat highlightColor[4] = {1.0, 0.0, 0.0, 1.0}; // Red color
-            glUniform4fv(diffusecol, 1, highlightColor);
-            glUniform4fv(specularcol, 1, highlightColor);
+        for (size_t i = 0; i < ExciteVertexIndices.size(); i++) {
+            static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1};
+            static GLfloat ActiveExciteVertexColor[4] = {0, 0, 1, 1};
+            static GLfloat ExcitedVertexBaseColor[4] = {1, 0, 0, 1};
 
+            static GLfloat vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
+            if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
+                InterpolateColors(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::abs(*Audio::FaustState::ExciteValue), vertex_color);
+            } else {
+                SetColor(ExcitableVertexColor, vertex_color);
+            }
+
+            glUniform4fv(diffusecol, 1, vertex_color);
+            glUniform4fv(specularcol, 1, vertex_color);
+
+            const int ExciteVertexIndex = ExciteVertexIndices[i];
             // Draw the excite vertex as a single point
+            glPointSize(5.0);
             glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
             glDrawArrays(GL_POINTS, ExciteVertexIndex, 1);
         }
@@ -669,10 +688,11 @@ void Mesh::Render() {
                         }
                     }
                     if (nearest_excite_vertex_pos >= 0) {
-                        Audio::ModelController::TriggerDown(nearest_excite_vertex_pos);
+                        *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
+                        *Audio::FaustState::ExciteValue = 1.f;
                     }
                 } else if (IsMouseReleased(0)) {
-                    Audio::ModelController::TriggerUp();
+                    *Audio::FaustState::ExciteValue = 0.f;
                 }
             }
         }

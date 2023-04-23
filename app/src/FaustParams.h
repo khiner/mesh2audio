@@ -137,11 +137,8 @@ public:
         MetaDataUI::declare(zone, key, value);
     }
 
-    void setItemValue(const char *label, Real value) {
-        if (zone_for_label.contains(label)) {
-            Real *zone = zone_for_label[label];
-            *zone = value;
-        }
+    Real *getZoneForLabel(const char *label) {
+        return zone_for_label.contains(label) ? zone_for_label[label] : nullptr;
     }
 
     Item ui{ItemType_None, ""};

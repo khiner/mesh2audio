@@ -20,7 +20,6 @@ void DrawUiItem(const FaustParams::Item &item) {
         Button(label);
         if (IsItemActivated() && *item.zone == 0.0) *item.zone = 1.0;
         else if (IsItemDeactivated() && *item.zone == 1.0) *item.zone = 0.0;
-        // *item.zone = Real(IsItemActive()); // Send 1.0 when pressed, 0.0 otherwise.
     } else if (type == ItemType_CheckButton) {
         auto value = bool(*item.zone);
         if (Checkbox(label, &value)) *item.zone = Real(value);

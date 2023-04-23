@@ -18,6 +18,10 @@ struct Audio {
         string Code = "";
         string Error;
 
+        // These values point to the corresponding Faust parameter zones.
+        inline static float *ExcitePos = nullptr;
+        inline static float *ExciteValue = nullptr;
+
         void Render() const;
     };
 
@@ -43,11 +47,6 @@ struct Audio {
     struct Graph {
         void Init();
         void Destroy();
-    };
-
-    struct ModelController {
-        static void TriggerDown(int excite_pos);
-        static void TriggerUp();
     };
 
     void Render();

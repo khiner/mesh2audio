@@ -61,10 +61,23 @@ static string Capitalize(string copy) {
 }
 
 namespace FaustContext {
+using State = Audio::FaustState;
+
 static dsp *Dsp = nullptr;
 static std::unique_ptr<FaustParams> Ui;
 
-static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
+static void OnUiChange() {
+    OnUiChange(Ui.get());
+    if (Ui == nullptr) {
+        State::ExcitePos = nullptr;
+        State::ExciteValue = nullptr;
+    } else {
+        State::ExcitePos = Ui->getZoneForLabel("exPos");
+        State::ExciteValue = Ui->getZoneForLabel("gate");
+    }
+}
+
+static void Init(State &faust, unsigned int sample_rate) {
     createLibContext();
 
     int argc = 0;
@@ -97,11 +110,12 @@ static void Init(Audio::FaustState &faust, unsigned int sample_rate) {
     if (!error_msg.empty()) faust.Error = error_msg;
     else if (!faust.Error.empty()) faust.Error = "";
 
-    OnUiChange(Ui.get());
+    OnUiChange();
 }
 
 static void Destroy() {
-    OnUiChange(nullptr);
+    Ui = nullptr;
+    OnUiChange();
 
     if (Dsp) {
         delete Dsp;
@@ -112,7 +126,7 @@ static void Destroy() {
     destroyLibContext();
 }
 
-static bool NeedsRestart(const Audio::FaustState &faust, u32 sample_rate) {
+static bool NeedsRestart(const State &faust, u32 sample_rate) {
     static string PreviousFaustCode = faust.Code;
     static u32 PreviousSampleRate = sample_rate;
 
@@ -123,7 +137,7 @@ static bool NeedsRestart(const Audio::FaustState &faust, u32 sample_rate) {
 }
 
 // Returns true if recompiled.
-static bool Update(Audio::FaustState &faust, u32 sample_rate, string *status_out) {
+static bool Update(State &faust, u32 sample_rate, string *status_out) {
     // Faust setup is only dependent on the faust code.
     const bool is_faust_initialized = !faust.Code.empty() && faust.Error.empty();
     const bool faust_needs_restart = NeedsRestart(faust, sample_rate); // Don't inline! Must run during every update.
@@ -530,16 +544,4 @@ void Audio::Graph::Destroy() {
     ma_data_source_node_uninit(&InputNode, nullptr);
     ma_audio_buffer_ref_uninit(&InputBuffer);
     ma_node_graph_uninit(&NodeGraph, nullptr); // Graph endpoint is already uninitialized in `Nodes.Uninit`.
-}
-
-void Audio::ModelController::TriggerDown(int excite_pos) {
-    if (excite_pos < 0 || FaustContext::Ui == nullptr) return;
-
-    FaustContext::Ui->setItemValue("exPos", float(excite_pos));
-    FaustContext::Ui->setItemValue("gate", 1.f);
-}
-void Audio::ModelController::TriggerUp() {
-    if (FaustContext::Ui == nullptr) return;
-
-    FaustContext::Ui->setItemValue("gate", 0.f);
 }
