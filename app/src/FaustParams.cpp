@@ -25,7 +25,7 @@ void DrawUiItem(const FaustParams::Item &item) {
         if (Checkbox(label, &value)) *item.zone = Real(value);
     } else if (type == ItemType_NumEntry) {
         auto value = int(*item.zone);
-        if (InputInt(label, &value, int(item.step))) *item.zone = Real(value);
+        if (InputInt(label, &value, int(item.step))) *item.zone = std::clamp(Real(value), item.min, item.max);
     } else if (type == ItemType_Knob || type == ItemType_HSlider || type == ItemType_VSlider || type == ItemType_HBargraph || type == ItemType_VBargraph) {
         auto value = float(*item.zone);
         ImGuiSliderFlags flags = item.logscale ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None;

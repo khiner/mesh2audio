@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 using std::string;
 using u32 = unsigned int;
@@ -23,6 +24,8 @@ struct Audio {
         inline static float *ExciteValue = nullptr;
 
         void Render() const;
+
+        static string GenerateModelInstrumentDsp(const std::string_view model_dsp, int num_excite_pos);
     };
 
     struct AudioDevice {
@@ -63,6 +66,3 @@ struct Audio {
     Graph Graph;
     FaustState Faust;
 };
-
-// DSP code in addition to the model, to be appended to make it playable.
-extern const string FaustInstrumentDsp;

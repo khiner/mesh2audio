@@ -333,11 +333,11 @@ int main(int, char **) {
                         OpenPopup(GenerateDspMsg.c_str());
                         if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
                         DspGeneratorThread = std::thread([&] {
-                            const string generated_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
-                            if (!generated_dsp.empty()) {
+                            const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
+                            if (!model_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;
-                                GeneratedDsp = generated_dsp + FaustInstrumentDsp;
+                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, Mesh::NumExciteVertices);
                             } else {
                                 DspTetMeshPath = "";
                                 GeneratedDsp = "process = _;";

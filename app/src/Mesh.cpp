@@ -432,7 +432,7 @@ void Mesh::DrawGl() const {
     if (!ExciteVertexIndices.empty()) {
         for (size_t i = 0; i < ExciteVertexIndices.size(); i++) {
             static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1};
-            static GLfloat ActiveExciteVertexColor[4] = {0, 0, 1, 1};
+            static GLfloat ActiveExciteVertexColor[4] = {0, 1, 0, 1};
             static GLfloat ExcitedVertexBaseColor[4] = {1, 0, 0, 1};
 
             static GLfloat vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
@@ -447,7 +447,7 @@ void Mesh::DrawGl() const {
 
             const int ExciteVertexIndex = ExciteVertexIndices[i];
             // Draw the excite vertex as a single point
-            glPointSize(5.0);
+            glPointSize(8.0);
             glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
             glDrawArrays(GL_POINTS, ExciteVertexIndex, 1);
         }
