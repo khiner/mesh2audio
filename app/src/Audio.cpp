@@ -174,6 +174,10 @@ static bool Update(State &faust, u32 sample_rate, string *status_out) {
 }
 } // namespace FaustContext
 
+bool Audio::FaustState::IsRunning() {
+    return FaustContext::Dsp != nullptr;
+}
+
 static ma_context AudioContext;
 static ma_device MaDevice;
 static ma_device_config DeviceConfig;

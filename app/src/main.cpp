@@ -337,7 +337,7 @@ int main(int, char **) {
                             if (!model_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;
-                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, Mesh::NumExciteVertices);
+                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, Mesh::NumExcitableVertices);
                             } else {
                                 DspTetMeshPath = "";
                                 GeneratedDsp = "process = _;";

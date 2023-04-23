@@ -26,6 +26,7 @@ struct Audio {
         void Render() const;
 
         static string GenerateModelInstrumentDsp(const std::string_view model_dsp, int num_excite_pos);
+        static bool IsRunning();
     };
 
     struct AudioDevice {

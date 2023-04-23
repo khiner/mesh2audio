@@ -108,13 +108,15 @@ struct Mesh {
     inline static Type ViewMeshType = MeshType_Triangular;
 
     inline static int HoveredVertexIndex = -1;
-    inline static int NumExciteVertices = 10;
+    inline static int NumExcitableVertices = 10;
+    inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
 
 private:
     static void InitializeStatic(); // Initialize variables shared across all meshes.
+    void UpdateExcitableVertices();
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._

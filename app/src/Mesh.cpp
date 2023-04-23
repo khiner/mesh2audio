@@ -44,7 +44,7 @@ static GLuint projectionPos, modelviewPos;
 // Variables to set uniform params for lighting fragment shader
 static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
-vector<int> ExciteVertexIndices;
+vector<int> ExcitableVertexIndices;
 
 void Mesh::InitializeStatic() {
     if (StaticInitialized) return;
@@ -184,7 +184,7 @@ void Mesh::ExtrudeProfile() {
 
     TetMesh.Clear();
     TetMeshPath.clear();
-    ExciteVertexIndices.clear();
+    ExcitableVertexIndices.clear();
     TriangularMesh.ExtrudeProfile(*Profile);
     ActiveViewMeshType = MeshType_Triangular;
     Bind();
@@ -429,15 +429,18 @@ void Mesh::DrawGl() const {
     // All render modes:
     glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
 
-    if (!ExciteVertexIndices.empty()) {
-        for (size_t i = 0; i < ExciteVertexIndices.size(); i++) {
-            static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1};
-            static GLfloat ActiveExciteVertexColor[4] = {0, 1, 0, 1};
-            static GLfloat ExcitedVertexBaseColor[4] = {1, 0, 0, 1};
+    if (ViewMeshType == MeshType_Tetrahedral && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
+        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+            static GLfloat DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
+            static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
+            static GLfloat ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
+            static GLfloat ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
 
             static GLfloat vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
-            if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
-                InterpolateColors(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::abs(*Audio::FaustState::ExciteValue), vertex_color);
+            if (!Audio::FaustState::IsRunning()) {
+                SetColor(DisabledExcitableVertexColor, vertex_color);
+            } else if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
+                InterpolateColors(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::min(1.f, std::abs(*Audio::FaustState::ExciteValue)), vertex_color);
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
@@ -445,11 +448,10 @@ void Mesh::DrawGl() const {
             glUniform4fv(diffusecol, 1, vertex_color);
             glUniform4fv(specularcol, 1, vertex_color);
 
-            const int ExciteVertexIndex = ExciteVertexIndices[i];
             // Draw the excite vertex as a single point
             glPointSize(8.0);
             glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            glDrawArrays(GL_POINTS, ExciteVertexIndex, 1);
+            glDrawArrays(GL_POINTS, ExcitableVertexIndices[i], 1);
         }
         // Restore the original material properties
         glUniform4fv(diffusecol, 1, Diffusion);
@@ -485,9 +487,17 @@ static vector<seconds_t> GetSavedTetMeshTimes() {
     return saved_tet_mesh_times;
 }
 
+void Mesh::UpdateExcitableVertices() {
+    // Linearly sample excitable vertices from all available vertices.
+    ExcitableVertexIndices.resize(NumExcitableVertices);
+    for (int i = 0; i < NumExcitableVertices; i++) {
+        const float t = float(i) / (NumExcitableVertices - 1);
+        ExcitableVertexIndices[i] = int(t * (TetMesh.Vertices.size() - 1));
+    }
+}
+
 void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
     TetMesh.Clear();
-    ExciteVertexIndices.clear();
     TetMesh.Vertices.reserve(tet_vecs.size());
     TetMesh.Normals.reserve(tet_vecs.size());
     TetMesh.Indices.reserve(tet_polys.size() * 12);
@@ -521,7 +531,9 @@ void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vect
 
     TetMesh.UpdateBounds();
     TetMesh.Center();
-    ViewMeshType = MeshType_Tetrahedral;
+    UpdateExcitableVertices();
+
+    ViewMeshType = MeshType_Tetrahedral; // Automatically switch to tetrahedral view.
     ActiveViewMeshType = MeshType_Triangular; // Force an automatic rebind on the next render (xxx crappy way of doing this).
 }
 
@@ -575,14 +587,6 @@ string Mesh::GenerateDsp() const {
         tet_vertices[i * 3 + 2] = tet_vecs[i].z;
     }
 
-    // Linearly sample `NumExciteVertices` vertices to excite.
-    ExciteVertexIndices.resize(NumExciteVertices);
-    for (int i = 0; i < NumExciteVertices; i++) {
-        const float t = float(i) / (NumExciteVertices - 1);
-        const int index = int(t * (tet_vecs.size() - 1));
-        ExciteVertexIndices[i] = index;
-    }
-
     // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
     ::TetMesh volumetric_mesh{
@@ -597,8 +601,8 @@ string Mesh::GenerateDsp() const {
         10000, // highest mode freq
         20, // number of synthesized modes (default is 20)
         50, // number of modes to be computed for the finite element analysis (default is 100)
-        ExciteVertexIndices, // specific excitation positions
-        ExciteVertexIndices.size() // number of excitation positions (default is max: -1)
+        ExcitableVertexIndices, // specific excitation positions
+        ExcitableVertexIndices.size() // number of excitation positions (default is max: -1)
     );
 }
 
@@ -678,8 +682,8 @@ void Mesh::Render() {
                     // Find the nearest excitation vertex to the clicked vertex.
                     int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
                     float min_dist = FLT_MAX;
-                    for (size_t i = 0; i < ExciteVertexIndices.size(); i++) {
-                        const auto &excite_vertex_index = ExciteVertexIndices[i];
+                    for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+                        const auto &excite_vertex_index = ExcitableVertexIndices[i];
                         const auto &excite_vertex = data.Vertices[excite_vertex_index];
                         const float dist = glm::distance(excite_vertex, hovered_vertex);
                         if (dist < min_dist) {
@@ -704,12 +708,6 @@ static const string GenerateTetMsg = "Generating tetrahedral mesh...";
 void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
-            if (HoveredVertexIndex >= 0) {
-                const auto &data = GetActiveData();
-                const auto &vertex = data.Vertices[HoveredVertexIndex];
-                Text("Hovering vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
-            }
-
             const auto &center = GetMainViewport()->GetCenter();
             const auto &popup_size = GetMainViewport()->Size / 4;
             SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
@@ -728,7 +726,10 @@ void Mesh::RenderConfig() {
 
             Text("File: %s", FilePath.c_str());
             if (HasTetMesh()) {
-                SliderInt("Num. excitable vertices", &NumExciteVertices, 1, std::min(200, int(TetMesh.Vertices.size())));
+                Checkbox("Show excitable vertices", &ShowExcitableVertices);
+                if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(TetMesh.Vertices.size())))) {
+                    UpdateExcitableVertices();
+                }
 
                 const string name = GetTetMeshName(TetMeshPath);
                 Text(
@@ -806,6 +807,14 @@ void Mesh::RenderConfig() {
                 if (RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
                 Checkbox("Bound sizing", &ShowBounds);
             }
+
+            SeparatorText("Debug");
+            if (HoveredVertexIndex >= 0) {
+                const auto &data = GetActiveData();
+                const auto &vertex = data.Vertices[HoveredVertexIndex];
+                Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
+            }
+
             EndTabItem();
         }
         if (BeginTabItem("Mesh profile")) {
