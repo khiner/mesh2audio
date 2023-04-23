@@ -385,21 +385,18 @@ void Mesh::DrawGl() const {
     const auto &data = GetActiveData();
     const int num_indices = data.Indices.size();
     glBindVertexArray(VertexArray);
-    if (RenderMode == 0) {
+    if (RenderMode == RenderType_Smooth) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (RenderMode == 1) {
+    if (RenderMode == RenderType_Lines) {
         glLineWidth(1);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (RenderMode == 2) {
+    if (RenderMode == RenderType_Points) {
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
-    if (RenderMode == 3) {
+    if (RenderMode == RenderType_Mesh) {
         const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -413,8 +410,11 @@ void Mesh::DrawGl() const {
 
         glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     }
+
+    // All render modes:
+    glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+
     glBindVertexArray(0);
 }
 
@@ -423,8 +423,7 @@ static string FormatTime(seconds_t seconds) {
 }
 
 static seconds_t GetTimeFromPath(const fs::path &file_path) {
-    const string &filename = file_path.stem(); // Name without extension.
-    return seconds_t{std::chrono::seconds(std::stoi(filename))};
+    return seconds_t{std::chrono::seconds(std::stoi(file_path.stem()))};
 }
 
 string Mesh::GetTetMeshName(fs::path file_path) {
@@ -583,20 +582,48 @@ void Mesh::Render() {
         unsigned int texture_id = gl_canvas.Render();
         Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
 
-        HoveringVertexIndex = -1;
+        HoveredVertexIndex = -1;
         if (window_hovered) {
+            const vec3 camera_position = glm::inverse(CameraView)[3];
             // Transform each vertex position to screen space and check if the mouse is hovering over it.
             const auto &mouse_pos = io.MousePos;
             const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
             const auto &data = GetActiveData();
             const auto &view_projection = CameraProjection * CameraView;
+
+            float min_vertex_camera_distance = FLT_MAX;
             for (size_t i = 0; i < data.Vertices.size(); i++) {
                 const auto &v = data.Vertices[i];
                 const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
                 const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
                 const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
-                const float distance_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
-                if (distance_squared <= VertexHoverRadiusSquared) HoveringVertexIndex = i;
+                const float screen_dist_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
+                if (screen_dist_squared <= VertexHoverRadiusSquared) {
+                    const float vertex_camera_distance = glm::distance(camera_position, v);
+                    if (vertex_camera_distance < min_vertex_camera_distance) {
+                        min_vertex_camera_distance = vertex_camera_distance;
+                        HoveredVertexIndex = i;
+                    }
+                }
+            }
+
+            // Visualize the hovered index.
+            if (HoveredVertexIndex >= 0) {
+                const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
+                const auto &view_projection = CameraProjection * CameraView;
+                auto *dl = GetWindowDrawList();
+                const auto &data = GetActiveData();
+                const auto &v = data.Vertices[HoveredVertexIndex];
+                const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
+                const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
+                const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
+
+                // Adjust the circle radius based on the distance
+                static const float base_radius = 1.0f;
+                static const float distance_scale_factor = 2.f;
+                const float vertex_camera_distance = glm::distance(camera_position, v);
+                const float scaled_radius = base_radius + (1.f / vertex_camera_distance) * distance_scale_factor;
+                dl->AddCircleFilled(vertex_screen, scaled_radius, IM_COL32(255, 0, 0, 255));
             }
         }
     }
@@ -605,10 +632,10 @@ void Mesh::Render() {
 void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
-            if (HoveringVertexIndex != -1) {
+            if (HoveredVertexIndex >= 0) {
                 const auto &data = GetActiveData();
-                const auto &vertex = data.Vertices[HoveringVertexIndex];
-                Text("Hovering vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveringVertexIndex, vertex.x, vertex.y, vertex.z);
+                const auto &vertex = data.Vertices[HoveredVertexIndex];
+                Text("Hovering vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 
             const auto &center = GetMainViewport()->GetCenter();

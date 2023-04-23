@@ -107,7 +107,7 @@ struct Mesh {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
 
-    inline static int HoveringVertexIndex = -1;
+    inline static int HoveredVertexIndex = -1;
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
