@@ -11,9 +11,9 @@ module m_finite_elements
         s_compute_global_stiffness_matrix, &
         s_compute_global_mass_matrix
 
-    real(kind(0d0)), dimension(4) :: gx !< x guass-quadrature points
-    real(kind(0d0)), dimension(4) :: gy !< y guass-quadrature points
-    real(kind(0d0)), dimension(4) :: weights !< guass-quadrature weights
+    real(kind(0d0)), dimension(9) :: gx !< x guass-quadrature points
+    real(kind(0d0)), dimension(9) :: gy !< y guass-quadrature points
+    real(kind(0d0)), dimension(9) :: weights !< guass-quadrature weights
 
     real(kind(0d0)) :: pi = 3.141592653589793d0
 
@@ -21,10 +21,23 @@ contains
 
     subroutine s_initialize_guass_quadrature()
 
-        real(kind(0d0)) :: c = 3d0
-        gx(1) = -sqrt(c)/c; gx(2) = -sqrt(c)/c; gx(3) = sqrt(c)/c; gx(4) = sqrt(c)/c
-        gy(1) = -sqrt(c)/c; gy(2) = sqrt(c)/c; gy(3) = -sqrt(c)/c; gy(4) = sqrt(c)/c
-        weights(1) = 1d0; weights(2) = 1d0; weights(3) = 1d0; weights(4) = 1d0
+        real(kind(0d0)) :: c = 0.6
+        gx(1) = -sqrt(c); gx(2) = -sqrt(c); gx(3) = -sqrt(c); gx(4) = 0d0
+        gx(5) = 0d0     ; gx(6) = 0d0     ; gx(7) = sqrt(c) ; gx(8) = sqrt(c)
+        gx(9) = sqrt(c)
+        gy(1) = -sqrt(c); gy(2) = 0d0     ; gy(3) = sqrt(c) ; gy(4) = -sqrt(c)
+        gy(5) = 0d0     ; gy(6) = sqrt(c) ; gy(7) = -sqrt(c); gy(8) = 0d0
+        gy(9) = sqrt(c)
+        
+        c = 25d0/81d0
+        weights(1) = c; weights(3) = c; weights(7) = c; weights(9) = c
+
+        c = 40d0/81d0
+        weights(2) = c; weights(4) = c; weights(6) = c; weights(8) = c
+
+        c = 64d0/81d0
+        weights(5) = c
+
 
     end subroutine s_initialize_guass_quadrature
 
@@ -123,13 +136,13 @@ contains
         end do
 
         ! Perform Guassian Quadrature
-        do i = 1,4
+        do i = 1,9
             call s_compute_b_matrix(B, elm, gx(i), gy(i))
             call s_compute_jacobian_determinant(jacD, elm, gx(i), gy(i))
-            
+            !call s_print_array(B, 4, 6)
             I1 = matmul(D,B*jacD)
             I2 = matmul(TRANSPOSE(B),I1)
-
+            
             Ke = Ke + weights(i)*I2
         end do
 
@@ -161,7 +174,7 @@ contains
         end do
 
                 ! Perform Guassian Quadrature
-        do i = 1,4
+        do i = 1,9
             call s_compute_N_matrix(N, gx(i), gy(i))
 
             I1 = matmul(transpose(N),N)

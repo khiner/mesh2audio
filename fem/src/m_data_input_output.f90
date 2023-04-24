@@ -33,13 +33,12 @@ contains
         call getarg(3, arg)       !< gets poissons ratio
         read(arg, *) nu
 
-        if (debug == 1) then
-            print*, ""
-            print*, "Material Properties"
-            print*, "     Youngs Modulus: ", ym
-            print*, "     Poisson's Ratio: ", nu
-            print*, ""
-        end if
+        print*, ""
+        print*, "Model: ", filename
+        print*, "Material Properties:"
+        print*, "     Youngs Modulus: ", ym
+        print*, "     Poisson's Ratio: ", nu
+        print*, ""
 
         open (unit = 1, file = trim(filename)//".obj", iostat=io)
 

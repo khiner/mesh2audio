@@ -36,7 +36,7 @@ contains
         D(4,1) = 0d0
         D(4,2) = 0d0
         D(4,3) = 0d0
-        D(4,4) = (1-2*nu)/2
+        D(4,4) = c*(1-2*nu)/2
 
     end subroutine s_initialize_d
 
@@ -57,7 +57,7 @@ contains
         z2 = dofs(E(elm,2),2)
         z3 = dofs(E(elm,3),2)
 
-        rc = EC(elm,1)
+        rc = EC(elm,1) 
 
         B(1,1) = (z3-z2)/(r3*(z2-z1) + r2*(z1-z3) + r1*(z3-z2))
         B(1,2) = 0d0
@@ -105,7 +105,7 @@ contains
         z2 = dofs(E(elm,2),2)
         z3 = dofs(E(elm,3),2)     
 
-        jacD = 0.125d0*(1 + t)*(r3*(z1-z2) + r2*(z3-z1) + r1*(z2-z3))
+        jacD = (1d0/8d0)*(1 + t)*(r3*(z1-z2) + r2*(z3-z1) + r1*(z2-z3))
 
     end subroutine
 
@@ -114,19 +114,19 @@ contains
         real(kind(0d0)), dimension(2,6) :: N
         real(kind(0d0)) :: s, t
 
-        N(1,1) = 25e-2*(1+s)*(1+t)
+        N(1,1) = (1d0/4d0)*(1+s)*(1+t)
         N(1,2) = 0d0
-        N(1,3) = 25e-2*(1-s)*(1+t)
+        N(1,3) = (1d0/4d0)*(1-s)*(1+t)
         N(1,4) = 0d0
-        N(1,5) = 50e-2*(1-t)
+        N(1,5) = (1d0/2d0)*(1-t)
         N(1,6) = 0d0
 
         N(2,1) = 0d0
-        N(2,2) = 25e-2*(1+s)*(1+t)
+        N(2,2) = (1d0/4d0)*(1+s)*(1+t)
         N(2,3) = 0d0
-        N(2,4) = 25e-2*(1-s)*(1+t)
+        N(2,4) = (1d0/4d0)*(1-s)*(1+t)
         N(2,5) = 0d0
-        N(2,6) = 50e-2*(1-t)
+        N(2,6) = (1d0/2d0)*(1-t)
 
     end subroutine
 

@@ -27,6 +27,6 @@ program p_main
     
     call cpu_time(finish)
     print*, "Run Time: ",finish - start
-    !call s_finalize_program()
+    print*, ""
 
 end program p_main
