@@ -19,13 +19,19 @@ program p_main
 
     call s_initialize_d()
 
+    print*, "Coomputing Global Stiffness Matrix"
     call s_compute_global_stiffness_matrix()
 
+    print*, ""
+    print*, "Computing Global Mass Matrix"
     call s_compute_global_mass_matrix()
 
+    print*, ""
+    print*, "Writing Output"
     call s_write_output()
     
     call cpu_time(finish)
+    print*, ""
     print*, "Run Time: ",finish - start
     print*, ""
 
