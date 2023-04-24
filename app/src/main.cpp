@@ -138,11 +138,6 @@ int main(int, char **) {
     // Alternatively, we could initialize with a mesh obj file:
     // mesh = std::make_unique<Mesh>(fs::path("res") / "obj" / "bell" / "english.obj");
 
-    // Or generate a profile parametrically, and extrude it around the y axis.
-    // const vector<vec2> trianglePath = {{1.0f, 1.0f}, {2.0f, 0.0f}, {1.0f, -1.0f}};
-    // mesh.SetProfile(trianglePath);
-    // mesh.ExtrudeProfile(100);
-
     glEnable(GL_DEPTH_TEST);
 
     // Main loop

@@ -37,6 +37,14 @@ MeshProfile::MeshProfile(fs::path svg_file_path) {
     CreateVertices();
 }
 
+vector<vec2> MeshProfile::GetVertices() const {
+    vector<vec2> vertices;
+    vertices.reserve(Vertices.size());
+    for (const auto &v : Vertices) vertices.push_back({v.x, v.y});
+
+    return vertices;
+}
+
 static Eigen::SparseMatrix<double> ReadSparseMatrix(const fs::path &file_path) {
     std::ifstream input_file(file_path);
     if (!input_file.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());

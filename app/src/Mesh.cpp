@@ -1,7 +1,6 @@
 #include "Mesh.h"
 
 #include <fmt/chrono.h>
-#include <fstream>
 #include <iomanip>
 #include <thread>
 
@@ -11,17 +10,13 @@
 
 #include "imspinner.h"
 
-#include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
-
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
 
+#include "Audio.h"
 #include "GlCanvas.h"
 #include "Shader.h"
-
-#include "Audio.h"
 
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
@@ -140,22 +135,20 @@ Mesh::Mesh(fs::path file_path) {
 }
 
 Mesh::~Mesh() {
-    glDeleteBuffers(1, &IndexBuffer);
-    glDeleteBuffers(1, &NormalBuffer);
-    glDeleteBuffers(1, &VertexBuffer);
-    glDeleteVertexArrays(1, &VertexArray);
-
     if (GeneratorThread.joinable()) GeneratorThread.join();
 }
 
-const Mesh::Data &Mesh::GetActiveData() const {
+const MeshInstance &Mesh::GetActiveInstance() const {
+    if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
+    return TetMesh;
+}
+MeshInstance &Mesh::GetActiveInstance() {
     if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
     return TetMesh;
 }
 
 void Mesh::Save(fs::path file_path) const {
-    const auto &data = GetActiveData();
-    data.Save(file_path);
+    GetActiveInstance().Save(file_path);
 }
 
 void Mesh::Flip(bool x, bool y, bool z) {
@@ -185,152 +178,9 @@ void Mesh::ExtrudeProfile() {
     TetMesh.Clear();
     TetMeshPath.clear();
     ExcitableVertexIndices.clear();
-    TriangularMesh.ExtrudeProfile(*Profile);
+    TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     ActiveViewMeshType = MeshType_Triangular;
     Bind();
-}
-
-void Mesh::Data::Clear() {
-    Vertices.clear();
-    Normals.clear();
-    Indices.clear();
-    Min = {};
-    Max = {};
-}
-
-void Mesh::Data::Save(fs::path file_path) const {
-    std::ofstream out(file_path.c_str());
-    if (!out.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
-
-    out << std::setprecision(10);
-    for (const vec3 &v : Vertices) {
-        out << "v " << v.x << " " << v.y << " " << v.z << "\n";
-    }
-    for (const vec3 &n : Normals) {
-        out << "vn " << n.x << " " << n.y << " " << n.z << "\n";
-    }
-    for (size_t i = 0; i < Indices.size(); i += 3) {
-        out << "f " << Indices[i] + 1 << "//" << Indices[i] + 1 << " "
-            << Indices[i + 1] + 1 << "//" << Indices[i + 1] + 1 << " "
-            << Indices[i + 2] + 1 << "//" << Indices[i + 2] + 1 << "\n";
-    }
-
-    out.close();
-}
-
-void Mesh::Data::Flip(bool x, bool y, bool z) {
-    const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
-    const vec3 center = (Min + Max) / 2.0f;
-    for (auto &vertex : Vertices) vertex = center + (vertex - center) * flip;
-    for (auto &normal : Normals) normal *= flip;
-    UpdateBounds();
-}
-void Mesh::Data::Rotate(const vec3 &axis, float angle) {
-    const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
-    for (auto &vertex : Vertices) vertex = rotation * vertex;
-    for (auto &normal : Normals) normal = rotation * normal;
-    UpdateBounds();
-}
-void Mesh::Data::Scale(const vec3 &scale) {
-    for (auto &vertex : Vertices) vertex *= scale;
-    UpdateBounds();
-}
-void Mesh::Data::Center() {
-    const vec3 center = (Min + Max) / 2.0f;
-    for (auto &vertex : Vertices) vertex -= center;
-    UpdateBounds();
-}
-
-void Mesh::Data::UpdateBounds() {
-    // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
-    Min = vec3(INFINITY, INFINITY, INFINITY);
-    Max = vec3(-INFINITY, -INFINITY, -INFINITY);
-    for (const vec3 &v : Vertices) {
-        if (v.x < Min.x) Min.x = v.x;
-        if (v.y < Min.y) Min.y = v.y;
-        if (v.z < Min.z) Min.z = v.z;
-        if (v.x > Max.x) Max.x = v.x;
-        if (v.y > Max.y) Max.y = v.y;
-        if (v.z > Max.z) Max.z = v.z;
-    }
-}
-
-void Mesh::Data::ExtrudeProfile(const MeshProfile &profile) {
-    Clear();
-    if (profile.NumVertices() < 3) return;
-
-    // The profile vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
-    // and last vertex corresponding the the bottom/inside of the surface.
-    // If the profile is not closed (default), these top/bottom vertices will be connected in the middle of the extruded 3D mesh,
-    // creating a continuous connected solid "bridge" between all rotated slices.
-    const vector<ImVec2> &profile_vertices = profile.GetVertices();
-    const int slices = profile.NumRadialSlices;
-    const bool is_closed = profile.IsClosed();
-    const int profile_size = profile_vertices.size();
-    const int start_index = is_closed ? 0 : 1;
-    const int end_index = profile_size - (is_closed ? 0 : 1);
-    const int profile_size_no_connect = end_index - start_index;
-    const int num_vertices = slices * profile_size_no_connect + (is_closed ? 0 : 2);
-    const int num_indices = slices * (profile_size_no_connect + (is_closed ? -1 : 0)) * 6;
-    Vertices.reserve(num_vertices);
-    Normals.reserve(num_vertices);
-    Indices.reserve(num_indices);
-
-    const double angle_increment = 2.0 * M_PI / slices;
-    for (int slice = 0; slice < slices; slice++) {
-        const double angle = slice * angle_increment;
-        const double c = cos(angle);
-        const double s = sin(angle);
-        // Exclude the top/bottom vertices, which will be connected later.
-        for (int i = start_index; i < end_index; i++) {
-            const auto &p = profile_vertices[i];
-            Vertices.push_back({p.x * c, p.y, p.x * s});
-            Normals.push_back({c, 0.0, s});
-        }
-    }
-    if (!is_closed) {
-        Vertices.push_back({0.0, profile_vertices[0].y, 0.0});
-        Normals.push_back({0.0, 0.0, 0.0});
-        Vertices.push_back({0.0, profile_vertices[profile_size - 1].y, 0.0});
-        Normals.push_back({0.0, 0.0, 0.0});
-    }
-
-    // Compute indices for the triangles.
-    for (int slice = 0; slice < slices; slice++) {
-        for (int i = 0; i < profile_size_no_connect - 1; i++) {
-            const int base_index = slice * profile_size_no_connect + i;
-            const int next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
-            // First triangle
-            Indices.push_back(base_index);
-            Indices.push_back(next_base_index + 1);
-            Indices.push_back(base_index + 1);
-
-            // Second triangle
-            Indices.push_back(base_index);
-            Indices.push_back(next_base_index);
-            Indices.push_back(next_base_index + 1);
-        }
-    }
-
-    // Connect the top and bottom.
-    if (!is_closed) {
-        for (int slice = 0; slice < slices; slice++) {
-            // Top
-            Indices.push_back(slice * profile_size_no_connect);
-            Indices.push_back(Vertices.size() - 2);
-            Indices.push_back(((slice + 1) % slices) * profile_size_no_connect);
-            // Bottom
-            Indices.push_back(slice * profile_size_no_connect + profile_size - 3);
-            Indices.push_back(Vertices.size() - 1);
-            Indices.push_back(((slice + 1) % slices) * profile_size_no_connect + profile_size - 3);
-        }
-    }
-
-    // SVG coordinates are upside-down relative to our 3D rendering coordinates.
-    // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the 3D mesh - not the profile.
-    UpdateBounds();
-    Flip(false, true, false);
-    Center();
 }
 
 void Mesh::SetCameraDistance(float distance) {
@@ -344,32 +194,26 @@ void Mesh::UpdateCameraProjection(const ImVec2 &size) {
 }
 
 void Mesh::Bind() {
-    const auto &data = GetActiveData();
-    Bind(data);
+    GetActiveInstance().Bind();
 }
 
-void Mesh::Bind(const Mesh::Data &data) {
-    glGenVertexArrays(1, &VertexArray);
-    glGenBuffers(1, &VertexBuffer);
-    glGenBuffers(1, &NormalBuffer);
-    glGenBuffers(1, &IndexBuffer);
-
+void MeshInstance::Bind() {
     glBindVertexArray(VertexArray);
 
     // Bind vertices to layout location 0
     glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Vertices.size(), &data.Vertices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
 
     // Bind normals to layout location 1
     glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * data.Normals.size(), &data.Normals[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * data.Indices.size(), &data.Indices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
@@ -396,9 +240,9 @@ void Mesh::DrawGl() const {
     glUniform4fv(specularcol, 1, Specular);
     glUniform1f(shininesscol, Shininess);
 
-    const auto &data = GetActiveData();
-    const int num_indices = data.Indices.size();
-    glBindVertexArray(VertexArray);
+    const auto &instance = GetActiveInstance();
+    const int num_indices = instance.Indices.size();
+    glBindVertexArray(instance.VertexArray);
     if (RenderMode == RenderType_Smooth) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
@@ -587,7 +431,7 @@ string Mesh::GenerateDsp() const {
         tet_vertices[i * 3 + 2] = tet_vecs[i].z;
     }
 
-    // Convert the tetrahedram mesh data into a VegaFEM tetmesh.
+    // Convert the tetrahedral mesh into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
     ::TetMesh volumetric_mesh{
         int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.Indices.size() / 4), (int *)TetMesh.Indices.data(),
@@ -641,12 +485,13 @@ void Mesh::Render() {
             // Transform each vertex position to screen space and check if the mouse is hovering over it.
             const auto &mouse_pos = io.MousePos;
             const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
-            const auto &data = GetActiveData();
+            const auto &instance = GetActiveInstance();
+            const auto &vertices = instance.Vertices;
             const auto &view_projection = CameraProjection * CameraView;
 
             float min_vertex_camera_distance = FLT_MAX;
-            for (size_t i = 0; i < data.Vertices.size(); i++) {
-                const auto &v = data.Vertices[i];
+            for (size_t i = 0; i < vertices.size(); i++) {
+                const auto &v = vertices[i];
                 const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
                 const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
                 const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
@@ -665,8 +510,7 @@ void Mesh::Render() {
                 const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
                 const auto &view_projection = CameraProjection * CameraView;
                 auto *dl = GetWindowDrawList();
-                const auto &data = GetActiveData();
-                const auto &hovered_vertex = data.Vertices[HoveredVertexIndex];
+                const auto &hovered_vertex = vertices[HoveredVertexIndex];
                 const vec4 pos_clip_space = view_projection * vec4{hovered_vertex.x, hovered_vertex.y, hovered_vertex.z, 1.0f};
                 const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
                 const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
@@ -685,7 +529,7 @@ void Mesh::Render() {
                         float min_dist = FLT_MAX;
                         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
                             const auto &excite_vertex_index = ExcitableVertexIndices[i];
-                            const auto &excite_vertex = data.Vertices[excite_vertex_index];
+                            const auto &excite_vertex = vertices[excite_vertex_index];
                             const float dist = glm::distance(excite_vertex, hovered_vertex);
                             if (dist < min_dist) {
                                 min_dist = dist;
@@ -812,8 +656,7 @@ void Mesh::RenderConfig() {
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
-                const auto &data = GetActiveData();
-                const auto &vertex = data.Vertices[HoveredVertexIndex];
+                const auto &vertex = GetActiveInstance().Vertices[HoveredVertexIndex];
                 Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 

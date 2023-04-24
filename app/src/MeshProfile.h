@@ -3,11 +3,14 @@
 #include <filesystem>
 #include <vector>
 
+#include <glm/vec2.hpp>
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_internal.h"
 
 using std::string, std::vector;
+using glm::vec2;
 
 namespace fs = std::filesystem;
 
@@ -25,13 +28,14 @@ struct MeshProfile {
     int NumVertices() const { return Vertices.size(); }
     bool IsClosed() const; // Takes into account `ClosePath`, `OffsetX`, and vertex positions.
 
-    // The vertices should be ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
+    // The vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
     // and last vertex corresponding the the bottom/inside of the surface.
+    // TODO this is not robustly true right now.
     // These top/bottom vertices will be connected in the middle of the extruded 3D mesh,
     // creating a continuous connected solid "bridge" between all rotated slices.
     // E.g. for a bell profile, the top-center of the bell would be the first vertex, the bottom-center
     // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
-    const vector<ImVec2> &GetVertices() const { return Vertices; }
+    vector<vec2> GetVertices() const;
 
     void SaveTesselation(fs::path file_path) const; // Export the tesselation to a 2D .obj file.
     string GenerateDspAxisymmetric() const;

@@ -2,15 +2,16 @@
 
 #include "tetMesh.h" // Vega
 #include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
 
 #include <cinolib/geometry/vec_mat.h>
 
+#include "MeshInstance.h"
 #include "Material.h"
 #include "MeshProfile.h"
 
 #include "ImGuizmo.h"
-using glm::vec3, glm::vec4, glm::mat4;
+
+using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 
 struct ImVec2;
 
@@ -36,25 +37,6 @@ struct Mesh {
     Mesh(fs::path file_path);
     ~Mesh();
 
-    struct Data {
-        bool Empty() const { return Vertices.empty(); }
-
-        void Clear();
-        void Save(fs::path file_path) const; // Export the mesh to a .obj file.
-
-        void Flip(bool x, bool y, bool z);
-        void Rotate(const vec3 &axis, float angle);
-        void Scale(const vec3 &scale);
-        void Center();
-
-        void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
-        void ExtrudeProfile(const MeshProfile &profile);
-
-        vector<vec3> Vertices, Normals;
-        vector<unsigned int> Indices;
-        vec3 Min, Max; // The bounding box of the mesh.
-    };
-
     void Render();
     void RenderConfig();
     void RenderProfile();
@@ -66,7 +48,8 @@ struct Mesh {
         if (Profile != nullptr) Profile->SaveTesselation(file_path);
     }
 
-    const Data &GetActiveData() const;
+    const MeshInstance &GetActiveInstance() const;
+    MeshInstance &GetActiveInstance();
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
@@ -124,12 +107,9 @@ private:
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
-    struct Data TriangularMesh, TetMesh;
+    struct MeshInstance TriangularMesh, TetMesh;
     Type ActiveViewMeshType = MeshType_Triangular;
 
-    unsigned int VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
-
-    void Bind(); // Bind active mesh.
-    void Bind(const Data &data); // Bind mesh and set up vertex attributes.
+    void Bind(); // Bind active mesh instance.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.
 };
