@@ -88,13 +88,7 @@ string MeshProfile::GenerateDspAxisymmetric() const {
     const auto M = ReadSparseMatrix(obj_path_no_extension.string() + "_M.out");
     const auto K = ReadSparseMatrix(obj_path_no_extension.string() + "_K.out");
 
-    static const int num_vertices = 4;
-    static const int vertex_dim = 2;
-    return m2f::mesh2faust(
-        M,
-        K,
-        num_vertices,
-        vertex_dim,
+    m2f::CommonArguments args{
         "modalModel", // generated object name
         true, // freq control activated
         20, // lowest mode freq
@@ -103,9 +97,10 @@ string MeshProfile::GenerateDspAxisymmetric() const {
         20, // number of modes to be computed for the finite element analysis (default is 100)
         {}, // specific excitation positions
         4, // number of excitation positions (default is max: -1)
-        false,
-        true
-    );
+    };
+    static const int num_vertices = 4;
+    static const int vertex_dim = 2;
+    return m2f::mesh2faust(M, K, num_vertices, vertex_dim, args);
 }
 
 static constexpr float Epsilon = 1e-6f;

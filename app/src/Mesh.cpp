@@ -593,8 +593,7 @@ string Mesh::GenerateDsp() const {
         int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.Indices.size() / 4), (int *)TetMesh.Indices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
-    return m2f::mesh2faust(
-        &volumetric_mesh,
+    m2f::CommonArguments args{
         "modalModel", // generated object name
         true, // freq control activated
         20, // lowest mode freq
@@ -602,8 +601,9 @@ string Mesh::GenerateDsp() const {
         20, // number of synthesized modes (default is 20)
         50, // number of modes to be computed for the finite element analysis (default is 100)
         ExcitableVertexIndices, // specific excitation positions
-        ExcitableVertexIndices.size() // number of excitation positions (default is max: -1)
-    );
+        int(ExcitableVertexIndices.size()) // number of excitation positions (default is max: -1)
+    };
+    return m2f::mesh2faust(&volumetric_mesh, args);
 }
 
 static constexpr float VertexHoverRadius = 5.f;
