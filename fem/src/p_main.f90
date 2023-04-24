@@ -21,11 +21,15 @@ program p_main
 
     print*, "Coomputing Global Stiffness Matrix"
     call s_compute_global_stiffness_matrix()
+    call cpu_time(finish)
+    print*, "Elapsed Time: ", finish - start
 
     print*, ""
     print*, "Computing Global Mass Matrix"
     call s_compute_global_mass_matrix()
-
+    call cpu_time(finish)
+    print*, "Elapsed Time: ", finish - start
+    
     print*, ""
     print*, "Writing Output"
     call s_write_output()

@@ -72,7 +72,7 @@ contains
 
         if (debug == 1) then
             print*, "Gobal Stiffness Matrix"
-            call s_print_array(S,ndofs,ndofs)
+            call s_print_array(S,ndofs,ndofs, 1e6)
         end if
         
     end subroutine s_compute_global_stiffness_matrix
@@ -142,7 +142,7 @@ contains
             !call s_print_array(B, 4, 6)
             I1 = matmul(D,B*jacD)
             I2 = matmul(TRANSPOSE(B),I1)
-            
+
             Ke = Ke + weights(i)*I2
         end do
 
@@ -151,7 +151,7 @@ contains
 
         if (debug == 1) then
             print*, "Local Stiffness Matrix of element: ", elm
-            call s_print_array(Ke, 6, 6)
+            call s_print_array(Ke, 6, 6, 1e6)
         end if
 
     end subroutine s_compute_element_stiffness_matrix
@@ -173,7 +173,7 @@ contains
             end do
         end do
 
-                ! Perform Guassian Quadrature
+        ! Perform Guassian Quadrature
         do i = 1,9
             call s_compute_N_matrix(N, gx(i), gy(i))
 
@@ -184,7 +184,7 @@ contains
         end do
 
         ! Convert to volume
-        Me = Me*(2*pi)
+        Me = Me*(rho*2*pi*EC(elm,3)*EC(elm,1))
 
         if (debug == 1) then
             print*, "Local Mass Matrix of element: ", elm

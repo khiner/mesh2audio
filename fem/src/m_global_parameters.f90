@@ -6,7 +6,7 @@ module m_global_parameters
     integer :: elements
     integer :: edges
 
-    integer, parameter :: debug = 0
+    integer, parameter :: debug = 1
 
     real(kind(0d0)), allocatable, dimension(:,:) :: dofs  !< degrees of freedom
     real(kind(0d0)), allocatable, dimension(:, :) :: M  !< Mass matrix
@@ -16,8 +16,9 @@ module m_global_parameters
     real(kind(0d0)), dimension(4,4) :: D !< stress strain matrix
     real(kind(0d0)), dimension(2,6) :: N !< (x,y) to x(s,t) y(s,t) matrix
 
-    real(kind(0d0)) :: ym !< youngs modulus
-    real(kind(0d0)) :: nu !< poissons ratio
+    real(kind(0d0)) :: ym  !< youngs modulus
+    real(kind(0d0)) :: nu  !< poissons ratio
+    real(kind(0d0)) :: rho !< density 
     integer :: ndofs
 
 
@@ -29,15 +30,23 @@ contains
 
     end subroutine
 
-    subroutine s_print_array(A, m, n)
+    subroutine s_print_array(A, m, n, div)
 
         real(kind(0d0)), dimension(m,n) :: A
         integer :: i, j
         integer :: m, n
+        real :: c
+        real, optional :: div
+
+        if (present(div)) then 
+            c = div
+        else
+            c = 1
+        endif
         
         do i = 1,m
             do j = 1,n
-                write(*,fmt="(F20.4)",advance="no") A(i,j)/1e6
+                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
             end do
             write(*, fmt="(A1)") " "
         end do

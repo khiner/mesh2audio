@@ -32,12 +32,15 @@ contains
         read(arg, *) ym
         call getarg(3, arg)       !< gets poissons ratio
         read(arg, *) nu
+        call getarg(4, arg)       !< gets density
+        read(arg, *) rho
 
         print*, ""
         print*, "Model: ", filename
         print*, "Material Properties:"
         print*, "     Youngs Modulus: ", ym
         print*, "     Poisson's Ratio: ", nu
+        print*, "     Density: ", rho
         print*, ""
 
         open (unit = 1, file = trim(filename)//".obj", iostat=io)
@@ -67,7 +70,7 @@ contains
                     call split(filecontents, " ", lineType)
                     read(lineType, *) elements
                     allocate (E(1:elements, 3))
-                    allocate (EC(1:elements, 2))
+                    allocate (EC(1:elements, 3))
                 end if
             end if
 
@@ -105,6 +108,7 @@ contains
             z3 = dofs(E(i,3),2)
             EC(i,1) = (r1 + r2 + r3)/3
             EC(i,2) = (z1 + z2 + z3)/3
+            EC(i,3) = abs(r1*(z2-z3) + r2*(z3-z1) + r3*(z1-z2)/2)/2
 
         end do
 
@@ -112,7 +116,7 @@ contains
             print*, "Element Connectivity array"
             call s_print_int_array(E, elements, 3)
             print*, "Element Centers array"
-            call s_print_array(EC, elements, 2)
+            call s_print_array(EC, elements, 3)
             print*, "DOFs array"
             call s_print_array(dofs, vertices, 2)
         end if
