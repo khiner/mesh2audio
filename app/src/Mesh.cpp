@@ -678,25 +678,27 @@ void Mesh::Render() {
                 const float scaled_radius = base_radius + (1.f / vertex_camera_distance) * distance_scale_factor;
                 dl->AddCircleFilled(vertex_screen, scaled_radius, IM_COL32(255, 0, 0, 255));
 
-                if (IsMouseClicked(0)) {
-                    // Find the nearest excitation vertex to the clicked vertex.
-                    int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
-                    float min_dist = FLT_MAX;
-                    for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-                        const auto &excite_vertex_index = ExcitableVertexIndices[i];
-                        const auto &excite_vertex = data.Vertices[excite_vertex_index];
-                        const float dist = glm::distance(excite_vertex, hovered_vertex);
-                        if (dist < min_dist) {
-                            min_dist = dist;
-                            nearest_excite_vertex_pos = i;
+                if (Audio::FaustState::IsRunning()) {
+                    if (IsMouseClicked(0)) {
+                        // Find the nearest excitation vertex to the clicked vertex.
+                        int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
+                        float min_dist = FLT_MAX;
+                        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+                            const auto &excite_vertex_index = ExcitableVertexIndices[i];
+                            const auto &excite_vertex = data.Vertices[excite_vertex_index];
+                            const float dist = glm::distance(excite_vertex, hovered_vertex);
+                            if (dist < min_dist) {
+                                min_dist = dist;
+                                nearest_excite_vertex_pos = i;
+                            }
                         }
+                        if (nearest_excite_vertex_pos >= 0) {
+                            *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
+                            *Audio::FaustState::ExciteValue = 1.f;
+                        }
+                    } else if (IsMouseReleased(0)) {
+                        *Audio::FaustState::ExciteValue = 0.f;
                     }
-                    if (nearest_excite_vertex_pos >= 0) {
-                        *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
-                        *Audio::FaustState::ExciteValue = 1.f;
-                    }
-                } else if (IsMouseReleased(0)) {
-                    *Audio::FaustState::ExciteValue = 0.f;
                 }
             }
         }
