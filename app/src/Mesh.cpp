@@ -538,29 +538,28 @@ void Mesh::Render() {
 
     // Handle mouse interactions.
     const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
-    if (mouse_clicked) {
-        CameraTargetVertexIndex = -1;
-    } else if (mouse_released) {
-        CameraTargetVertexIndex = HoveredVertexIndex;
-    }
+    if (window_hovered) {
+        if (mouse_clicked) CameraTargetVertexIndex = -1;
+        else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
-    // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
-    if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
-        const auto &hovered_vertex = vertices[HoveredVertexIndex];
-        int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
-        float min_dist = FLT_MAX;
-        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-            const auto &excite_vertex_index = ExcitableVertexIndices[i];
-            const auto &excite_vertex = vertices[excite_vertex_index];
-            const float dist = glm::distance(excite_vertex, hovered_vertex);
-            if (dist < min_dist) {
-                min_dist = dist;
-                nearest_excite_vertex_pos = i;
+        // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
+        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
+            const auto &hovered_vertex = vertices[HoveredVertexIndex];
+            int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
+            float min_dist = FLT_MAX;
+            for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+                const auto &excite_vertex_index = ExcitableVertexIndices[i];
+                const auto &excite_vertex = vertices[excite_vertex_index];
+                const float dist = glm::distance(excite_vertex, hovered_vertex);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    nearest_excite_vertex_pos = i;
+                }
             }
-        }
-        if (nearest_excite_vertex_pos >= 0) { // Shouldn't ever be false, but sanity check.
-            *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
-            *Audio::FaustState::ExciteValue = 1.f;
+            if (nearest_excite_vertex_pos >= 0) { // Shouldn't ever be false, but sanity check.
+                *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
+                *Audio::FaustState::ExciteValue = 1.f;
+            }
         }
     }
 
