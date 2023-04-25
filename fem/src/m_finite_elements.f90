@@ -38,7 +38,6 @@ contains
         c = 64d0/81d0
         weights(5) = c
 
-
     end subroutine s_initialize_guass_quadrature
 
     subroutine S_compute_global_stiffness_matrix()
@@ -189,6 +188,7 @@ contains
         if (debug == 1) then
             print*, "Local Mass Matrix of element: ", elm
             call s_print_array(Me, 6, 6)
+            print*, EC(elm,3), EC(elm,1)
         end if
 
 

@@ -108,7 +108,7 @@ contains
             z3 = dofs(E(i,3),2)
             EC(i,1) = (r1 + r2 + r3)/3
             EC(i,2) = (z1 + z2 + z3)/3
-            EC(i,3) = abs(r1*(z2-z3) + r2*(z3-z1) + r3*(z1-z2)/2)/2
+            EC(i,3) = abs(r1*(z2-z3) + r2*(z3-z1) + r3*(z1-z2))/2
 
         end do
 
