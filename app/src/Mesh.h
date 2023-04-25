@@ -93,6 +93,8 @@ struct Mesh {
     inline static int NumExcitableVertices = 10;
     inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
 
+    inline static bool QualityTetMesh = true;
+
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
 

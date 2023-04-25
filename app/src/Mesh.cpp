@@ -379,10 +379,10 @@ void Mesh::GenerateTetMesh() {
     // Write to an obj file and read back into a cinolib tetmesh.
     fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
     const fs::path tmp_obj_path = TempDir / "tmp.obj";
-    Save(tmp_obj_path);
+    TriangularMesh.Save(tmp_obj_path);
     cinolib::Polygonmesh<> poly_mesh(tmp_obj_path.c_str());
     vector<uint> edges_in; // Not used.
-    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, "q", tet_vecs, tet_indices);
+    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, QualityTetMesh ? "q" : "", tet_vecs, tet_indices);
     fs::remove(tmp_obj_path); // Delete the temporary file.
 
     // Write the tet mesh to disk, deleting the oldest tet mesh(es) if this puts us past the max save limit.
@@ -607,6 +607,28 @@ void Mesh::RenderConfig() {
                 EndPopup();
             }
 
+            SeparatorText("Create");
+            Checkbox("Quality mode", &QualityTetMesh);
+            const string generate_mesh_label = HasTetMesh() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh";
+            if (Button(generate_mesh_label.c_str())) {
+                OpenPopup(GenerateTetMsg.c_str());
+                if (GeneratorThread.joinable()) GeneratorThread.join();
+                GeneratorThread = std::thread([&] { GenerateTetMesh(); });
+            }
+            // Dropdown to select from saved tet meshes and load.
+            if (BeginCombo("Saved tet meshes", nullptr)) {
+                const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
+                if (saved_tet_mesh_times.empty()) TextUnformatted("No saved tet meshes");
+                for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
+                    const string formatted_time = FormatTime(tet_mesh_time);
+                    if (Selectable(formatted_time.c_str(), false)) {
+                        LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
+                    }
+                }
+                EndCombo();
+            }
+
+            SeparatorText("Current mesh");
             Text("File: %s", FilePath.c_str());
             if (HasTetMesh()) {
                 Checkbox("Show excitable vertices", &ShowExcitableVertices);
@@ -625,23 +647,6 @@ void Mesh::RenderConfig() {
                 RadioButton("Tetrahedral", &ViewMeshType, MeshType_Tetrahedral);
             } else {
                 TextUnformatted("No tetrahedral mesh loaded");
-                if (Button("Generate tetrahedral mesh")) {
-                    OpenPopup(GenerateTetMsg.c_str());
-                    if (GeneratorThread.joinable()) GeneratorThread.join();
-                    GeneratorThread = std::thread([&] { GenerateTetMesh(); });
-                }
-            }
-            // Dropdown to select from saved tet meshes and load.
-            if (BeginCombo("Saved tet meshes", nullptr)) {
-                const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
-                if (saved_tet_mesh_times.empty()) TextUnformatted("No saved tet meshes");
-                for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
-                    const string formatted_time = FormatTime(tet_mesh_time);
-                    if (Selectable(formatted_time.c_str(), false)) {
-                        LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
-                    }
-                }
-                EndCombo();
             }
 
             SeparatorText("Modify");
