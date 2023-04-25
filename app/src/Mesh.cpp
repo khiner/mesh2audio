@@ -255,7 +255,7 @@ void Mesh::DrawGl() const {
     // All render modes:
     glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
 
-    if (ViewMeshType == MeshType_Tetrahedral && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
+    if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
             static GLfloat DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
             static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
@@ -543,7 +543,7 @@ void Mesh::Render() {
         else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
         // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
-        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
+        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning() && !Audio::FaustState::Is2DModel) {
             const auto &hovered_vertex = vertices[HoveredVertexIndex];
             int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
             float min_dist = FLT_MAX;

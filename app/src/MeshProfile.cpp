@@ -10,6 +10,8 @@
 #include "Eigen/SparseCore"
 #include "Material.h"
 
+#include "Audio.h"
+
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
 
@@ -109,7 +111,7 @@ string MeshProfile::GenerateDspAxisymmetric() const {
         20, // number of synthesized modes (default is 20)
         50, // number of modes to be computed for the finite element analysis (default is 100)
         {}, // specific excitation positions
-        num_vertices / 2, // number of excitation positions (default is max: -1)
+        NumExcitationVertices(), // number of excitation positions (default is max: -1)
     };
     static const int vertex_dim = 2;
     return m2f::mesh2faust(M, K, num_vertices, vertex_dim, args);
@@ -272,6 +274,14 @@ bool MeshProfile::Render() {
             }
             dl->_Path.push_back(dl->_Path[0]); // Close triangle path.
             dl->PathStroke(TesselationStrokeColorU32, 0, 1);
+        }
+    }
+    if (Audio::FaustState::IsRunning() && Audio::FaustState::Is2DModel) {
+        const int tesselation_index_pos = *Audio::FaustState::ExcitePos;
+        if (tesselation_index_pos >= 0 && tesselation_index_pos < TesselationIndices.size()) {
+            const int tesselation_index = TesselationIndices[tesselation_index_pos];
+            const ImVec2 vertex = TesselationVertices[tesselation_index];
+            dl->AddCircleFilled(vertex * scale + offset, AnchorPointRadius, GetColorU32(ImGuiCol_ButtonHovered));
         }
     }
 

@@ -30,6 +30,7 @@ static std::unique_ptr<Mesh> mesh;
 
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
+static bool IsGeneratedDsp2d = false; // `false` means 3D.
 static string GeneratedDsp; // The most recently generated DSP code.
 static string GenerateDspMsg = "Generating DSP code...";
 
@@ -298,8 +299,10 @@ int main(int, char **) {
                     if (generate_tet_dsp || generate_axisymmetric_dsp) {
                         OpenPopup(GenerateDspMsg.c_str());
                         if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
+                        IsGeneratedDsp2d = !generate_tet_dsp;
                         DspGeneratorThread = std::thread([&] {
                             const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
+                            const int num_excitations = generate_tet_dsp ? mesh->Num3DExcitationVertices() : mesh->Num2DExcitationVertices();
                             if (!model_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;
@@ -321,6 +324,7 @@ int main(int, char **) {
                         ImSpinner::SpinnerWaveDots(GenerateDspMsg.c_str(), spinner_dim / 2, 3);
                         if (!GeneratedDsp.empty()) {
                             Audio.Faust.Code = GeneratedDsp;
+                            Audio::FaustState::Is2DModel = IsGeneratedDsp2d;
                             GeneratedDsp = "";
                             if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
                             CloseCurrentPopup();

@@ -26,6 +26,8 @@ struct MeshProfile {
 
     inline int NumControlPoints() const { return ControlPoints.size(); }
     int NumVertices() const { return Vertices.size(); }
+    int NumExcitationVertices() const { return TesselationIndices.size() / 2; }
+
     bool IsClosed() const; // Takes into account `ClosePath`, `OffsetX`, and vertex positions.
 
     // The vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,

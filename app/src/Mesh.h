@@ -62,6 +62,8 @@ struct Mesh {
     std::string GenerateDspAxisymmetric() const {
         return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : "";
     }
+    int Num3DExcitationVertices() const { return NumExcitableVertices; }
+    int Num2DExcitationVertices() const { return Profile != nullptr ? Profile->NumExcitationVertices() : 0; }
 
     void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
     void Rotate(const vec3 &axis, float angle);
