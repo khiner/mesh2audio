@@ -189,6 +189,9 @@ static ma_node *OutputNode;
 static ma_node_base FaustNode{};
 static ma_data_source_node InputNode{};
 
+static ma_encoder_config WavEncoderConfig;
+static ma_encoder WavEncoder;
+
 enum IO_ {
     IO_None = -1,
     IO_In,
@@ -217,6 +220,10 @@ static const ma_device_id *GetDeviceId(IO io, string_view device_name) {
 void DataCallback(ma_device *device, void *output, const void *input, ma_uint32 frame_count) {
     ma_audio_buffer_ref_set_data(&InputBuffer, input, frame_count);
     ma_node_graph_read_pcm_frames(&NodeGraph, output, frame_count, nullptr);
+
+    if (Audio::AudioDevice::IsRecording) {
+        ma_encoder_write_pcm_frames(&WavEncoder, output, frame_count, nullptr);
+    }
     (void)device; // unused
 }
 
@@ -345,6 +352,7 @@ void Audio::AudioDevice::Init() {
     DeviceConfig.sampleRate = SampleRate;
 
     int result = ma_device_init(nullptr, &DeviceConfig, &MaDevice);
+
     if (result != MA_SUCCESS) throw std::runtime_error(format("Error initializing audio device: {}", result));
 
     result = ma_context_get_device_info(MaDevice.pContext, MaDevice.type, nullptr, &DeviceInfo);
@@ -361,6 +369,26 @@ void Audio::AudioDevice::Init() {
     if (MaDevice.capture.format != InFormat) InFormat = MaDevice.capture.format;
     if (MaDevice.playback.format != OutFormat) OutFormat = MaDevice.playback.format;
     if (MaDevice.sampleRate != SampleRate) SampleRate = MaDevice.sampleRate;
+}
+
+void Audio::AudioDevice::StartRecording() const {
+    if (IsRecording) return;
+
+    WavEncoderConfig = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, 1, SampleRate);
+    const string wav_filename = format("{}-{}.wav", "recording", std::time(nullptr));
+    if (ma_encoder_init_file(wav_filename.c_str(), &WavEncoderConfig, &WavEncoder) != MA_SUCCESS) {
+        throw std::runtime_error(format("Failed to initialize output file {}", wav_filename));
+    }
+    IsRecording = true;
+}
+
+void Audio::AudioDevice::StopRecording() const {
+    if (!IsRecording) return;
+
+    IsRecording = false;
+    // Janky - sleep for a bit to make sure the encoder has finished writing to the file.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    ma_encoder_uninit(&WavEncoder);
 }
 
 bool Audio::AudioDevice::IsStarted() const { return ma_device_is_started(&MaDevice); }
@@ -416,6 +444,11 @@ void Audio::AudioDevice::Render() {
     if (!IsStarted()) {
         TextUnformatted("No audio device started yet");
         return;
+    }
+    SameLine();
+    if (Button(IsRecording ? "Stop recording" : "Record to wav")) {
+        if (IsRecording) StopRecording();
+        else StartRecording();
     }
     Checkbox("Muted", &Muted);
     SameLine();
@@ -508,6 +541,7 @@ void Audio::AudioDevice::Render() {
 }
 
 void Audio::AudioDevice::Destroy() {
+    StopRecording();
     ma_device_uninit(&MaDevice);
 }
 

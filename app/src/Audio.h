@@ -41,12 +41,17 @@ struct Audio {
         bool IsInitialized() const;
         bool IsStarted() const;
 
+        void StartRecording() const;
+        void StopRecording() const;
+
+        inline static bool IsRecording = false;
+
         bool On = true;
         bool Muted = false;
         float Volume = 1.0; // Master volume. Corresponds to `ma_device_set_master_volume`.
         string InDeviceName, OutDeviceName;
         int InFormat, OutFormat;
-        u32 SampleRate;
+        u32 SampleRate{48000};
     };
 
     struct Graph {
