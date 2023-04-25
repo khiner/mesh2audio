@@ -6,7 +6,7 @@ module m_global_parameters
     integer :: elements
     integer :: edges
 
-    integer, parameter :: debug = 1
+    integer, parameter :: debug = 0
 
     real(kind(0d0)), allocatable, dimension(:,:) :: dofs  !< degrees of freedom
     real(kind(0d0)), allocatable, dimension(:, :) :: M  !< Mass matrix
