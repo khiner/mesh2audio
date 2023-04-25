@@ -108,8 +108,8 @@ string MeshProfile::GenerateDspAxisymmetric() const {
         true, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq
-        20, // number of synthesized modes (default is 20)
-        50, // number of modes to be computed for the finite element analysis (default is 100)
+        40, // number of synthesized modes (default is 20)
+        80, // number of modes to be computed for the finite element analysis (default is 100)
         {}, // specific excitation positions
         NumExcitationVertices(), // number of excitation positions (default is max: -1)
     };

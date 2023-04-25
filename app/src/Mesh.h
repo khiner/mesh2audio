@@ -113,6 +113,8 @@ private:
     struct MeshInstance TriangularMesh, TetMesh;
     Type ActiveViewMeshType = MeshType_Triangular;
 
+    ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
+
     void Bind(); // Bind active mesh instance.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.
 };

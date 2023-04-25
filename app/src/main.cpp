@@ -306,7 +306,7 @@ int main(int, char **) {
                             if (!model_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;
-                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, Mesh::NumExcitableVertices);
+                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, num_excitations);
                             } else {
                                 DspTetMeshPath = "";
                                 GeneratedDsp = "process = _;";
@@ -334,7 +334,7 @@ int main(int, char **) {
                     if (has_tetrahedral_mesh || has_profile) {
                         SeparatorText("Material properties");
                         // Presets
-                        static std::string selected_preset = "Copper";
+                        static std::string selected_preset = "Bell";
                         if (BeginCombo("Presets", selected_preset.c_str())) {
                             for (const auto &[preset_name, material] : MaterialPresets) {
                                 bool is_selected = (preset_name == selected_preset);
