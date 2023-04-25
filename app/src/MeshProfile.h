@@ -44,7 +44,7 @@ struct MeshProfile {
     bool RenderConfig(); // Render config section (using ImGui).
 
     // `CreateVertices` is called when these parameters change.
-    inline static int NumRadialSlices{100};
+    inline static int NumRadialSlices{60};
     inline static float CurveTolerance{0.0001f};
 
     inline static TesselationMode TessMode = TesselationMode_CDT;

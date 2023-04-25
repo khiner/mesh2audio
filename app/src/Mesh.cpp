@@ -421,7 +421,7 @@ string Mesh::GenerateDsp() const {
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
     m2f::CommonArguments args{
-        "modalModel", // generated object name
+        "modalModel",
         true, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq

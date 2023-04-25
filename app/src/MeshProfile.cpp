@@ -100,14 +100,14 @@ string MeshProfile::GenerateDspAxisymmetric() const {
     const auto M = ReadSparseMatrix(obj_path_no_extension.string() + "_M.out");
     const auto K = ReadSparseMatrix(obj_path_no_extension.string() + "_K.out");
 
-    const int num_vertices = Vertices.size();
+    const int num_vertices = TesselationVertices.size();
     m2f::CommonArguments args{
-        "modalModel", // generated object name
+        "modalModel",
         true, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq
-        std::min(40, num_vertices / 2), // number of synthesized modes (default is 20)
-        std::min(50, 3 * num_vertices / 4), // number of modes to be computed for the finite element analysis (default is 100)
+        20, // number of synthesized modes (default is 20)
+        50, // number of modes to be computed for the finite element analysis (default is 100)
         {}, // specific excitation positions
         num_vertices / 2, // number of excitation positions (default is max: -1)
     };
