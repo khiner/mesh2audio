@@ -264,7 +264,7 @@ bool MeshProfile::Render() {
         }
     }
 
-    if (ShowTesselation) {
+    if (ShowTesselation && !TesselationIndices.empty()) {
         for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
             for (int j = 0; j < 3; j++) {
                 const ImVec2 vertex = TesselationVertices[TesselationIndices[i + j]];
