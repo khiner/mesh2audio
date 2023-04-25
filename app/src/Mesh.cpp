@@ -10,9 +10,10 @@
 
 #include "imspinner.h"
 
-#include <glm/gtc/matrix_transform.hpp>
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include "Audio.h"
 #include "GlCanvas.h"
@@ -32,6 +33,7 @@ static GlCanvas gl_canvas;
 
 static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes.
 
+static const mat4 Identity(1.f);
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 static bool StaticInitialized = false;
@@ -39,7 +41,8 @@ static GLuint projectionPos, modelviewPos;
 // Variables to set uniform params for lighting fragment shader
 static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
 
-vector<int> ExcitableVertexIndices;
+static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
+static vector<int> ExcitableVertexIndices;
 
 void Mesh::InitializeStatic() {
     if (StaticInitialized) return;
@@ -175,6 +178,7 @@ void Mesh::Center() {
 void Mesh::ExtrudeProfile() {
     if (Profile == nullptr) return;
 
+    HoveredVertexIndex = CameraTargetVertexIndex = -1;
     TetMesh.Clear();
     TetMeshPath.clear();
     ExcitableVertexIndices.clear();
@@ -195,28 +199,6 @@ void Mesh::UpdateCameraProjection(const ImVec2 &size) {
 
 void Mesh::Bind() {
     GetActiveInstance().Bind();
-}
-
-void MeshInstance::Bind() {
-    glBindVertexArray(VertexArray);
-
-    // Bind vertices to layout location 0
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    // Bind normals to layout location 1
-    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
 }
 
 static void InterpolateColors(GLfloat a[], GLfloat b[], float interpolation, GLfloat result[]) {
@@ -341,6 +323,7 @@ void Mesh::UpdateExcitableVertices() {
 }
 
 void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
+    HoveredVertexIndex = CameraTargetVertexIndex = -1;
     TetMesh.Clear();
     TetMesh.Vertices.reserve(tet_vecs.size());
     TetMesh.Normals.reserve(tet_vecs.size());
@@ -463,89 +446,144 @@ void Mesh::Render() {
     }
     const auto content_region = GetContentRegionAvail();
     UpdateCameraProjection(content_region);
-    if (content_region.x > 0 && content_region.y > 0) {
-        const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-        gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
-        if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
-            ViewMeshType = MeshType_Triangular;
-        }
-        if (ActiveViewMeshType != ViewMeshType) {
-            ActiveViewMeshType = ViewMeshType;
-            Bind();
-        }
-        DrawGl();
+    if (content_region.x <= 0 && content_region.y <= 0) return;
 
-        // Render the mesh to an OpenGl texture and display it.
-        unsigned int texture_id = gl_canvas.Render();
-        Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
+    const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
+    gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
+        ViewMeshType = MeshType_Triangular;
+    }
+    if (ActiveViewMeshType != ViewMeshType) {
+        ActiveViewMeshType = ViewMeshType;
+        Bind();
+    }
+    DrawGl();
 
-        HoveredVertexIndex = -1;
-        if (window_hovered) {
-            const vec3 camera_position = glm::inverse(CameraView)[3];
-            // Transform each vertex position to screen space and check if the mouse is hovering over it.
-            const auto &mouse_pos = io.MousePos;
-            const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
-            const auto &instance = GetActiveInstance();
-            const auto &vertices = instance.Vertices;
-            const auto &view_projection = CameraProjection * CameraView;
+    // Render the mesh to an OpenGl texture and display it.
+    unsigned int texture_id = gl_canvas.Render();
+    Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
 
-            float min_vertex_camera_distance = FLT_MAX;
-            for (size_t i = 0; i < vertices.size(); i++) {
-                const auto &v = vertices[i];
-                const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
-                const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
-                const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
-                const float screen_dist_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
-                if (screen_dist_squared <= VertexHoverRadiusSquared) {
-                    const float vertex_camera_distance = glm::distance(camera_position, v);
-                    if (vertex_camera_distance < min_vertex_camera_distance) {
-                        min_vertex_camera_distance = vertex_camera_distance;
-                        HoveredVertexIndex = i;
-                    }
-                }
-            }
+    const auto &window_pos = GetWindowPos();
+    if (ShowGizmo || ShowCameraGizmo || ShowGrid) {
+        ImGuizmo::BeginFrame();
+        ImGuizmo::SetDrawlist();
+        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetRect(window_pos.x, window_pos.y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
+    }
+    if (ShowGrid) {
+        ImGuizmo::DrawGrid(&CameraView[0][0], &CameraProjection[0][0], &Identity[0][0], 100.f);
+    }
+    if (ShowGizmo) {
+        ImGuizmo::Manipulate(
+            &CameraView[0][0], &CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &ObjectMatrix[0][0], nullptr,
+            nullptr, ShowBounds ? Bounds : nullptr, nullptr
+        );
+    }
+    if (ShowCameraGizmo) {
+        static const float view_manipulate_size = 128;
+        const auto viewManipulatePos = window_pos +
+            ImVec2{
+                GetWindowContentRegionMax().x - view_manipulate_size,
+                GetWindowContentRegionMin().y,
+            };
+        ImGuizmo::ViewManipulate(&CameraView[0][0], CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
+    }
 
-            if (HoveredVertexIndex >= 0) {
-                // Visualize the hovered index.
-                const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
-                const auto &view_projection = CameraProjection * CameraView;
-                auto *dl = GetWindowDrawList();
-                const auto &hovered_vertex = vertices[HoveredVertexIndex];
-                const vec4 pos_clip_space = view_projection * vec4{hovered_vertex.x, hovered_vertex.y, hovered_vertex.z, 1.0f};
-                const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
-                const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
+    const auto &instance = GetActiveInstance();
+    const auto &vertices = instance.Vertices;
 
-                // Adjust the circle radius based on the distance
-                static const float base_radius = 1.0f;
-                static const float distance_scale_factor = 2.f;
-                const float vertex_camera_distance = glm::distance(camera_position, hovered_vertex);
-                const float scaled_radius = base_radius + (1.f / vertex_camera_distance) * distance_scale_factor;
-                dl->AddCircleFilled(vertex_screen, scaled_radius, IM_COL32(255, 0, 0, 255));
+    // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
+    HoveredVertexIndex = -1;
+    const vec3 camera_position = glm::inverse(CameraView)[3];
+    if (window_hovered) {
+        // Transform each vertex position to screen space and check if the mouse is hovering over it.
+        const auto &mouse_pos = io.MousePos;
+        const auto &content_pos = window_pos + GetWindowContentRegionMin();
+        const auto &view_projection = CameraProjection * CameraView;
 
-                if (Audio::FaustState::IsRunning()) {
-                    if (IsMouseClicked(0)) {
-                        // Find the nearest excitation vertex to the clicked vertex.
-                        int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
-                        float min_dist = FLT_MAX;
-                        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-                            const auto &excite_vertex_index = ExcitableVertexIndices[i];
-                            const auto &excite_vertex = vertices[excite_vertex_index];
-                            const float dist = glm::distance(excite_vertex, hovered_vertex);
-                            if (dist < min_dist) {
-                                min_dist = dist;
-                                nearest_excite_vertex_pos = i;
-                            }
-                        }
-                        if (nearest_excite_vertex_pos >= 0) {
-                            *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
-                            *Audio::FaustState::ExciteValue = 1.f;
-                        }
-                    } else if (IsMouseReleased(0)) {
-                        *Audio::FaustState::ExciteValue = 0.f;
-                    }
+        float min_vertex_camera_distance = FLT_MAX;
+        for (size_t i = 0; i < vertices.size(); i++) {
+            const auto &v = vertices[i];
+            const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
+            const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
+            const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
+            const float screen_dist_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
+            if (screen_dist_squared <= VertexHoverRadiusSquared) {
+                const float vertex_camera_distance = glm::distance(camera_position, v);
+                if (vertex_camera_distance < min_vertex_camera_distance) {
+                    min_vertex_camera_distance = vertex_camera_distance;
+                    HoveredVertexIndex = i;
                 }
             }
         }
+    }
+
+    // Visualize the hovered index.
+    if (HoveredVertexIndex >= 0) {
+        const auto &content_pos = window_pos + GetWindowContentRegionMin();
+        const auto &view_projection = CameraProjection * CameraView;
+        auto *dl = GetWindowDrawList();
+        const auto &hovered_vertex = vertices[HoveredVertexIndex];
+        const vec4 pos_clip_space = view_projection * vec4{hovered_vertex.x, hovered_vertex.y, hovered_vertex.z, 1.0f};
+        const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
+        const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
+
+        // Adjust the circle radius based on the distance
+        static const float base_radius = 1.0f;
+        static const float distance_scale_factor = 2.f;
+        const float vertex_camera_distance = glm::distance(camera_position, hovered_vertex);
+        const float scaled_radius = base_radius + (1.f / vertex_camera_distance) * distance_scale_factor;
+        dl->AddCircleFilled(vertex_screen, scaled_radius, IM_COL32(255, 0, 0, 255));
+    }
+
+    // Handle mouse interactions.
+    const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
+    if (mouse_clicked) {
+        CameraTargetVertexIndex = -1;
+    } else if (mouse_released) {
+        CameraTargetVertexIndex = HoveredVertexIndex;
+    }
+
+    // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
+    if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
+        const auto &hovered_vertex = vertices[HoveredVertexIndex];
+        int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
+        float min_dist = FLT_MAX;
+        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+            const auto &excite_vertex_index = ExcitableVertexIndices[i];
+            const auto &excite_vertex = vertices[excite_vertex_index];
+            const float dist = glm::distance(excite_vertex, hovered_vertex);
+            if (dist < min_dist) {
+                min_dist = dist;
+                nearest_excite_vertex_pos = i;
+            }
+        }
+        if (nearest_excite_vertex_pos >= 0) { // Shouldn't ever be false, but sanity check.
+            *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
+            *Audio::FaustState::ExciteValue = 1.f;
+        }
+    }
+
+    // Any time mouse is released, release the excitation trigger
+    // (even if mouse was pressed, dragged outside the window, and released).
+    if (mouse_released && Audio::FaustState::IsRunning()) *Audio::FaustState::ExciteValue = 0.f;
+
+    // Rotate the camera to the targeted vertex.
+    if (CameraTargetVertexIndex >= 0) {
+        static const float CameraMovementSpeed = 0.5;
+
+        const auto &target_vertex = vertices[CameraTargetVertexIndex];
+        const vec3 target_direction = glm::normalize(target_vertex - Origin);
+        // Calculate the direction from the origin to the camera position
+        const vec3 current_direction = glm::normalize(camera_position - Origin);
+        // Create quaternions representing the two directions
+        const glm::quat current_quat = glm::quatLookAt(current_direction, Up);
+        const glm::quat target_quat = glm::quatLookAt(target_direction, Up);
+        // Interpolate linearly between the two quaternions along the sphere defined by the camera distance.
+        const float lerp_factor = glm::clamp(CameraMovementSpeed / CameraDistance, 0.0f, 1.0f);
+        const glm::quat new_quat = glm::slerp(current_quat, target_quat, lerp_factor);
+        const vec3 new_camera_direction = new_quat * glm::vec3(0.0f, 0.0f, -1.0f);
+        CameraView = glm::lookAt(Origin + new_camera_direction * CameraDistance, Origin, Up);
     }
 }
 

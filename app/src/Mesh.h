@@ -90,7 +90,6 @@ struct Mesh {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
 
-    inline static int HoveredVertexIndex = -1;
     inline static int NumExcitableVertices = 10;
     inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
 

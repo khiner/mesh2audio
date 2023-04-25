@@ -28,8 +28,6 @@ static WindowsState Windows;
 
 static std::unique_ptr<Mesh> mesh;
 
-static const mat4 Identity(1.f);
-
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 static string GeneratedDsp; // The most recently generated DSP code.
@@ -253,33 +251,6 @@ int main(int, char **) {
 
             const auto content_region = GetContentRegionAvail(); // Must be called before mesh render.
             if (mesh != nullptr) mesh->Render();
-
-            if (Mesh::ShowGizmo || Mesh::ShowCameraGizmo || Mesh::ShowGrid) {
-                ImGuizmo::BeginFrame();
-                ImGuizmo::SetDrawlist();
-                ImGuizmo::SetOrthographic(false);
-                ImGuizmo::SetRect(GetWindowPos().x, GetWindowPos().y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
-            }
-            if (Mesh::ShowGrid) {
-                ImGuizmo::DrawGrid(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Identity[0][0], 100.f);
-            }
-            if (Mesh::ShowGizmo) {
-                // This is how you would draw a test cube:
-                // ImGuizmo::DrawCubes(&Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], &Mesh::ObjectMatrix[0][0], 1);
-                ImGuizmo::Manipulate(
-                    &Mesh::CameraView[0][0], &Mesh::CameraProjection[0][0], Mesh::GizmoOp, ImGuizmo::LOCAL, &Mesh::ObjectMatrix[0][0], nullptr,
-                    nullptr, Mesh::ShowBounds ? Mesh::Bounds : nullptr, nullptr
-                );
-            }
-            if (Mesh::ShowCameraGizmo) {
-                static const float view_manipulate_size = 128;
-                const auto viewManipulatePos = GetWindowPos() +
-                    ImVec2{
-                        GetWindowContentRegionMax().x - view_manipulate_size,
-                        GetWindowContentRegionMin().y,
-                    };
-                ImGuizmo::ViewManipulate(&Mesh::CameraView[0][0], Mesh::CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
-            }
             End();
             PopStyleVar();
         }
