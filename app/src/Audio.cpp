@@ -100,12 +100,12 @@ static void Init(State &faust, unsigned int sample_rate) {
 
     static int num_inputs, num_outputs;
     static string error_msg;
-    const Box box = DSPToBoxes("FlowGrid", faust.Code, argc, argv, &num_inputs, &num_outputs, error_msg);
+    const Box box = DSPToBoxes("Mesh2Audio", faust.Code, argc, argv, &num_inputs, &num_outputs, error_msg);
 
     static llvm_dsp_factory *dsp_factory;
     if (box && error_msg.empty()) {
         static const int optimize_level = -1;
-        dsp_factory = createDSPFactoryFromBoxes("FlowGrid", box, argc, argv, "", error_msg, optimize_level);
+        dsp_factory = createDSPFactoryFromBoxes("Mesh2Audio", box, argc, argv, "", error_msg, optimize_level);
     }
     if (!box && error_msg.empty()) error_msg = "Incomplete Faust code.";
 

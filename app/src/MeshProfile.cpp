@@ -89,24 +89,28 @@ string MeshProfile::GenerateDspAxisymmetric() const {
     // Execute the `fem` program to generate the mass/stiffness matrices.
     fs::path obj_path_no_extension = obj_path;
     obj_path_no_extension = obj_path_no_extension.replace_extension("");
-    const string fem_cmd = fmt::format("{} {} {} {}", (fem_dir / "fem").string(), obj_path_no_extension.string(), Material.YoungModulus, Material.PoissonRatio);
+    const string fem_cmd = fmt::format(
+        "{} {} {} {} {}", (fem_dir / "fem").string(),
+        obj_path_no_extension.string(),
+        Material.YoungModulus, Material.PoissonRatio, Material.Density
+    );
     int result = std::system(fem_cmd.c_str());
     if (result != 0) throw std::runtime_error("Error executing fem command.");
 
     const auto M = ReadSparseMatrix(obj_path_no_extension.string() + "_M.out");
     const auto K = ReadSparseMatrix(obj_path_no_extension.string() + "_K.out");
 
+    const int num_vertices = Vertices.size();
     m2f::CommonArguments args{
         "modalModel", // generated object name
         true, // freq control activated
         20, // lowest mode freq
         10000, // highest mode freq
-        20, // number of synthesized modes (default is 20)
-        20, // number of modes to be computed for the finite element analysis (default is 100)
+        std::min(40, num_vertices / 2), // number of synthesized modes (default is 20)
+        std::min(50, 3 * num_vertices / 4), // number of modes to be computed for the finite element analysis (default is 100)
         {}, // specific excitation positions
-        4, // number of excitation positions (default is max: -1)
+        num_vertices / 2, // number of excitation positions (default is max: -1)
     };
-    static const int num_vertices = 4;
     static const int vertex_dim = 2;
     return m2f::mesh2faust(M, K, num_vertices, vertex_dim, args);
 }
