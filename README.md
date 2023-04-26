@@ -8,18 +8,13 @@ Convert a volumetric mesh to a physical audio model. Based on [mesh2faust](https
 
 #### Mac
 
-Install glew:
-
 ```shell
 $ brew install glew llvm eigen
-$ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
 ```
 
 #### Linux
 
 (Only tested on Ubuntu.)
-
-Install LLVM/Clang
 
 ```shell
 $ sudo apt install llvm eigen
