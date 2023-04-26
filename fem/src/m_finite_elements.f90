@@ -141,7 +141,9 @@ contains
             !call s_print_array(B, 4, 6)
             I1 = matmul(D,B*jacD)
             I2 = matmul(TRANSPOSE(B),I1)
-
+            if (elm == 4 .and. i == 9) then
+                call s_print_array(B,4,6)
+            end if
             Ke = Ke + weights(i)*I2
         end do
 
@@ -188,7 +190,6 @@ contains
         if (debug == 1) then
             print*, "Local Mass Matrix of element: ", elm
             call s_print_array(Me, 6, 6)
-            print*, EC(elm,3), EC(elm,1)
         end if
 
 

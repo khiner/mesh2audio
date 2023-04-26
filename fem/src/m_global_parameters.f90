@@ -46,7 +46,7 @@ contains
         
         do i = 1,m
             do j = 1,n
-                write(*,fmt="(F8.2)",advance="no") A(i,j)/c
+                write(*,fmt="(F12.4)",advance="no") A(i,j)/c
             end do
             write(*, fmt="(A1)") " "
         end do
