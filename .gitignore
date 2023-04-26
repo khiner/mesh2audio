@@ -1,4 +1,5 @@
 build/
+.vscode/
 
 fem/src/*.mod
 fem/src/*.o
