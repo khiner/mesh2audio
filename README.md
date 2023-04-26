@@ -4,6 +4,10 @@ Generate axisymmetric 3D models, or import existing 3D models, and transform the
 
 Supports fast DSP generation of physical audio models that sound decently realistic, as well as blazing fast 2D axisymmetric model generation, at the expense of some fidelity.
 
+The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer.
+
+Example audio output is in the [sound_samples](sound_samples/) directory.
+
 Based on [mesh2faust](https://hal.science/hal-03162901/document).
 
 Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
