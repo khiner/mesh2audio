@@ -8,6 +8,10 @@ SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
 
 project(mesh2audio LANGUAGES C CXX)
 
+if(APPLE)
+    enable_language(OBJC)
+endif()
+
 add_subdirectory(lib)
 
 file(
