@@ -19,7 +19,8 @@
 	url = git@github.com:fmtlib/fmt.git
 [submodule "app/lib/faust"]
 	path = app/lib/faust
-	url = git@github.com:grame-cncm/faust.git
+	url = git@github.com:khiner/faust.git
+	branch = mesh2faust-eigen
 [submodule "app/lib/miniaudio"]
 	path = app/lib/miniaudio
 	url = git@github.com:mackron/miniaudio.git
