@@ -301,8 +301,8 @@ int main(int, char **) {
                         if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
                         IsGeneratedDsp2d = !generate_tet_dsp;
                         DspGeneratorThread = std::thread([&] {
-                            const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
                             const int num_excitations = generate_tet_dsp ? mesh->Num3DExcitationVertices() : mesh->Num2DExcitationVertices();
+                            const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
                             if (!model_dsp.empty()) {
                                 // Cache the path to the tet mesh that was used to generate the most recent DSP.
                                 DspTetMeshPath = mesh->TetMeshPath;

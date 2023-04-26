@@ -314,7 +314,7 @@ bool MeshProfile::RenderConfig() {
         modified |= RadioButton("Constrained Delaunay triangulation", &TessMode, TesselationMode_CDT) ||
             RadioButton("Ear clipping", &TessMode, TesselationMode_Earcut);
         if (TessMode == TesselationMode_CDT) {
-            modified |= SliderInt("Random points", &NumRandomTesselationPoints, 0, 100);
+            modified |= SliderInt("Random points", &NumRandomTesselationPoints, 0, 300);
         }
         if (ColorEdit4("Color##Tesselation", (float *)&TesselationStrokeColor)) TesselationStrokeColorU32 = ColorConvertFloat4ToU32(TesselationStrokeColor);
     }
