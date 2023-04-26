@@ -1,6 +1,13 @@
 # mesh2audio
 
-Convert a volumetric mesh to a physical audio model. Based on [mesh2faust](https://hal.science/hal-03162901/document).
+Generate axisymmetric 3D models, or import existing 3D models, and transform them into real-time playable physical audio models!
+
+Supports fast DSP generation of physical audio models that sound decently realistic, as well as blazing fast 2D axisymmetric model generation, at the expense of some fidelity.
+
+Based on [mesh2faust](https://hal.science/hal-03162901/document).
+
+Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
+(Ben implemented everything under the `fem` directory.)
 
 ## Build app
 
@@ -41,6 +48,7 @@ $ sudo apt-get install libglew-dev
 $ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
 $ cd mesh2audio/app
 ```
+
 - **Clean:**
   - Clean up everything: `./script/Clean`
   - Clean debug build only: `./script/Clean -d [--debug]`
