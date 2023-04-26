@@ -128,11 +128,19 @@ Could even just support parametrically generating bell meshes (mesh2faust refere
 
 ## Stack
 
-- FEM:
-  - Fortran?
-  - ... (Ben)
 - App: UI/UX/mesh/audio generation & editing
   - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX, supporting many environments & backends.
-  - [ImPlot](https://github.com/epezent/implot/): For plotting
   - [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
   - [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
+  - [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D meshes into tetrahedral meshes.
+  - [CDT](https://github.com/artem-ogre/CDT): Constrained Delaunay Triangulation, the default 2D polygon triangulation method
+  - [earcut](https://github.com/mapbox/earcut.hpp): Simpler 2D polygon triangulation, provided as an option.
+  - [glm](https://github.com/g-truc/glm): Frontend maths.
+  - [nativefiledialog-extended](https://github.com/btzy/nativefiledialog-extended): Native file dialogs.
+  - [nanosvg](https://github.com/memononen/nanosvg): Read path vertices from SVG files.
+  - [ImPlot](https://github.com/epezent/implot): Plotting
+  - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform and camera rotation gizmos.
+  - [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loading spinners for ImGui.
+- FEM:
+  - 2D FEM: Custom Fortran implementation by [Ben Wilfong](https://github.com/wilfonba)
+  - 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega)
