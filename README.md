@@ -6,6 +6,10 @@ Supports fast DSP generation of physical audio models that sound decently realis
 
 The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer.
 
+This is the final project for Karl Hiner and Ben Wilfong for CSE-6730 Modeling & Simulation, Spring 2023.
+
+Project video: https://youtu.be/RwxgOHVBDvc
+
 Example audio output is in the [sound_samples](sound_samples/) directory.
 
 Based on [mesh2faust](https://hal.science/hal-03162901/document).
