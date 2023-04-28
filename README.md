@@ -28,7 +28,7 @@ $ brew install glew llvm eigen
 (Only tested on Ubuntu.)
 
 ```shell
-$ sudo apt install llvm eigen
+$ sudo apt install llvm libeigen3-dev
 $ export PATH="$PATH:$(llvm-config-15 --bindir)"
 $ sudo apt-get install libc++-dev libc++abi-dev
 ```
