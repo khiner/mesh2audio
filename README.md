@@ -12,10 +12,10 @@ Project video: https://youtu.be/RwxgOHVBDvc
 
 Example audio output is in the [sound_samples](sound_samples/) directory.
 
-Based on [mesh2faust](https://hal.science/hal-03162901/document).
-
 Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
 (Ben implemented everything under the `fem` directory.)
+
+The rest of the code is basically a GUI wrapper around Ben's axysimmetric FEM, and the O.G., [mesh2faust](https://hal.science/hal-03162901/document) by Romain Michon, Sara R Martin, and Julius O Smith, with some performance improvements like using [tetgen](https://github.com/libigl/tetgen) instead of [VegaFEM](https://viterbi-web.usc.edu/~jbarbic/vega/) for converting triangular meshes to tetrahedral, and using Eigen/[Spectra](https://github.com/yixuan/spectra) instead of MKL/[Pardiso](https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2023-0/onemkl-pardiso-parallel-direct-sparse-solver-iface.html) to find the eigenvalues of the mass/stiffness matrices, for compatibility with non-Intel processors such as ARM.
 
 ## Build app
 
