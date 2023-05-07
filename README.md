@@ -32,9 +32,10 @@ $ brew install glew llvm eigen
 (Only tested on Ubuntu.)
 
 ```shell
-$ sudo apt install llvm libeigen3-dev
-$ export PATH="$PATH:$(llvm-config-15 --bindir)"
 $ sudo apt-get install libc++-dev libc++abi-dev
+$ sudo apt install llvm libeigen3-dev
+$ ln -s llvm-config-15 llvm-config
+$ export PATH="$(llvm-config --bindir):$PATH"
 ```
 
 Install GTK (for native file dialogs):
