@@ -1,8 +1,5 @@
 #=================== SDL3 ===================
 
-cmake_policy(SET CMP0077 NEW)
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
 set(SDL3_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SDL)
 add_subdirectory(${SDL3_DIR})
 
@@ -31,7 +28,7 @@ target_include_directories(IMGUI
     )
 
 find_package(OpenGL REQUIRED)
-target_link_libraries(IMGUI PUBLIC SDL3 OpenGL::GL)
+target_link_libraries(IMGUI PUBLIC SDL3::SDL3 OpenGL::GL)
 
 #=================== nativefiledialog ===================
 
