@@ -69,14 +69,17 @@ int main(int, char **) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+
     auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
     SDL_Window *window = SDL_CreateWindowWithPosition("mesh2audio", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
-    if (glewInit() != GLEW_OK) {
-        std::cout << "Error initializing `glew`.\n";
+    const int glew_result = glewInit();
+    // GLEW_ERROR_NO_GLX_DISPLAY seems to be a false alarm - still works for me!
+    if (glew_result != GLEW_OK && glew_result != GLEW_ERROR_NO_GLX_DISPLAY) {
+        std::cout << "Error initializing `glew`: Error " << glew_result << '\n';
         return -1;
     }
 
