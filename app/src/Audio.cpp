@@ -37,15 +37,16 @@ static string Capitalize(string copy) {
 
 string Audio::FaustState::GenerateModelInstrumentDsp(const string_view model_dsp, int num_excite_pos) {
     static const string freq = "freq = hslider(\"Frequency[scale:log][tooltip: Fundamental frequency of the model]\",220,60,8000,1) : ba.sAndH(gate);";
+    static const string source = "source = vslider(\"Excitation source [style:radio {'Hammer':0;'Audio input':1 }]\",0,0,1,1);";
     const string exPos = format("exPos = nentry(\"exPos\",{},0,{},1) : ba.sAndH(gate);", (num_excite_pos - 1) / 2, num_excite_pos - 1);
     static const string
         t60Scale = "t60Scale = hslider(\"t60[scale:log][tooltip: Resonance duration (s) of the lowest mode.]\",16,0,50,0.01) : ba.sAndH(gate);",
         t60Decay = "t60Decay = hslider(\"t60 Decay[scale:log][tooltip: Decay of modes as a function of their frequency, in t60 units.\nAt 1, the t60 of the highest mode will be close to 0 seconds.]\",0.80,0,1,0.01) : ba.sAndH(gate);",
         t60Slope = "t60Slope = hslider(\"t60 Slope[scale:log][tooltip: Power of the function used to compute the decay of modes t60 in function of their frequency.\nAt 1, decay is linear. At 2, decay slope has degree 2, etc.]\",2.5,1,6,0.01) : ba.sAndH(gate);",
-        hammerHardness = "hammerHardness = hslider(\"hammerHardness\",0.9,0,1,0.01) : ba.sAndH(gate);",
-        hammerSize = "hammerSize = hslider(\"hammerSize\",0.3,0,1,0.01) : ba.sAndH(gate);",
-        gain = "gain = hslider(\"gain\",0.1,0,1,0.01);",
-        gate = "gate = button(\"gate\");";
+        hammerHardness = "hammerHardness = hslider(\"hammerHardness[tooltip: Only has an effect when excitation source is 'Hammer'.]\",0.9,0,1,0.01) : ba.sAndH(gate);",
+        hammerSize = "hammerSize = hslider(\"hammerSize[tooltip: Only has an effect when excitation source is 'Hammer'.]\",0.3,0,1,0.01) : ba.sAndH(gate);",
+        gain = "gain = hslider(\"gain[scale:log]\",0.1,0,0.5,0.01);",
+        gate = "gate = button(\"gate[tooltip: When excitation source is 'Hammer', excites the vertex. With any excitation source, applies the current parameters.]\");";
     // DSP code in addition to the model, to be appended to make it playable.
     static const string instrument = R"(
 hammer(trig,hardness,size) = en.ar(att,att,trig)*no.noise : fi.lowpass(3,ctoff)
@@ -54,19 +55,20 @@ with{
   att = (1-hardness)*0.01+0.001;
 };
 
-process = hammer(gate,hammerHardness,hammerSize) : modalModel(freq,exPos,t60Scale,t60Decay,t60Slope)*gain;
+process = hammer(gate,hammerHardness,hammerSize),_ : select2(source) : modalModel(freq,exPos,t60Scale,t60Decay,t60Slope)*gain;
 )";
 
     std::stringstream full_instrument;
-    full_instrument << freq << '\n'
+    full_instrument << source << '\n'
+                    << gate << '\n'
+                    << hammerHardness << '\n'
+                    << hammerSize << '\n'
+                    << gain << '\n'
+                    << freq << '\n'
                     << exPos << '\n'
                     << t60Scale << '\n'
                     << t60Decay << '\n'
                     << t60Slope << '\n'
-                    << hammerHardness << '\n'
-                    << hammerSize << '\n'
-                    << gain << '\n'
-                    << gate << '\n'
                     << '\n'
                     << instrument;
     return model_dsp.data() + full_instrument.str();
@@ -590,7 +592,7 @@ void Audio::Graph::Init() {
     }
 
     ma_node_attach_output_bus(&FaustNode, 0, OutputNode, 0);
-    // ma_node_attach_output_bus(&InputNode, 0, &FaustNode, 0);
+    ma_node_attach_output_bus(&InputNode, 0, &FaustNode, 0);
 }
 
 void Audio::Graph::Destroy() {

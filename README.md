@@ -4,7 +4,7 @@ Generate axisymmetric 3D models, or import existing 3D models, and transform the
 
 Supports fast DSP generation of physical audio models that sound decently realistic, as well as blazing fast 2D axisymmetric model generation, at the expense of some fidelity.
 
-The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer.
+The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer, or by using an audio input device (such as a microphone) to excite the vertices.
 
 This is the final project for Karl Hiner and Ben Wilfong for CSE-6730 Modeling & Simulation, Spring 2023.
 
