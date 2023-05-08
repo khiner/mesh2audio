@@ -37,17 +37,10 @@ $ ln -s llvm-config-15 llvm-config
 $ export PATH="$(llvm-config --bindir):$PATH"
 ```
 
-Install GTK (for native file dialogs):
+Install GTK (for native file dialogs), and OpenGL dependencies:
 
 ```shell
-$ sudo apt-get install build-essential libgtk-3-dev
-```
-
-Install OpenGL (via glut) and glew:
-
-```shell
-$ sudo apt-get install libglu1-mesa-dev freeglut3-dev mesa-common-dev
-$ sudo apt-get install libglew-dev
+$ sudo apt install build-essential libgtk-3-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev libglew-dev
 ```
 
 ### Clone, clean and build app
@@ -67,6 +60,13 @@ $ cd mesh2audio/app
 
 Debug build is generated in the `./build` directory relative to project (repo) root.
 Release build is generated in `./build-release`.
+
+On Linux, you will also need to build the `fem` executable (since the one that's committed to this repo was build on Mac):
+
+```shell
+$ sudo apt install gfortran
+$ ./build.sh
+```
 
 To run the freshly built application:
 
