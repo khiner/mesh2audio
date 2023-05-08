@@ -7,6 +7,27 @@ using namespace ImGui;
 
 FaustParams *interface;
 
+bool RadioButtons(const char *label, float *value, const FaustParams::NamesAndValues &names_and_values) {
+    PushID(label);
+    BeginGroup();
+
+    const auto &style = GetStyle();
+    Text("%s", label);
+    bool changed = false;
+    for (int i = 0; i < int(names_and_values.names.size()); i++) {
+        const string &choice_name = names_and_values.names[i];
+        const Real choice_value = names_and_values.values[i];
+        if (RadioButton(choice_name.c_str(), *value == choice_value)) {
+            *value = float(choice_value);
+            changed = true;
+        }
+    }
+    EndGroup();
+    PopID();
+
+    return changed;
+}
+
 void DrawUiItem(const FaustParams::Item &item) {
     const auto type = item.type;
     const auto *label = item.label.c_str();
@@ -31,6 +52,9 @@ void DrawUiItem(const FaustParams::Item &item) {
         ImGuiSliderFlags flags = item.logscale ? ImGuiSliderFlags_Logarithmic : ImGuiSliderFlags_None;
         if (SliderFloat(label, &value, float(item.min), float(item.max), nullptr, flags)) *item.zone = Real(value);
     } else if (type == ItemType_HRadioButtons || type == ItemType_VRadioButtons) {
+        auto value = float(*item.zone);
+        const auto &names_and_values = interface->names_and_values[item.zone];
+        if (RadioButtons(item.label.c_str(), &value, names_and_values)) *item.zone = Real(value);
     } else if (type == ItemType_Menu) {
         auto value = float(*item.zone);
         const auto &names_and_values = interface->names_and_values[item.zone];
