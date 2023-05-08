@@ -93,7 +93,7 @@ static void Init(State &faust, unsigned int sample_rate) {
     createLibContext();
 
     string libraries_path = fs::relative("../lib/faust/libraries").string();
-    vector<const char*> argv;
+    vector<const char *> argv;
     argv.reserve(8);
     argv.push_back("-I");
     argv.push_back(libraries_path.c_str());

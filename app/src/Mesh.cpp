@@ -429,7 +429,6 @@ string Mesh::GenerateDsp() const {
         80, // number of modes to be computed for the finite element analysis (default is 100)
         ExcitableVertexIndices, // specific excitation positions
         int(ExcitableVertexIndices.size()), // number of excitation positions (default is max: -1)
-        true,
     };
     return m2f::mesh2faust(&volumetric_mesh, args);
 }
