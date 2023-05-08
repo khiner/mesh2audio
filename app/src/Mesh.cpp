@@ -608,6 +608,12 @@ void Mesh::RenderConfig() {
             }
 
             SeparatorText("Create");
+
+            const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
+            if (!can_generate_tet_mesh) {
+                BeginDisabled();
+                TextUnformatted("Disable |MeshProfile|->|ClosePath| to generate tet mesh.\n(Meshes with holes can only be used for axisymmetric simulations.)");
+            }
             Checkbox("Quality mode", &QualityTetMesh);
             const string generate_mesh_label = HasTetMesh() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh";
             if (Button(generate_mesh_label.c_str())) {
@@ -615,6 +621,8 @@ void Mesh::RenderConfig() {
                 if (GeneratorThread.joinable()) GeneratorThread.join();
                 GeneratorThread = std::thread([&] { GenerateTetMesh(); });
             }
+            if (!can_generate_tet_mesh) EndDisabled();
+
             // Dropdown to select from saved tet meshes and load.
             if (BeginCombo("Saved tet meshes", nullptr)) {
                 const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
