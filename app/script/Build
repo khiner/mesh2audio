@@ -18,7 +18,7 @@ fi
 
 # Common part of cmake configure command
 # See readme for details on the choice to specify clang compiler.
-CMakeConfig="CC=clang CXX=clang++ cmake -B \"${BuildDir}\" -S \"${ProjectRootDir}\""
+CMakeConfig="cmake -B \"${BuildDir}\" -S \"${ProjectRootDir}\""
 
 # Configure.
 if [ "$IsRelease" = true ]; then
@@ -28,4 +28,4 @@ else
 fi
 
 # Build.
-CC=clang CXX=clang++ cmake --build "${BuildDir}" --target mesh2audio -- -j 8
+cmake --build "${BuildDir}" --target mesh2audio -- -j 8

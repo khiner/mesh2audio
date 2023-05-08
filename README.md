@@ -32,7 +32,7 @@ $ brew install glew llvm eigen
 (Only tested on Ubuntu.)
 
 ```shell
-$ sudo apt install llvm clang lldb lld libc++-dev libc++abi-dev libeigen3-dev
+$ sudo apt install llvm libc++-dev libc++abi-dev libeigen3-dev
 $ ln -s llvm-config-15 llvm-config
 $ export PATH="$(llvm-config --bindir):$PATH"
 ```
