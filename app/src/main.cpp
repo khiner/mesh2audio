@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 
+#include <fstream>
 #include <iostream>
 #include <thread>
 
@@ -360,6 +361,20 @@ int main(int, char **) {
                 }
                 if (!Audio.Faust.Code.empty()) {
                     if (BeginTabItem("Code")) {
+                        if (Button("Export to file")) {
+                            nfdchar_t *save_path;
+                            nfdfilteritem_t filter[] = {{"Faust DSP", "dsp"}};
+                            nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "model");
+                            if (result == NFD_OKAY) {
+                                // Write the Faust code to the file.
+                                std::ofstream file(save_path);
+                                file << Audio.Faust.Code;
+                                file.close();
+                                NFD_FreePath(save_path);
+                            } else if (result != NFD_CANCEL) {
+                                std::cerr << "Error: " << NFD_GetError() << '\n';
+                            }
+                        }
                         TextUnformatted(Audio.Faust.Code.c_str());
                         EndTabItem();
                     }
