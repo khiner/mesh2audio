@@ -1,8 +1,10 @@
 #include "Mesh.h"
 
-#include <fmt/chrono.h>
+#include <format>
 #include <iomanip>
 #include <thread>
+
+#include "date.h"
 
 // mesh2faust/vega
 #include "mesh2faust.h"
@@ -22,7 +24,7 @@
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-// std::cout << fmt::format("{}", duration) << std::endl;
+// std::cout << std::format("{}", duration) << std::endl;
 
 using std::string, std::to_string;
 
@@ -288,7 +290,7 @@ void Mesh::DrawGl() const {
 }
 
 static string FormatTime(seconds_t seconds) {
-    return fmt::format("{:%m-%d %H:%M:%S %Z}", seconds);
+    return date::format("{:%m-%d %H:%M:%S %Z}", seconds);
 }
 
 static seconds_t GetTimeFromPath(const fs::path &file_path) {

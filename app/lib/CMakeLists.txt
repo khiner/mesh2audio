@@ -34,10 +34,6 @@ target_link_libraries(IMGUI PUBLIC SDL3::SDL3 OpenGL::GL)
 
 add_subdirectory(nativefiledialog)
 
-#=================== fmt ===================
-
-add_subdirectory(fmt)
-
 #=================== faust ===================
 
 # See [the docs](https://faustdoc.grame.fr/manual/embedding/#using-libfaust-with-the-llvm-backend) for general help.

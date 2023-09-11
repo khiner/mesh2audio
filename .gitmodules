@@ -14,9 +14,6 @@
 [submodule "app/lib/nativefiledialog"]
 	path = app/lib/nativefiledialog
 	url = git@github.com:btzy/nativefiledialog-extended.git
-[submodule "app/lib/fmt"]
-	path = app/lib/fmt
-	url = git@github.com:fmtlib/fmt.git
 [submodule "app/lib/faust"]
 	path = app/lib/faust
 	url = git@github.com:grame-cncm/faust.git
@@ -42,3 +39,6 @@
 [submodule "app/lib/CDT"]
 	path = app/lib/CDT
 	url = git@github.com:artem-ogre/CDT.git
+[submodule "app/lib/date"]
+	path = app/lib/date
+	url = git@github.com:HowardHinnant/date.git

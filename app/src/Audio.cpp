@@ -1,6 +1,6 @@
 #include <atomic>
 #include <filesystem>
-#include <fmt/core.h>
+#include <format>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
@@ -23,7 +23,6 @@ using Sample = float;
 #include "Audio.h"
 #include "FaustParams.h"
 
-using fmt::format;
 using std::string_view, std::vector;
 
 namespace fs = std::filesystem;
@@ -38,7 +37,7 @@ static string Capitalize(string copy) {
 string Audio::FaustState::GenerateModelInstrumentDsp(const string_view model_dsp, int num_excite_pos) {
     static const string freq = "freq = hslider(\"Frequency[scale:log][tooltip: Fundamental frequency of the model]\",220,60,8000,1) : ba.sAndH(gate);";
     static const string source = "source = vslider(\"Excitation source [style:radio {'Hammer':0;'Audio input':1 }]\",0,0,1,1);";
-    const string exPos = format("exPos = nentry(\"exPos\",{},0,{},1) : ba.sAndH(gate);", (num_excite_pos - 1) / 2, num_excite_pos - 1);
+    const string exPos = std::format("exPos = nentry(\"exPos\",{},0,{},1) : ba.sAndH(gate);", (num_excite_pos - 1) / 2, num_excite_pos - 1);
     static const string
         t60Scale = "t60Scale = hslider(\"t60[scale:log][tooltip: Resonance duration (s) of the lowest mode.]\",16,0,50,0.01) : ba.sAndH(gate);",
         t60Decay = "t60Decay = hslider(\"t60 Decay[scale:log][tooltip: Decay of modes as a function of their frequency, in t60 units.\nAt 1, the t60 of the highest mode will be close to 0 seconds.]\",0.80,0,1,0.01) : ba.sAndH(gate);",
@@ -249,12 +248,12 @@ void Audio::Init() {
     }
 
     int result = ma_context_init(nullptr, 0, nullptr, &AudioContext);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error initializing audio context: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error initializing audio context: {}", result));
 
     static u32 PlaybackDeviceCount, CaptureDeviceCount;
     static ma_device_info *PlaybackDeviceInfos, *CaptureDeviceInfos;
     result = ma_context_get_devices(&AudioContext, &PlaybackDeviceInfos, &PlaybackDeviceCount, &CaptureDeviceInfos, &CaptureDeviceCount);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error getting audio devices: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error getting audio devices: {}", result));
 
     for (u32 i = 0; i < CaptureDeviceCount; i++) {
         DeviceInfos[IO_In].emplace_back(&CaptureDeviceInfos[i]);
@@ -282,7 +281,7 @@ void Audio::Destroy() {
     Device.Destroy();
 
     const int result = ma_context_uninit(&AudioContext);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error shutting down audio context: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error shutting down audio context: {}", result));
 
     Status = AudioStatusMessage::Stopped;
 }
@@ -357,10 +356,10 @@ void Audio::AudioDevice::Init() {
 
     int result = ma_device_init(nullptr, &DeviceConfig, &MaDevice);
 
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error initializing audio device: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error initializing audio device: {}", result));
 
     result = ma_context_get_device_info(MaDevice.pContext, MaDevice.type, nullptr, &DeviceInfo);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error getting audio device info: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error getting audio device info: {}", result));
 
     for (u32 i = 0; i < DeviceInfo.nativeDataFormatCount; i++) {
         const auto &native_format = DeviceInfo.nativeDataFormats[i];
@@ -379,9 +378,9 @@ void Audio::AudioDevice::StartRecording() const {
     if (IsRecording) return;
 
     WavEncoderConfig = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, 1, SampleRate);
-    const string wav_filename = format("{}-{}.wav", "recording", std::time(nullptr));
+    const string wav_filename = std::format("{}-{}.wav", "recording", std::time(nullptr));
     if (ma_encoder_init_file(wav_filename.c_str(), &WavEncoderConfig, &WavEncoder) != MA_SUCCESS) {
-        throw std::runtime_error(format("Failed to initialize output file {}", wav_filename));
+        throw std::runtime_error(std::format("Failed to initialize output file {}", wav_filename));
     }
     IsRecording = true;
 }
@@ -399,11 +398,11 @@ bool Audio::AudioDevice::IsStarted() const { return ma_device_is_started(&MaDevi
 
 const string GetFormatName(const int format) {
     const bool is_native = std::find(NativeFormats.begin(), NativeFormats.end(), format) != NativeFormats.end();
-    return fmt::format("{}{}", ma_get_format_name((ma_format)format), is_native ? "*" : "");
+    return std::format("{}{}", ma_get_format_name((ma_format)format), is_native ? "*" : "");
 }
 const string GetSampleRateName(const u32 sample_rate) {
     const bool is_native = std::find(NativeSampleRates.begin(), NativeSampleRates.end(), sample_rate) != NativeSampleRates.end();
-    return format("{}{}", sample_rate, is_native ? "*" : "");
+    return std::format("{}{}", sample_rate, is_native ? "*" : "");
 }
 
 using namespace ImGui;
@@ -491,7 +490,7 @@ void Audio::AudioDevice::Render() {
 
         static char name[MA_MAX_DEVICE_NAME_LENGTH + 1];
         ma_device_get_name(device, device->type == ma_device_type_loopback ? ma_device_type_playback : ma_device_type_capture, name, sizeof(name), nullptr);
-        if (TreeNode(format("{} ({})", name, "Capture").c_str())) {
+        if (TreeNode(std::format("{} ({})", name, "Capture").c_str())) {
             Text("Format: %s -> %s", ma_get_format_name(device->capture.internalFormat), ma_get_format_name(device->capture.format));
             Text("Channels: %d -> %d", device->capture.internalChannels, device->capture.channels);
             Text("Sample Rate: %d -> %d", device->capture.internalSampleRate, device->sampleRate);
@@ -518,7 +517,7 @@ void Audio::AudioDevice::Render() {
         if (device->type == ma_device_type_loopback) return;
 
         ma_device_get_name(device, ma_device_type_playback, name, sizeof(name), nullptr);
-        if (TreeNode(format("{} ({})", name, "Playback").c_str())) {
+        if (TreeNode(std::format("{} ({})", name, "Playback").c_str())) {
             Text("Format: %s -> %s", ma_get_format_name(device->playback.format), ma_get_format_name(device->playback.internalFormat));
             Text("Channels: %d -> %d", device->playback.channels, device->playback.internalChannels);
             Text("Sample Rate: %d -> %d", device->sampleRate, device->playback.internalSampleRate);
@@ -552,26 +551,26 @@ void Audio::AudioDevice::Destroy() {
 
 void Audio::AudioDevice::Start() const {
     const int result = ma_device_start(&MaDevice);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error starting audio device: {}", +result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error starting audio device: {}", +result));
 }
 void Audio::AudioDevice::Stop() const {
     const int result = ma_device_stop(&MaDevice);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Error stopping audio device: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Error stopping audio device: {}", result));
 }
 
 void Audio::Graph::Init() {
     NodeGraphConfig = ma_node_graph_config_init(MaDevice.capture.channels);
     int result = ma_node_graph_init(&NodeGraphConfig, nullptr, &NodeGraph);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize node graph: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Failed to initialize node graph: {}", result));
 
     OutputNode = ma_node_graph_get_endpoint(&NodeGraph);
     result = ma_audio_buffer_ref_init(MaDevice.capture.format, MaDevice.capture.channels, nullptr, 0, &InputBuffer);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize input audio buffer: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Failed to initialize input audio buffer: {}", result));
 
     static ma_data_source_node_config Config{};
     Config = ma_data_source_node_config_init(&InputBuffer);
     result = ma_data_source_node_init(&NodeGraph, &Config, nullptr, &InputNode);
-    if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize the input node: {}", result));
+    if (result != MA_SUCCESS) throw std::runtime_error(std::format("Failed to initialize the input node: {}", result));
 
     if (FaustContext::Dsp) {
         const u32 in_channels = FaustContext::Dsp->getNumInputs();
@@ -588,7 +587,7 @@ void Audio::Graph::Init() {
         config.vtable = &vtable;
 
         const int result = ma_node_init(&NodeGraph, &config, nullptr, &FaustNode);
-        if (result != MA_SUCCESS) throw std::runtime_error(format("Failed to initialize the Faust node: {}", result));
+        if (result != MA_SUCCESS) throw std::runtime_error(std::format("Failed to initialize the Faust node: {}", result));
     }
 
     ma_node_attach_output_bus(&FaustNode, 0, OutputNode, 0);

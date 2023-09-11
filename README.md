@@ -34,7 +34,7 @@ $ brew install glew llvm eigen
 
 ```shell
 $ sudo apt install llvm libc++-dev libc++abi-dev libeigen3-dev
-$ ln -s llvm-config-15 llvm-config
+$ ln -s llvm-config-16 llvm-config
 $ export PATH="$(llvm-config --bindir):$PATH"
 ```
 

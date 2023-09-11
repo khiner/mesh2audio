@@ -4,7 +4,7 @@
 #include "mesh2faust.h"
 #include "nanosvg.h"
 
-#include <fmt/format.h>
+#include <format>
 #include <fstream>
 
 #include "Eigen/SparseCore"
@@ -91,7 +91,7 @@ string MeshProfile::GenerateDspAxisymmetric() const {
     // Execute the `fem` program to generate the mass/stiffness matrices.
     fs::path obj_path_no_extension = obj_path;
     obj_path_no_extension = obj_path_no_extension.replace_extension("");
-    const string fem_cmd = fmt::format(
+    const string fem_cmd = std::format(
         "{} {} {} {} {}", (fem_dir / "fem").string(),
         obj_path_no_extension.string(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density
