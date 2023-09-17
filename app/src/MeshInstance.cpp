@@ -100,6 +100,21 @@ void MeshInstance::Center() {
     UpdateBounds();
 }
 
+void MeshInstance::ComputeNormals() {
+    if (!Normals.empty()) return;
+
+    Normals.resize(Vertices.size());
+
+    // Compute normals for each triangle.
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        const vec3 &v0 = Vertices[Indices[i]];
+        const vec3 &v1 = Vertices[Indices[i + 1]];
+        const vec3 &v2 = Vertices[Indices[i + 2]];
+        const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+        Normals[Indices[i]] = Normals[Indices[i + 1]] = Normals[Indices[i + 2]] = normal;
+    }
+}
+
 void MeshInstance::UpdateBounds() {
     // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
     Min = vec3(INFINITY, INFINITY, INFINITY);

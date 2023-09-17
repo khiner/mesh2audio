@@ -126,7 +126,15 @@ Mesh::Mesh(fs::path file_path) {
             fscanf(fp, "%f %f %f", &x, &y, &z);
             TriangularMesh.Normals.push_back(glm::normalize(vec3(x, y, z)));
         } else if (c1 == 'f') {
-            fscanf(fp, "%d//%d %d//%d %d//%d", &fx, &ignore, &fy, &ignore, &fz, &ignore);
+            fscanf(fp, "%d", &fx);
+            int first_char = fgetc(fp);
+            int second_char = fgetc(fp);
+            if (first_char == '/' && second_char == '/') {
+                fscanf(fp, "%d %d//%d %d//%d", &ignore, &fy, &ignore, &fz, &ignore);
+            } else {
+                ungetc(second_char, fp);
+                fscanf(fp, "%d %d/%d %d/%d", &ignore, &fy, &ignore, &fz, &ignore);
+            }
             TriangularMesh.Indices.push_back(fx - 1);
             TriangularMesh.Indices.push_back(fy - 1);
             TriangularMesh.Indices.push_back(fz - 1);
@@ -134,6 +142,7 @@ Mesh::Mesh(fs::path file_path) {
     }
     fclose(fp);
 
+    TriangularMesh.ComputeNormals();
     TriangularMesh.UpdateBounds();
     TriangularMesh.Center();
     Bind();

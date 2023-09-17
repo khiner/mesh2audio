@@ -28,6 +28,7 @@ struct MeshInstance {
     void Scale(const glm::vec3 &scale);
     void Center();
 
+    void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
     void ExtrudeProfile(const vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
