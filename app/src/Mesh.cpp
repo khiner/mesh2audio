@@ -4,12 +4,11 @@
 #include <iomanip>
 #include <thread>
 
-#include "date.h"
-
 // mesh2faust/vega
 #include "mesh2faust.h"
 #include "tetMesher.h"
 
+#include "date.h"
 #include "imspinner.h"
 
 #include <cinolib/meshes/meshes.h>
@@ -34,6 +33,7 @@ using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono
 static GlCanvas gl_canvas;
 
 static std::thread GeneratorThread; // Worker thread for generating tetrahedral meshes.
+static std::thread RealImpactLoadThread; // Worker thread for loading RealImpact data (including a 2.3G sample data file).
 
 static const mat4 Identity(1.f);
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
@@ -603,14 +603,13 @@ void Mesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
             const auto &center = GetMainViewport()->GetCenter();
-            const auto &popup_size = GetMainViewport()->Size / 4;
             SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
-            SetNextWindowSize(popup_size);
+            SetNextWindowSize(GetMainViewport()->Size / 4);
             if (BeginPopupModal(GenerateTetMsg.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
                 const auto &ws = GetWindowSize();
-                const float spinner_dim = std::min(ws.x, ws.y) / 2;
-                SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
-                ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg.c_str(), spinner_dim / 2, 3);
+                const float spinner_size = std::min(ws.x, ws.y) / 2;
+                SetCursorPos((ws - ImVec2{spinner_size, spinner_size}) / 2 + ImVec2(0, GetTextLineHeight()));
+                ImSpinner::SpinnerMultiFadeDots(GenerateTetMsg.c_str(), spinner_size / 2, 3);
                 if (HasTetMesh()) {
                     if (GeneratorThread.joinable()) GeneratorThread.join();
                     CloseCurrentPopup();
@@ -767,6 +766,36 @@ void Mesh::RenderConfig() {
                 SliderFloat3("Positions", &LightPositions[4 * i], -25.0f, 25.0f);
                 ColorEdit3("Color", &LightColors[4 * i]);
                 PopID();
+            }
+            EndTabItem();
+        }
+        if (BeginTabItem("RealImpact")) {
+            if (!RealImpact) {
+                const auto directory = FilePath.parent_path();
+                if (std::filesystem::exists(directory / RealImpact::SampleDataFileName)) {
+                    static string LoadingRealImpactMsg = "Loading RealImpact data...";
+                    if (Button("Load RealImpact")) {
+                        OpenPopup(LoadingRealImpactMsg.c_str());
+                        if (RealImpactLoadThread.joinable()) RealImpactLoadThread.join();
+                        RealImpactLoadThread = std::thread([&] { RealImpact = std::make_unique<::RealImpact>(directory); });
+                    }
+                    SetNextWindowSize(GetMainViewport()->Size / 4);
+                    if (BeginPopupModal(LoadingRealImpactMsg.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                        const auto &ws = GetWindowSize();
+                        const float spinner_size = std::min(ws.x, ws.y) / 2;
+                        SetCursorPos((ws - ImVec2{spinner_size, spinner_size}) / 2 + ImVec2(0, GetTextLineHeight()));
+                        ImSpinner::SpinnerWaveDots(LoadingRealImpactMsg.c_str(), spinner_size / 2, 3);
+                        if (RealImpact) {
+                            if (RealImpactLoadThread.joinable()) RealImpactLoadThread.join();
+                            CloseCurrentPopup();
+                        }
+                        EndPopup();
+                    }
+                } else {
+                    Text("No RealImpact data found in the same directory as the mesh.");
+                }
+            } else {
+                RealImpact->Render();
             }
             EndTabItem();
         }

@@ -43,6 +43,7 @@ include_directories(
     lib/earcut/include/mapbox
     lib/CDT/CDT/include
     lib/date/include/date
+    lib/libnpy/include
     ${Mesh2FaustDir}/src
 )
 

@@ -67,6 +67,18 @@
     "variant": "cpp",
     "string_view": "cpp",
     "span": "cpp",
-    "queue": "cpp"
+    "queue": "cpp",
+    "thread": "cpp",
+    "*.tcc": "cpp",
+    "chrono": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "functional": "cpp",
+    "iterator": "cpp",
+    "stop_token": "cpp",
+    "cinttypes": "cpp",
+    "charconv": "cpp",
+    "complex": "cpp",
+    "algorithm": "cpp"
   }
 }

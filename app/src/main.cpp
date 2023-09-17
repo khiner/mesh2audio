@@ -18,6 +18,7 @@
 
 #include "Audio.h"
 #include "Mesh.h"
+#include "RealImpact.h"
 #include "Window.h"
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.

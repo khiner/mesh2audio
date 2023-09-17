@@ -6,12 +6,12 @@ struct Window {
 };
 
 struct WindowsState {
-    Window AudioDevice{"Audio Device"};
-    Window AudioModel{"Audio Model"};
-    Window MeshControls{"Mesh Controls"};
+    Window AudioDevice{"Audio device"};
+    Window AudioModel{"Audio model"};
+    Window MeshControls{"Mesh controls"};
     Window Mesh{"Mesh"};
-    Window MeshProfile{"Mesh Profile"};
+    Window MeshProfile{"Mesh profile"};
     // By default, these demo windows are docked, but not visible.
-    Window ImGuiDemo{"Dear ImGui Demo", false};
-    Window ImPlotDemo{"ImPlot Demo", false};
+    Window ImGuiDemo{"Dear ImGui demo", false};
+    Window ImPlotDemo{"ImPlot demo", false};
 };

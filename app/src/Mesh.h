@@ -8,6 +8,7 @@
 #include "MeshInstance.h"
 #include "Material.h"
 #include "MeshProfile.h"
+#include "RealImpact.h"
 
 #include "ImGuizmo.h"
 
@@ -110,6 +111,8 @@ private:
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
+    std::unique_ptr<::RealImpact> RealImpact;
+
     struct MeshInstance TriangularMesh, TetMesh;
     Type ActiveViewMeshType = MeshType_Triangular;
 

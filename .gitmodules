@@ -42,3 +42,9 @@
 [submodule "app/lib/date"]
 	path = app/lib/date
 	url = git@github.com:HowardHinnant/date.git
+[submodule "app/lib/libnpy"]
+	path = app/lib/libnpy
+	url = git@github.com:llohse/libnpy.git
+[submodule "app/app/lib/libnpy"]
+	path = app/app/lib/libnpy
+	url = git@github.com:llohse/libnpy.git
