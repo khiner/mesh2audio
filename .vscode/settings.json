@@ -79,6 +79,9 @@
     "cinttypes": "cpp",
     "charconv": "cpp",
     "complex": "cpp",
-    "algorithm": "cpp"
+    "algorithm": "cpp",
+    "format": "cpp",
+    "unordered_set": "cpp",
+    "utility": "cpp"
   }
 }

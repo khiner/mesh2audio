@@ -18,17 +18,16 @@
 
 #include "Audio.h"
 #include "GlCanvas.h"
-#include "Shader.h"
+#include <GL/glew.h>
 
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
 // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 // std::cout << std::format("{}", duration) << std::endl;
 
+using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
-
-// Alias for epoch seconds.
-using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>;
+using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
 static GlCanvas gl_canvas;
 
@@ -38,62 +37,10 @@ static std::thread RealImpactLoadThread; // Worker thread for loading RealImpact
 static const mat4 Identity(1.f);
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
-static bool StaticInitialized = false;
-static GLuint projectionPos, modelviewPos;
-// Variables to set uniform params for lighting fragment shader
-static GLuint lightcol, lightpos, ambientcol, diffusecol, specularcol, emissioncol, shininesscol;
-
 static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
 static vector<int> ExcitableVertexIndices;
 
-void Mesh::InitializeStatic() {
-    if (StaticInitialized) return;
-
-    // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
-    std::fill_n(LightColors, NumLights * 4, 1.0f);
-    for (int i = 0; i < NumLights; i++) {
-        const float angle = 2 * M_PI * i / NumLights;
-        const float dist = 15.0f;
-        LightPositions[i * 4 + 0] = dist * cosf(angle);
-        LightPositions[i * 4 + 1] = 0;
-        LightPositions[i * 4 + 2] = dist * sinf(angle);
-        LightPositions[4 * i + 3] = 1.0f;
-        LightColors[4 * i + 3] = 1.0f;
-    }
-
-    /**
-      Initialize a right-handed coordinate system, with:
-        * Positive x pointing right
-        * Positive y pointing up, and
-        * Positive z pointing forward (toward the camera).
-      This would put the camera `eye` at position (0, 0, camDistance) in world space, pointing at the origin.
-      We offset the camera angle slightly from this point along spherical coordinates to make the initial view more interesting.
-    */
-    static float x_angle = M_PI / 10; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
-    static float y_angle = M_PI / 2 - M_PI / 10; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
-    static vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
-    CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
-
-    static GLuint vertexshader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
-    static GLuint fragmentshader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
-    static GLuint shaderprogram = Shader::InitProgram(vertexshader, fragmentshader);
-
-    lightpos = glGetUniformLocation(shaderprogram, "light_posn");
-    lightcol = glGetUniformLocation(shaderprogram, "light_col");
-    ambientcol = glGetUniformLocation(shaderprogram, "ambient");
-    diffusecol = glGetUniformLocation(shaderprogram, "diffuse");
-    specularcol = glGetUniformLocation(shaderprogram, "specular");
-    emissioncol = glGetUniformLocation(shaderprogram, "emission");
-    shininesscol = glGetUniformLocation(shaderprogram, "shininess");
-    projectionPos = glGetUniformLocation(shaderprogram, "projection");
-    modelviewPos = glGetUniformLocation(shaderprogram, "modelview");
-
-    StaticInitialized = true;
-}
-
-Mesh::Mesh(fs::path file_path) {
-    InitializeStatic();
-
+Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     const bool is_svg = file_path.extension() == ".svg";
     const bool is_obj = file_path.extension() == ".obj";
     if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -198,40 +145,21 @@ void Mesh::ExtrudeProfile() {
     Bind();
 }
 
-void Mesh::SetCameraDistance(float distance) {
-    // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
-    const vec3 eye = glm::inverse(CameraView)[3];
-    CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
-    CameraDistance = distance;
-}
-void Mesh::UpdateCameraProjection(const ImVec2 &size) {
-    CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
-}
-
 void Mesh::Bind() {
     GetActiveInstance().Bind();
 }
 
-static void InterpolateColors(GLfloat a[], GLfloat b[], float interpolation, GLfloat result[]) {
+static void InterpolateColors(float a[], float b[], float interpolation, float result[]) {
     for (int i = 0; i < 4; i++) {
         result[i] = a[i] * (1.0 - interpolation) + b[i] * interpolation;
     }
 }
-static void SetColor(GLfloat to[], GLfloat result[]) {
+static void SetColor(float to[], float result[]) {
     for (int i = 0; i < 4; i++) result[i] = to[i];
 }
 
 void Mesh::DrawGl() const {
-    glUniformMatrix4fv(projectionPos, 1, GL_FALSE, &CameraProjection[0][0]);
-    glUniformMatrix4fv(modelviewPos, 1, GL_FALSE, &(CameraView * ObjectMatrix)[0][0]);
-
-    glUniform4fv(lightpos, NumLights, LightPositions);
-    glUniform4fv(lightcol, NumLights, LightColors);
-
-    glUniform4fv(ambientcol, 1, Ambient);
-    glUniform4fv(diffusecol, 1, Diffusion);
-    glUniform4fv(specularcol, 1, Specular);
-    glUniform1f(shininesscol, Shininess);
+    Scene.SetupDraw();
 
     const auto &instance = GetActiveInstance();
     const int num_indices = instance.Indices.size();
@@ -248,12 +176,12 @@ void Mesh::DrawGl() const {
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
     }
     if (RenderMode == RenderType_Mesh) {
-        const static GLfloat black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
+        const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-        glUniform4fv(diffusecol, 1, black);
-        glUniform4fv(specularcol, 1, white);
+        // glUniform4fv(diffusecol, 1, black);
+        // glUniform4fv(specularcol, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
@@ -268,12 +196,12 @@ void Mesh::DrawGl() const {
 
     if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-            static GLfloat DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
-            static GLfloat ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
-            static GLfloat ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
-            static GLfloat ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
+            static float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
+            static float ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
+            static float ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
+            static float ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
 
-            static GLfloat vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
+            static float vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
             if (!Audio::FaustState::IsRunning()) {
                 SetColor(DisabledExcitableVertexColor, vertex_color);
             } else if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
@@ -282,17 +210,9 @@ void Mesh::DrawGl() const {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
 
-            glUniform4fv(diffusecol, 1, vertex_color);
-            glUniform4fv(specularcol, 1, vertex_color);
-
-            // Draw the excite vertex as a single point
-            glPointSize(8.0);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            glDrawArrays(GL_POINTS, ExcitableVertexIndices[i], 1);
+            Scene.DrawPoint(ExcitableVertexIndices[i], vertex_color);
         }
-        // Restore the original material properties
-        glUniform4fv(diffusecol, 1, Diffusion);
-        glUniform4fv(specularcol, 1, Specular);
+        Scene.RestoreDefaultMaterial();
     }
 
     glBindVertexArray(0);
@@ -453,10 +373,10 @@ void Mesh::Render() {
     const auto &io = ImGui::GetIO();
     const bool window_hovered = IsWindowHovered();
     if (window_hovered && io.MouseWheel != 0) {
-        SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
+        Scene.SetCameraDistance(Scene.CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
-    UpdateCameraProjection(content_region);
+    Scene.UpdateCameraProjection(content_region);
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
@@ -475,29 +395,29 @@ void Mesh::Render() {
     Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
 
     const auto &window_pos = GetWindowPos();
-    if (ShowGizmo || ShowCameraGizmo || ShowGrid) {
+    if (Scene.ShowGizmo || Scene.ShowCameraGizmo || Scene.ShowGrid) {
         ImGuizmo::BeginFrame();
         ImGuizmo::SetDrawlist();
         ImGuizmo::SetOrthographic(false);
         ImGuizmo::SetRect(window_pos.x, window_pos.y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
     }
-    if (ShowGrid) {
-        ImGuizmo::DrawGrid(&CameraView[0][0], &CameraProjection[0][0], &Identity[0][0], 100.f);
+    if (Scene.ShowGrid) {
+        ImGuizmo::DrawGrid(&Scene.CameraView[0][0], &Scene.CameraProjection[0][0], &Identity[0][0], 100.f);
     }
-    if (ShowGizmo) {
+    if (Scene.ShowGizmo) {
         ImGuizmo::Manipulate(
-            &CameraView[0][0], &CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &ObjectMatrix[0][0], nullptr,
-            nullptr, ShowBounds ? Bounds : nullptr, nullptr
+            &Scene.CameraView[0][0], &Scene.CameraProjection[0][0], Scene.GizmoOp, ImGuizmo::LOCAL, &Scene.ObjectMatrix[0][0], nullptr,
+            nullptr, Scene.ShowBounds ? Bounds : nullptr, nullptr
         );
     }
-    if (ShowCameraGizmo) {
+    if (Scene.ShowCameraGizmo) {
         static const float view_manipulate_size = 128;
         const auto viewManipulatePos = window_pos +
             ImVec2{
                 GetWindowContentRegionMax().x - view_manipulate_size,
                 GetWindowContentRegionMin().y,
             };
-        ImGuizmo::ViewManipulate(&CameraView[0][0], CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
+        ImGuizmo::ViewManipulate(&Scene.CameraView[0][0], Scene.CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
     }
 
     const auto &instance = GetActiveInstance();
@@ -505,13 +425,12 @@ void Mesh::Render() {
 
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
-    const vec3 camera_position = glm::inverse(CameraView)[3];
+    const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
     if (window_hovered) {
         // Transform each vertex position to screen space and check if the mouse is hovering over it.
         const auto &mouse_pos = io.MousePos;
         const auto &content_pos = window_pos + GetWindowContentRegionMin();
-        const auto &view_projection = CameraProjection * CameraView;
-
+        const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
         for (size_t i = 0; i < vertices.size(); i++) {
             const auto &v = vertices[i];
@@ -532,7 +451,7 @@ void Mesh::Render() {
     // Visualize the hovered index.
     if (HoveredVertexIndex >= 0) {
         const auto &content_pos = window_pos + GetWindowContentRegionMin();
-        const auto &view_projection = CameraProjection * CameraView;
+        const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         auto *dl = GetWindowDrawList();
         const auto &hovered_vertex = vertices[HoveredVertexIndex];
         const vec4 pos_clip_space = view_projection * vec4{hovered_vertex.x, hovered_vertex.y, hovered_vertex.z, 1.0f};
@@ -590,10 +509,10 @@ void Mesh::Render() {
         const glm::quat current_quat = glm::quatLookAt(current_direction, Up);
         const glm::quat target_quat = glm::quatLookAt(target_direction, Up);
         // Interpolate linearly between the two quaternions along the sphere defined by the camera distance.
-        const float lerp_factor = glm::clamp(CameraMovementSpeed / CameraDistance, 0.0f, 1.0f);
+        const float lerp_factor = glm::clamp(CameraMovementSpeed / Scene.CameraDistance, 0.0f, 1.0f);
         const glm::quat new_quat = glm::slerp(current_quat, target_quat, lerp_factor);
         const vec3 new_camera_direction = new_quat * glm::vec3(0.0f, 0.0f, -1.0f);
-        CameraView = glm::lookAt(Origin + new_camera_direction * CameraDistance, Origin, Up);
+        Scene.CameraView = glm::lookAt(Origin + new_camera_direction * Scene.CameraDistance, Origin, Up);
     }
 }
 
@@ -694,8 +613,8 @@ void Mesh::RenderConfig() {
             RadioButton("Mesh", &RenderMode, RenderType_Mesh);
             NewLine();
             SeparatorText("Gizmo");
-            Checkbox("Show gizmo", &ShowGizmo);
-            if (ShowGizmo) {
+            Checkbox("Show gizmo", &Scene.ShowGizmo);
+            if (Scene.ShowGizmo) {
                 const string interaction_text = "Interaction: " +
                     string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
                                ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
@@ -704,14 +623,14 @@ void Mesh::RenderConfig() {
                                                                                                          "Not interacting");
                 TextUnformatted(interaction_text.c_str());
 
-                if (IsKeyPressed(ImGuiKey_T)) GizmoOp = ImGuizmo::TRANSLATE;
-                if (IsKeyPressed(ImGuiKey_R)) GizmoOp = ImGuizmo::ROTATE;
-                if (IsKeyPressed(ImGuiKey_S)) GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Translate (T)", GizmoOp == ImGuizmo::TRANSLATE)) GizmoOp = ImGuizmo::TRANSLATE;
-                if (RadioButton("Rotate (R)", GizmoOp == ImGuizmo::ROTATE)) GizmoOp = ImGuizmo::ROTATE;
-                if (RadioButton("Scale (S)", GizmoOp == ImGuizmo::SCALE)) GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Universal", GizmoOp == ImGuizmo::UNIVERSAL)) GizmoOp = ImGuizmo::UNIVERSAL;
-                Checkbox("Bound sizing", &ShowBounds);
+                if (IsKeyPressed(ImGuiKey_T)) Scene.GizmoOp = ImGuizmo::TRANSLATE;
+                if (IsKeyPressed(ImGuiKey_R)) Scene.GizmoOp = ImGuizmo::ROTATE;
+                if (IsKeyPressed(ImGuiKey_S)) Scene.GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Translate (T)", Scene.GizmoOp == ImGuizmo::TRANSLATE)) Scene.GizmoOp = ImGuizmo::TRANSLATE;
+                if (RadioButton("Rotate (R)", Scene.GizmoOp == ImGuizmo::ROTATE)) Scene.GizmoOp = ImGuizmo::ROTATE;
+                if (RadioButton("Scale (S)", Scene.GizmoOp == ImGuizmo::SCALE)) Scene.GizmoOp = ImGuizmo::SCALE;
+                if (RadioButton("Universal", Scene.GizmoOp == ImGuizmo::UNIVERSAL)) Scene.GizmoOp = ImGuizmo::UNIVERSAL;
+                Checkbox("Bound sizing", &Scene.ShowBounds);
             }
 
             SeparatorText("Debug");
@@ -726,49 +645,7 @@ void Mesh::RenderConfig() {
             RenderProfileConfig();
             EndTabItem();
         }
-        if (BeginTabItem("Camera")) {
-            Checkbox("Show gizmo", &ShowCameraGizmo);
-            SameLine();
-            Checkbox("Grid", &ShowGrid);
-            SliderFloat("FOV", &fov, 20.f, 110.f);
-
-            float camera_distance = CameraDistance;
-            if (SliderFloat("Distance", &camera_distance, .1f, 10.f)) {
-                SetCameraDistance(camera_distance);
-            }
-            EndTabItem();
-        }
-        if (BeginTabItem("Lighing")) {
-            SeparatorText("Colors");
-            Checkbox("Custom colors", &CustomColor);
-            if (CustomColor) {
-                ColorEdit3("Ambient", &Ambient[0]);
-                ColorEdit3("Diffusion", &Diffusion[0]);
-                ColorEdit3("Specular", &Specular[0]);
-                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
-            } else {
-                for (int i = 1; i < 3; i++) {
-                    Ambient[i] = Ambient[0];
-                    Diffusion[i] = Diffusion[0];
-                    Specular[i] = Specular[0];
-                }
-                SliderFloat("Ambient", &Ambient[0], 0.0f, 1.0f);
-                SliderFloat("Diffusion", &Diffusion[0], 0.0f, 1.0f);
-                SliderFloat("Specular", &Specular[0], 0.0f, 1.0f);
-                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
-            }
-
-            SeparatorText("Lights");
-            for (int i = 0; i < NumLights; i++) {
-                Separator();
-                PushID(i);
-                Text("Light %d", i + 1);
-                SliderFloat3("Positions", &LightPositions[4 * i], -25.0f, 25.0f);
-                ColorEdit3("Color", &LightColors[4 * i]);
-                PopID();
-            }
-            EndTabItem();
-        }
+        Scene.RenderConfig();
         if (BeginTabItem("RealImpact")) {
             if (!RealImpact) {
                 const auto directory = FilePath.parent_path();

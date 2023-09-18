@@ -21,6 +21,9 @@
 #include "RealImpact.h"
 #include "Window.h"
 
+#include "Scene.h"
+#include <memory>
+
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
 #include "../libs/emscripten/emscripten_mainloop_stub.h"
@@ -28,6 +31,7 @@
 
 static WindowsState Windows;
 
+static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<Mesh> mesh;
 
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
@@ -138,7 +142,8 @@ int main(int, char **) {
     // ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     // IM_ASSERT(font != NULL);
 
-    mesh = std::make_unique<Mesh>(fs::path("res") / "svg" / "bell" / "std.svg");
+    if (!MainScene) MainScene = std::make_unique<Scene>();
+    mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
     // Alternatively, we could initialize with a mesh obj file:
     // mesh = std::make_unique<Mesh>(fs::path("res") / "obj" / "bell" / "english.obj");
 
@@ -195,7 +200,7 @@ int main(int, char **) {
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
-                        mesh = std::make_unique<Mesh>(file_path);
+                        mesh = std::make_unique<Mesh>(*MainScene, file_path);
                         NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
