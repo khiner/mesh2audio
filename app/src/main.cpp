@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <thread>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -11,7 +10,6 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
 #include "implot.h"
-#include "imspinner.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <nfd.h>
@@ -20,9 +18,9 @@
 #include "Mesh.h"
 #include "RealImpact.h"
 #include "Window.h"
+#include "Worker.h"
 
 #include "Scene.h"
-#include <memory>
 
 // This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
 #ifdef __EMSCRIPTEN__
@@ -34,11 +32,10 @@ static WindowsState Windows;
 static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<Mesh> mesh;
 
+static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
 static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
-static std::thread DspGeneratorThread; // Worker thread for generating DSP code.
 static bool IsGeneratedDsp2d = false; // `false` means 3D.
 static string GeneratedDsp; // The most recently generated DSP code.
-static string GenerateDspMsg = "Generating DSP code...";
 
 ::Audio Audio{};
 
@@ -307,10 +304,7 @@ int main(int, char **) {
                         EndDisabled();
                     }
                     if (generate_tet_dsp || generate_axisymmetric_dsp) {
-                        OpenPopup(GenerateDspMsg.c_str());
-                        if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
-                        IsGeneratedDsp2d = !generate_tet_dsp;
-                        DspGeneratorThread = std::thread([&] {
+                        DspGenerator.Launch([&] {
                             const int num_excitations = generate_tet_dsp ? mesh->Num3DExcitationVertices() : mesh->Num2DExcitationVertices();
                             const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
                             if (!model_dsp.empty()) {
@@ -322,24 +316,12 @@ int main(int, char **) {
                                 GeneratedDsp = "process = _;";
                             }
                         });
+                        IsGeneratedDsp2d = !generate_tet_dsp;
                     }
-                    const auto &center = GetMainViewport()->GetCenter();
-                    const auto &popup_size = GetMainViewport()->Size / 4;
-                    SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
-                    SetNextWindowSize(popup_size);
-                    if (BeginPopupModal(GenerateDspMsg.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                        const auto &ws = GetWindowSize();
-                        const float spinner_dim = std::min(ws.x, ws.y) / 2;
-                        SetCursorPos((ws - ImVec2{spinner_dim, spinner_dim}) / 2 + ImVec2(0, GetTextLineHeight()));
-                        ImSpinner::SpinnerWaveDots(GenerateDspMsg.c_str(), spinner_dim / 2, 3);
-                        if (!GeneratedDsp.empty()) {
-                            Audio.Faust.Code = GeneratedDsp;
-                            Audio::FaustState::Is2DModel = IsGeneratedDsp2d;
-                            GeneratedDsp = "";
-                            if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
-                            CloseCurrentPopup();
-                        }
-                        EndPopup();
+                    if (DspGenerator.Render()) {
+                        Audio.Faust.Code = GeneratedDsp;
+                        Audio::FaustState::Is2DModel = IsGeneratedDsp2d;
+                        GeneratedDsp = "";
                     }
                     if (has_tetrahedral_mesh || has_profile) {
                         SeparatorText("Material properties");
@@ -425,7 +407,6 @@ int main(int, char **) {
     DestroyContext();
 
     Audio.Stop();
-    if (DspGeneratorThread.joinable()) DspGeneratorThread.join();
     NFD_Quit();
 
     SDL_GL_DeleteContext(gl_context);

@@ -4,12 +4,12 @@
 
 #include <cinolib/geometry/vec_mat.h>
 
-#include "MeshInstance.h"
 #include "Material.h"
+#include "MeshInstance.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
-
 #include "Scene.h"
+#include "Worker.h"
 
 struct ImVec2;
 
@@ -97,6 +97,11 @@ private:
     Type ActiveViewMeshType = MeshType_Triangular;
 
     ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
+
+    Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
+    Worker RealImpactLoader {
+        "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }
+    };
 
     void Bind(); // Bind active mesh instance.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.

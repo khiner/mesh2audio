@@ -82,6 +82,9 @@
     "algorithm": "cpp",
     "format": "cpp",
     "unordered_set": "cpp",
-    "utility": "cpp"
+    "utility": "cpp",
+    "memory_resource": "cpp",
+    "random": "cpp",
+    "semaphore": "cpp"
   }
 }
