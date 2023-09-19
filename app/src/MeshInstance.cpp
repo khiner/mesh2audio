@@ -27,7 +27,7 @@ MeshInstance::~MeshInstance() {
     glDeleteVertexArrays(1, &VertexArray);
 }
 
-void MeshInstance::Bind() {
+void MeshInstance::Bind() const {
     glBindVertexArray(VertexArray);
 
     // Bind vertices to layout location 0
@@ -148,7 +148,7 @@ void MeshInstance::ExtrudeProfile(const vector<vec2> &profile_vertices, uint sli
     Indices.reserve(num_indices);
 
     const double angle_increment = 2.0 * M_PI / slices;
-    for (int slice = 0; slice < slices; slice++) {
+    for (uint slice = 0; slice < slices; slice++) {
         const double angle = slice * angle_increment;
         const double c = cos(angle);
         const double s = sin(angle);
@@ -167,7 +167,7 @@ void MeshInstance::ExtrudeProfile(const vector<vec2> &profile_vertices, uint sli
     }
 
     // Compute indices for the triangles.
-    for (int slice = 0; slice < slices; slice++) {
+    for (uint slice = 0; slice < slices; slice++) {
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const int base_index = slice * profile_size_no_connect + i;
             const int next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
@@ -185,7 +185,7 @@ void MeshInstance::ExtrudeProfile(const vector<vec2> &profile_vertices, uint sli
 
     // Connect the top and bottom.
     if (!closed) {
-        for (int slice = 0; slice < slices; slice++) {
+        for (uint slice = 0; slice < slices; slice++) {
             // Top
             Indices.push_back(slice * profile_size_no_connect);
             Indices.push_back(Vertices.size() - 2);

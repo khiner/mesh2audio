@@ -70,14 +70,18 @@ void Scene::SetupDraw() {
     glUniform1f(shininesscol, Shininess);
 }
 
-void Scene::DrawPoint(int vertex_index, float color[]) {
+void Scene::DrawPoints(int first, int count, const float color[]) {
     glUniform4fv(diffusecol, 1, color);
     glUniform4fv(specularcol, 1, color);
 
     // Draw the excite vertex as a single point
     glPointSize(8.0);
     glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-    glDrawArrays(GL_POINTS, vertex_index, 1);
+    glDrawArrays(GL_POINTS, first, count);
+}
+
+void Scene::DrawPoint(int vertex_index, const float color[]) {
+    DrawPoints(vertex_index, 1, color);
 }
 
 void Scene::RestoreDefaultMaterial() {

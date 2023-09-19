@@ -75,14 +75,12 @@ struct Mesh {
 
     inline static int NumExcitableVertices = 10;
     inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
-
     inline static bool QualityTetMesh = true;
 
     fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
 
 private:
-    static void InitializeStatic(); // Initialize variables shared across all meshes.
     void UpdateExcitableVertices();
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
@@ -93,7 +91,7 @@ private:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 
-    struct MeshInstance TriangularMesh, TetMesh;
+    MeshInstance TriangularMesh, TetMesh, RealImpactListenerPoints;
     Type ActiveViewMeshType = MeshType_Triangular;
 
     ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.

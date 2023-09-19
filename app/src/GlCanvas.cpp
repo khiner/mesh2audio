@@ -9,8 +9,9 @@ GlCanvas::~GlCanvas() {
 
 void GlCanvas::SetupRender(float width, float height, float r, float g, float b, float a) {
     if (width != Width || height != Height) {
-        Width = width;
-        Height = height;
+        // Render image to twice the dimensions, for better quality.
+        Width = width * 2;
+        Height = height * 2;
         Destroy();
 
         glGenFramebuffers(1, &FrameBufferId);
@@ -19,27 +20,26 @@ void GlCanvas::SetupRender(float width, float height, float r, float g, float b,
         glGenTextures(1, &TextureId);
         glBindTexture(GL_TEXTURE_2D, TextureId);
 
-        // Render image to twice the dimensions, for better quality.
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width * 2, Height * 2, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Width, Height, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
         glGenRenderbuffers(1, &DepthRenderBufferId);
         glBindRenderbuffer(GL_RENDERBUFFER, DepthRenderBufferId);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Width * 2, Height * 2);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Width, Height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, DepthRenderBufferId);
 
         glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, TextureId, 0);
 
         GLenum DrawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-        glDrawBuffers(1, DrawBuffers); // "1" is the size of DrawBuffers
+        glDrawBuffers(1, DrawBuffers); // `1` is the size of DrawBuffers
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             throw std::runtime_error("Error: Framebuffer is not complete.\n");
         }
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferId);
-    glViewport(0, 0, Width * 2, Height * 2); // Rendered image is twice the dimensions, for better quality.
+    glViewport(0, 0, Width, Height);
 
     glClearColor(r, g, b, a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

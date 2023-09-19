@@ -139,9 +139,7 @@ void Mesh::ExtrudeProfile() {
     Bind();
 }
 
-void Mesh::Bind() {
-    GetActiveInstance().Bind();
-}
+void Mesh::Bind() { GetActiveInstance().Bind(); }
 
 static void InterpolateColors(float a[], float b[], float interpolation, float result[]) {
     for (int i = 0; i < 4; i++) {
@@ -170,10 +168,9 @@ void Mesh::DrawGl() const {
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
     }
     if (RenderMode == RenderType_Mesh) {
-        const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
-
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+        // const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
         // glUniform4fv(diffusecol, 1, black);
         // glUniform4fv(specularcol, 1, white);
 
@@ -208,6 +205,15 @@ void Mesh::DrawGl() const {
         }
         Scene.RestoreDefaultMaterial();
     }
+
+    // todo points not rendering. Going to work on multiple mesh instances first.
+    // if (RealImpact) {
+    //     // Draw RealImpact listener points.
+    //     static const float color[4] = {0, 1, 0, 1};
+    //     glBindVertexArray(RealImpactListenerPoints.VertexArray);
+    //     Scene.DrawPoints(0, RealImpact->NumListenerPoints(), color);
+    //     Scene.RestoreDefaultMaterial();
+    // }
 
     glBindVertexArray(0);
 }
@@ -628,12 +634,25 @@ void Mesh::RenderConfig() {
             if (!RealImpact) {
                 if (std::filesystem::exists(FilePath.parent_path() / RealImpact::SampleDataFileName)) {
                     RealImpactLoader.RenderLauncher();
-                    RealImpactLoader.Render();
                 } else {
                     Text("No RealImpact data found in the same directory as the mesh.");
                 }
             } else {
                 RealImpact->Render();
+            }
+            if (RealImpactLoader.Render() && RealImpact) {
+                const size_t num_points = RealImpact->NumListenerPoints();
+                RealImpactListenerPoints = MeshInstance(num_points, num_points, num_points);
+                for (size_t i = 0; i < num_points; i++) {
+                    RealImpactListenerPoints.Indices.push_back(i);
+                    const auto v = RealImpact->ListenerPoint(i);
+                    RealImpactListenerPoints.Vertices.push_back(v);
+                    const float x = v[0], y = v[1], z = v[2];
+                    const float angle = atan2(z, x);
+                    RealImpactListenerPoints.Normals.push_back({cos(angle), 0, sin(angle)});
+                }
+                RealImpactListenerPoints.UpdateBounds();
+                RealImpactListenerPoints.Bind();
             }
             EndTabItem();
         }

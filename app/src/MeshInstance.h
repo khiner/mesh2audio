@@ -17,7 +17,7 @@ struct MeshInstance {
     MeshInstance(uint num_vertices, uint num_normals, uint num_indices);
     ~MeshInstance();
 
-    void Bind(); // Bind mesh and set up vertex attributes.
+    void Bind() const; // Bind mesh and set up vertex attributes.
     void Clear();
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
 

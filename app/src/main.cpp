@@ -257,7 +257,6 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
-            const auto content_region = GetContentRegionAvail(); // Must be called before mesh render.
             if (mesh != nullptr) mesh->Render();
             End();
             PopStyleVar();

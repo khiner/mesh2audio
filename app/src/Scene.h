@@ -31,7 +31,8 @@ struct Scene {
     void RestoreDefaultMaterial();
 
     void SetupDraw();
-    void DrawPoint(int vertex_index, float color[]);
+    void DrawPoint(int vertex_index, const float color[]);
+    void DrawPoints(int first, int count, const float color[]);
 
     void RenderConfig();
 };
