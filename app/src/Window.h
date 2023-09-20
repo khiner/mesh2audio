@@ -8,6 +8,7 @@ struct Window {
 struct WindowsState {
     Window AudioDevice{"Audio device"};
     Window AudioModel{"Audio model"};
+    Window SceneControls{"Scene controls"};
     Window MeshControls{"Mesh controls"};
     Window Mesh{"Mesh"};
     Window MeshProfile{"Mesh profile"};

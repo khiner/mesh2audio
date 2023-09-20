@@ -23,14 +23,6 @@ struct Mesh {
         MeshType_Tetrahedral,
     };
 
-    enum RenderType_ {
-        RenderType_Smooth,
-        RenderType_Lines,
-        RenderType_Points,
-        RenderType_Mesh
-    };
-    using RenderType = int;
-
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     Mesh(::Scene &scene, fs::path file_path);
     ~Mesh();
@@ -68,9 +60,6 @@ struct Mesh {
     void Scale(const glm::vec3 &scale); // Scale the mesh by the given amounts.
     void Center(); // Center the mesh at the origin.
 
-    inline static RenderType RenderMode = RenderType_Smooth;
-
-    inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static Type ViewMeshType = MeshType_Triangular;
 
     inline static int NumExcitableVertices = 10;

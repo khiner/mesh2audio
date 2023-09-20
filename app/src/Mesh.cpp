@@ -15,7 +15,6 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "Audio.h"
-#include "GlCanvas.h"
 #include <GL/glew.h>
 
 // auto start = std::chrono::high_resolution_clock::now();
@@ -27,9 +26,6 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
-static GlCanvas gl_canvas;
-
-static const mat4 Identity(1.f);
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
@@ -151,40 +147,6 @@ static void SetColor(float to[], float result[]) {
 }
 
 void Mesh::DrawGl() const {
-    Scene.SetupDraw();
-
-    const auto &geometry = GetActiveGeometry();
-    const int num_indices = geometry.Indices.size();
-    glBindVertexArray(geometry.VertexArray);
-    if (RenderMode == RenderType_Smooth) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-    if (RenderMode == RenderType_Lines) {
-        glLineWidth(1);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-    if (RenderMode == RenderType_Points) {
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-    }
-    if (RenderMode == RenderType_Mesh) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-        // const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
-        // glUniform4fv(diffusecol, 1, black);
-        // glUniform4fv(specularcol, 1, white);
-
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-
-        glLineWidth(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-
-    // All render modes:
-    glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-
     if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
             static float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
@@ -205,16 +167,6 @@ void Mesh::DrawGl() const {
         }
         Scene.RestoreDefaultMaterial();
     }
-
-    // todo points not rendering. Going to work on multiple geometries first.
-    // if (RealImpact) {
-    //     // Draw RealImpact listener points.
-    //     static const float color[4] = {0, 1, 0, 1};
-    //     glBindVertexArray(RealImpactListenerPoints.VertexArray);
-    //     Scene.DrawPoints(0, RealImpact->NumListenerPoints(), color);
-    //     Scene.RestoreDefaultMaterial();
-    // }
-
     glBindVertexArray(0);
 }
 
@@ -370,17 +322,6 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 using namespace ImGui;
 
 void Mesh::Render() {
-    const auto &io = ImGui::GetIO();
-    const bool window_hovered = IsWindowHovered();
-    if (window_hovered && io.MouseWheel != 0) {
-        Scene.SetCameraDistance(Scene.CameraDistance * (1.f - io.MouseWheel / 16.f));
-    }
-    const auto content_region = GetContentRegionAvail();
-    Scene.UpdateCameraProjection(content_region);
-    if (content_region.x <= 0 && content_region.y <= 0) return;
-
-    const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-    gl_canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
     if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
         ViewMeshType = MeshType_Triangular;
     }
@@ -388,45 +329,29 @@ void Mesh::Render() {
         ActiveViewMeshType = ViewMeshType;
         Bind();
     }
+    Scene.Draw(GetActiveGeometry());
     DrawGl();
-
-    // Render the mesh to an OpenGl texture and display it.
-    unsigned int texture_id = gl_canvas.Render();
-    Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
-
-    const auto &window_pos = GetWindowPos();
-    if (Scene.ShowGizmo || Scene.ShowCameraGizmo || Scene.ShowGrid) {
-        ImGuizmo::BeginFrame();
-        ImGuizmo::SetDrawlist();
-        ImGuizmo::SetOrthographic(false);
-        ImGuizmo::SetRect(window_pos.x, window_pos.y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
-    }
-    if (Scene.ShowGrid) {
-        ImGuizmo::DrawGrid(&Scene.CameraView[0][0], &Scene.CameraProjection[0][0], &Identity[0][0], 100.f);
-    }
-    if (Scene.ShowGizmo) {
-        ImGuizmo::Manipulate(
-            &Scene.CameraView[0][0], &Scene.CameraProjection[0][0], Scene.GizmoOp, ImGuizmo::LOCAL, &Scene.ObjectMatrix[0][0], nullptr,
-            nullptr, Scene.ShowBounds ? Bounds : nullptr, nullptr
-        );
-    }
-    if (Scene.ShowCameraGizmo) {
-        static const float view_manipulate_size = 128;
-        const auto viewManipulatePos = window_pos +
-            ImVec2{
-                GetWindowContentRegionMax().x - view_manipulate_size,
-                GetWindowContentRegionMin().y,
-            };
-        ImGuizmo::ViewManipulate(&Scene.CameraView[0][0], Scene.CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
-    }
+    // todo points not rendering. Going to work on multiple geometries first.
+    // if (RealImpact) {
+    //     // Draw RealImpact listener points.
+    //     static const float color[4] = {0, 1, 0, 1};
+    //     glBindVertexArray(RealImpactListenerPoints.VertexArray);
+    //     Scene.DrawPoints(0, RealImpact->NumListenerPoints(), color);
+    //     Scene.RestoreDefaultMaterial();
+    // }
+    Scene.Render();
 
     const auto &geometry = GetActiveGeometry();
     const auto &vertices = geometry.Vertices;
 
+    const auto content_region = GetContentRegionAvail();
+    const bool window_hovered = IsWindowHovered();
+    const auto &window_pos = GetWindowPos();
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
     const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
     if (window_hovered) {
+        const auto &io = ImGui::GetIO();
         // Transform each vertex position to screen space and check if the mouse is hovering over it.
         const auto &mouse_pos = io.MousePos;
         const auto &content_pos = window_pos + GetWindowContentRegionMin();
@@ -493,7 +418,7 @@ void Mesh::Render() {
         }
     }
 
-    // Any time mouse is released, release the excitation trigger
+    // When mouse is released, release the excitation trigger
     // (even if mouse was pressed, dragged outside the window, and released).
     if (mouse_released && Audio::FaustState::IsRunning()) *Audio::FaustState::ExciteValue = 0.f;
 
@@ -588,35 +513,6 @@ void Mesh::RenderConfig() {
             SameLine();
             if (Button("Z##Rotate")) Rotate({0, 0, 1}, 90);
 
-            SeparatorText("Render mode");
-            RadioButton("Smooth", &RenderMode, RenderType_Smooth);
-            SameLine();
-            RadioButton("Lines", &RenderMode, RenderType_Lines);
-            RadioButton("Point cloud", &RenderMode, RenderType_Points);
-            SameLine();
-            RadioButton("Mesh", &RenderMode, RenderType_Mesh);
-            NewLine();
-            SeparatorText("Gizmo");
-            Checkbox("Show gizmo", &Scene.ShowGizmo);
-            if (Scene.ShowGizmo) {
-                const string interaction_text = "Interaction: " +
-                    string(ImGuizmo::IsUsing() ? "Using Gizmo" : ImGuizmo::IsOver(ImGuizmo::TRANSLATE) ? "Translate hovered" :
-                               ImGuizmo::IsOver(ImGuizmo::ROTATE)                                      ? "Rotate hovered" :
-                               ImGuizmo::IsOver(ImGuizmo::SCALE)                                       ? "Scale hovered" :
-                               ImGuizmo::IsOver()                                                      ? "Hovered" :
-                                                                                                         "Not interacting");
-                TextUnformatted(interaction_text.c_str());
-
-                if (IsKeyPressed(ImGuiKey_T)) Scene.GizmoOp = ImGuizmo::TRANSLATE;
-                if (IsKeyPressed(ImGuiKey_R)) Scene.GizmoOp = ImGuizmo::ROTATE;
-                if (IsKeyPressed(ImGuiKey_S)) Scene.GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Translate (T)", Scene.GizmoOp == ImGuizmo::TRANSLATE)) Scene.GizmoOp = ImGuizmo::TRANSLATE;
-                if (RadioButton("Rotate (R)", Scene.GizmoOp == ImGuizmo::ROTATE)) Scene.GizmoOp = ImGuizmo::ROTATE;
-                if (RadioButton("Scale (S)", Scene.GizmoOp == ImGuizmo::SCALE)) Scene.GizmoOp = ImGuizmo::SCALE;
-                if (RadioButton("Universal", Scene.GizmoOp == ImGuizmo::UNIVERSAL)) Scene.GizmoOp = ImGuizmo::UNIVERSAL;
-                Checkbox("Bound sizing", &Scene.ShowBounds);
-            }
-
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
                 const auto &vertex = GetActiveGeometry().Vertices[HoveredVertexIndex];
@@ -629,7 +525,6 @@ void Mesh::RenderConfig() {
             RenderProfileConfig();
             EndTabItem();
         }
-        Scene.RenderConfig();
         if (BeginTabItem("RealImpact")) {
             if (!RealImpact) {
                 if (std::filesystem::exists(FilePath.parent_path() / RealImpact::SampleDataFileName)) {

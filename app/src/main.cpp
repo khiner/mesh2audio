@@ -185,9 +185,10 @@ int main(int, char **) {
             DockBuilderDockWindow(Windows.ImGuiDemo.Name, demo_node_id);
             DockBuilderDockWindow(Windows.ImPlotDemo.Name, demo_node_id);
             auto mesh_node_id = dockspace_id;
-            auto mesh_controls_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.4f, nullptr, &mesh_node_id);
+            auto controls_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Left, 0.4f, nullptr, &mesh_node_id);
             auto mesh_profile_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.8f, nullptr, &mesh_node_id);
-            DockBuilderDockWindow(Windows.MeshControls.Name, mesh_controls_node_id);
+            DockBuilderDockWindow(Windows.MeshControls.Name, controls_node_id);
+            DockBuilderDockWindow(Windows.SceneControls.Name, controls_node_id);
             DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
             DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
         }
@@ -231,6 +232,7 @@ int main(int, char **) {
             if (BeginMenu("Windows")) {
                 MenuItem(Windows.AudioDevice.Name, nullptr, &Windows.AudioDevice.Visible);
                 MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
+                MenuItem(Windows.SceneControls.Name, nullptr, &Windows.SceneControls.Visible);
                 MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
                 MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
                 MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
@@ -244,6 +246,15 @@ int main(int, char **) {
         if (Windows.ImGuiDemo.Visible) ShowDemoWindow(&Windows.ImGuiDemo.Visible);
         if (Windows.ImPlotDemo.Visible) ImPlot::ShowDemoWindow(&Windows.ImPlotDemo.Visible);
 
+        if (Windows.SceneControls.Visible) {
+            Begin(Windows.SceneControls.Name, &Windows.SceneControls.Visible);
+            if (MainScene == nullptr) {
+                Text("No scene has been loaded.");
+            } else {
+                MainScene->RenderConfig();
+            }
+            End();
+        }
         if (Windows.MeshControls.Visible) {
             Begin(Windows.MeshControls.Name, &Windows.MeshControls.Visible);
             if (mesh == nullptr) {
@@ -258,6 +269,7 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
+            MainScene->SetupRender();
             if (mesh != nullptr) mesh->Render();
             End();
             PopStyleVar();
