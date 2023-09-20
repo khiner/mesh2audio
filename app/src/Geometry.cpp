@@ -1,33 +1,35 @@
-#include "MeshInstance.h"
+#include "Geometry.h"
 
 #include <fstream>
+#include <iostream>
 
-#include "GL/glew.h"
+#include <GL/glew.h>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 using glm::vec2, glm::vec3;
 using std::string;
 
-MeshInstance::MeshInstance() {
+Geometry::Geometry() {
     glGenVertexArrays(1, &VertexArray);
     glGenBuffers(1, &VertexBuffer);
     glGenBuffers(1, &NormalBuffer);
     glGenBuffers(1, &IndexBuffer);
 }
-MeshInstance::MeshInstance(uint num_vertices, uint num_normals, uint num_indices) : MeshInstance() {
+Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices) : Geometry() {
     Vertices.reserve(num_vertices);
     Normals.reserve(num_normals);
     Indices.reserve(num_indices);
 }
 
-MeshInstance::~MeshInstance() {
+Geometry::~Geometry() {
     glDeleteBuffers(1, &IndexBuffer);
     glDeleteBuffers(1, &NormalBuffer);
     glDeleteBuffers(1, &VertexBuffer);
     glDeleteVertexArrays(1, &VertexArray);
 }
 
-void MeshInstance::Bind() const {
+void Geometry::Bind() const {
     glBindVertexArray(VertexArray);
 
     // Bind vertices to layout location 0
@@ -49,7 +51,7 @@ void MeshInstance::Bind() const {
     glBindVertexArray(0);
 }
 
-void MeshInstance::Clear() {
+void Geometry::Clear() {
     Vertices.clear();
     Normals.clear();
     Indices.clear();
@@ -57,7 +59,7 @@ void MeshInstance::Clear() {
     Max = {};
 }
 
-void MeshInstance::Save(fs::path file_path) const {
+void Geometry::Save(fs::path file_path) const {
     std::ofstream out(file_path.c_str());
     if (!out.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
 
@@ -77,30 +79,30 @@ void MeshInstance::Save(fs::path file_path) const {
     out.close();
 }
 
-void MeshInstance::Flip(bool x, bool y, bool z) {
+void Geometry::Flip(bool x, bool y, bool z) {
     const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
     const vec3 center = (Min + Max) / 2.0f;
     for (auto &vertex : Vertices) vertex = center + (vertex - center) * flip;
     for (auto &normal : Normals) normal *= flip;
     UpdateBounds();
 }
-void MeshInstance::Rotate(const vec3 &axis, float angle) {
+void Geometry::Rotate(const vec3 &axis, float angle) {
     const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
     for (auto &vertex : Vertices) vertex = rotation * vertex;
     for (auto &normal : Normals) normal = rotation * normal;
     UpdateBounds();
 }
-void MeshInstance::Scale(const vec3 &scale) {
+void Geometry::Scale(const vec3 &scale) {
     for (auto &vertex : Vertices) vertex *= scale;
     UpdateBounds();
 }
-void MeshInstance::Center() {
+void Geometry::Center() {
     const vec3 center = (Min + Max) / 2.0f;
     for (auto &vertex : Vertices) vertex -= center;
     UpdateBounds();
 }
 
-void MeshInstance::ComputeNormals() {
+void Geometry::ComputeNormals() {
     if (!Normals.empty()) return;
 
     Normals.resize(Vertices.size());
@@ -115,8 +117,8 @@ void MeshInstance::ComputeNormals() {
     }
 }
 
-void MeshInstance::UpdateBounds() {
-    // Update `Min`/`Max`, the bounds of the mesh, based on the current vertices.
+void Geometry::UpdateBounds() {
+    // Update `Min`/`Max` based on the current vertices.
     Min = vec3(INFINITY, INFINITY, INFINITY);
     Max = vec3(-INFINITY, -INFINITY, -INFINITY);
     for (const vec3 &v : Vertices) {
@@ -129,13 +131,13 @@ void MeshInstance::UpdateBounds() {
     }
 }
 
-void MeshInstance::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices, bool closed) {
+void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices, bool closed) {
     Clear();
     if (profile_vertices.size() < 3) return;
 
     // The profile vertices are ordered clockwise, with the first vertex corresponding to the top/outside of the surface,
     // and last vertex corresponding the the bottom/inside of the surface.
-    // If the profile is not closed (default), these top/bottom vertices will be connected in the middle of the extruded 3D mesh,
+    // If the profile is not closed (default), these top/bottom vertices will be connected in the middle of the extruded geometry,
     // creating a continuous connected solid "bridge" between all rotated slices.
     const int n = profile_vertices.size();
     const int start_index = closed ? 0 : 1;
@@ -198,7 +200,7 @@ void MeshInstance::ExtrudeProfile(const vector<vec2> &profile_vertices, uint sli
     }
 
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
-    // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the 3D mesh - not the profile.
+    // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the y-axis (the up/down axis).
     UpdateBounds();
     Flip(false, true, false);
     Center();

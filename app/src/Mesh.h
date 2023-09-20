@@ -4,8 +4,8 @@
 
 #include <cinolib/geometry/vec_mat.h>
 
+#include "Geometry.h"
 #include "Material.h"
-#include "MeshInstance.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
 #include "Scene.h"
@@ -46,8 +46,8 @@ struct Mesh {
         if (Profile != nullptr) Profile->SaveTesselation(file_path);
     }
 
-    const MeshInstance &GetActiveInstance() const;
-    MeshInstance &GetActiveInstance();
+    const Geometry &GetActiveGeometry() const;
+    Geometry &GetActiveGeometry();
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
@@ -91,16 +91,15 @@ private:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 
-    MeshInstance TriangularMesh, TetMesh, RealImpactListenerPoints;
+    Geometry TriangularMesh, TetMesh, RealImpactListenerPoints;
     Type ActiveViewMeshType = MeshType_Triangular;
 
     ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
 
     Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
-    Worker RealImpactLoader {
-        "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }
-    };
+    Worker RealImpactLoader{
+        "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
 
-    void Bind(); // Bind active mesh instance.
+    void Bind(); // Bind active geometry.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.
 };

@@ -12,10 +12,10 @@ namespace fs = std::filesystem;
 using uint = unsigned int;
 using std::vector;
 
-struct MeshInstance {
-    MeshInstance();
-    MeshInstance(uint num_vertices, uint num_normals, uint num_indices);
-    ~MeshInstance();
+struct Geometry {
+    Geometry();
+    Geometry(uint num_vertices, uint num_normals, uint num_indices);
+    ~Geometry();
 
     void Bind() const; // Bind mesh and set up vertex attributes.
     void Clear();

@@ -93,17 +93,17 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
 Mesh::~Mesh() {
 }
 
-const MeshInstance &Mesh::GetActiveInstance() const {
+const Geometry &Mesh::GetActiveGeometry() const {
     if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
     return TetMesh;
 }
-MeshInstance &Mesh::GetActiveInstance() {
+Geometry &Mesh::GetActiveGeometry() {
     if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
     return TetMesh;
 }
 
 void Mesh::Save(fs::path file_path) const {
-    GetActiveInstance().Save(file_path);
+    GetActiveGeometry().Save(file_path);
 }
 
 void Mesh::Flip(bool x, bool y, bool z) {
@@ -139,7 +139,7 @@ void Mesh::ExtrudeProfile() {
     Bind();
 }
 
-void Mesh::Bind() { GetActiveInstance().Bind(); }
+void Mesh::Bind() { GetActiveGeometry().Bind(); }
 
 static void InterpolateColors(float a[], float b[], float interpolation, float result[]) {
     for (int i = 0; i < 4; i++) {
@@ -153,9 +153,9 @@ static void SetColor(float to[], float result[]) {
 void Mesh::DrawGl() const {
     Scene.SetupDraw();
 
-    const auto &instance = GetActiveInstance();
-    const int num_indices = instance.Indices.size();
-    glBindVertexArray(instance.VertexArray);
+    const auto &geometry = GetActiveGeometry();
+    const int num_indices = geometry.Indices.size();
+    glBindVertexArray(geometry.VertexArray);
     if (RenderMode == RenderType_Smooth) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
@@ -206,7 +206,7 @@ void Mesh::DrawGl() const {
         Scene.RestoreDefaultMaterial();
     }
 
-    // todo points not rendering. Going to work on multiple mesh instances first.
+    // todo points not rendering. Going to work on multiple geometries first.
     // if (RealImpact) {
     //     // Draw RealImpact listener points.
     //     static const float color[4] = {0, 1, 0, 1};
@@ -420,8 +420,8 @@ void Mesh::Render() {
         ImGuizmo::ViewManipulate(&Scene.CameraView[0][0], Scene.CameraDistance, viewManipulatePos, {view_manipulate_size, view_manipulate_size}, 0);
     }
 
-    const auto &instance = GetActiveInstance();
-    const auto &vertices = instance.Vertices;
+    const auto &geometry = GetActiveGeometry();
+    const auto &vertices = geometry.Vertices;
 
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
@@ -619,7 +619,7 @@ void Mesh::RenderConfig() {
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
-                const auto &vertex = GetActiveInstance().Vertices[HoveredVertexIndex];
+                const auto &vertex = GetActiveGeometry().Vertices[HoveredVertexIndex];
                 Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 
@@ -642,7 +642,7 @@ void Mesh::RenderConfig() {
             }
             if (RealImpactLoader.Render() && RealImpact) {
                 const size_t num_points = RealImpact->NumListenerPoints();
-                RealImpactListenerPoints = MeshInstance(num_points, num_points, num_points);
+                RealImpactListenerPoints = Geometry(num_points, num_points, num_points);
                 for (size_t i = 0; i < num_points; i++) {
                     RealImpactListenerPoints.Indices.push_back(i);
                     const auto v = RealImpact->ListenerPoint(i);

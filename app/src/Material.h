@@ -9,4 +9,4 @@ struct MaterialProperties {
 };
 
 extern std::map<std::string, MaterialProperties> MaterialPresets;
-extern MaterialProperties Material; // Global instance
+extern MaterialProperties Material; // Global.
