@@ -15,7 +15,11 @@ using std::vector;
 struct Geometry {
     Geometry();
     Geometry(uint num_vertices, uint num_normals, uint num_indices);
+    Geometry(fs::path file_path);
+
     ~Geometry();
+
+    void Load(fs::path file_path);
 
     void Bind() const; // Bind mesh and set up vertex attributes.
     void Clear();

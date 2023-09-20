@@ -1,7 +1,6 @@
 #include "Mesh.h"
 
 #include <format>
-#include <iomanip>
 
 // mesh2faust/vega
 #include "mesh2faust.h"
@@ -40,54 +39,12 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(FilePath);
         ExtrudeProfile();
-        return;
+    } else {
+        TriangularMesh.Load(FilePath);
     }
-
-    FILE *fp;
-    fp = fopen(FilePath.c_str(), "rb");
-    if (fp == nullptr) throw std::runtime_error("Error loading file: " + FilePath.string());
-
-    float x, y, z;
-    int fx, fy, fz, ignore;
-    int c1, c2;
-    while (!feof(fp)) {
-        c1 = fgetc(fp);
-        while (!(c1 == 'v' || c1 == 'f')) {
-            c1 = fgetc(fp);
-            if (feof(fp)) break;
-        }
-        c2 = fgetc(fp);
-        if ((c1 == 'v') && (c2 == ' ')) {
-            fscanf(fp, "%f %f %f", &x, &y, &z);
-            TriangularMesh.Vertices.push_back({x, y, z});
-        } else if ((c1 == 'v') && (c2 == 'n')) {
-            fscanf(fp, "%f %f %f", &x, &y, &z);
-            TriangularMesh.Normals.push_back(glm::normalize(vec3(x, y, z)));
-        } else if (c1 == 'f') {
-            fscanf(fp, "%d", &fx);
-            int first_char = fgetc(fp);
-            int second_char = fgetc(fp);
-            if (first_char == '/' && second_char == '/') {
-                fscanf(fp, "%d %d//%d %d//%d", &ignore, &fy, &ignore, &fz, &ignore);
-            } else {
-                ungetc(second_char, fp);
-                fscanf(fp, "%d %d/%d %d/%d", &ignore, &fy, &ignore, &fz, &ignore);
-            }
-            TriangularMesh.Indices.push_back(fx - 1);
-            TriangularMesh.Indices.push_back(fy - 1);
-            TriangularMesh.Indices.push_back(fz - 1);
-        }
-    }
-    fclose(fp);
-
-    TriangularMesh.ComputeNormals();
-    TriangularMesh.UpdateBounds();
-    TriangularMesh.Center();
-    Bind();
 }
 
-Mesh::~Mesh() {
-}
+Mesh::~Mesh() {}
 
 const Geometry &Mesh::GetActiveGeometry() const {
     if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;

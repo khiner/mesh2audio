@@ -22,6 +22,54 @@ Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices) : Geom
     Indices.reserve(num_indices);
 }
 
+Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
+
+void Geometry::Load(fs::path file_path) {
+    if (file_path.extension() != ".obj") throw std::runtime_error("Unsupported file type: " + file_path.string());
+
+    FILE *fp;
+    fp = fopen(file_path.c_str(), "rb");
+    if (fp == nullptr) throw std::runtime_error("Error loading file: " + file_path.string());
+
+    float x, y, z;
+    int fx, fy, fz, ignore;
+    int c1, c2;
+    while (!feof(fp)) {
+        c1 = fgetc(fp);
+        while (!(c1 == 'v' || c1 == 'f')) {
+            c1 = fgetc(fp);
+            if (feof(fp)) break;
+        }
+        c2 = fgetc(fp);
+        if ((c1 == 'v') && (c2 == ' ')) {
+            fscanf(fp, "%f %f %f", &x, &y, &z);
+            Vertices.push_back({x, y, z});
+        } else if ((c1 == 'v') && (c2 == 'n')) {
+            fscanf(fp, "%f %f %f", &x, &y, &z);
+            Normals.push_back(glm::normalize(vec3(x, y, z)));
+        } else if (c1 == 'f') {
+            fscanf(fp, "%d", &fx);
+            int first_char = fgetc(fp);
+            int second_char = fgetc(fp);
+            if (first_char == '/' && second_char == '/') {
+                fscanf(fp, "%d %d//%d %d//%d", &ignore, &fy, &ignore, &fz, &ignore);
+            } else {
+                ungetc(second_char, fp);
+                fscanf(fp, "%d %d/%d %d/%d", &ignore, &fy, &ignore, &fz, &ignore);
+            }
+            Indices.push_back(fx - 1);
+            Indices.push_back(fy - 1);
+            Indices.push_back(fz - 1);
+        }
+    }
+    fclose(fp);
+
+    ComputeNormals();
+    UpdateBounds();
+    Center();
+    Bind();
+}
+
 Geometry::~Geometry() {
     glDeleteBuffers(1, &IndexBuffer);
     glDeleteBuffers(1, &NormalBuffer);
