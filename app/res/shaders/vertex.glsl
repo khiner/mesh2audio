@@ -3,6 +3,7 @@
 // Vertex array layout inputs to the vertex shader.
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
+layout (location = 2) in mat4 aInstanceModel;
 
 // Uniform variables.
 uniform mat4 model_view;
@@ -13,7 +14,9 @@ out vec3 vertex_normal;
 out vec4 vertex_position;
 
 void main() {
-    gl_Position = projection * model_view * vec4(aPos, 1.0);
+    vertex_position = aInstanceModel * vec4(aPos, 1.0);
+    gl_Position = projection * model_view * vertex_position;
     vertex_normal = aNormal;
-    vertex_position = vec4(aPos, 1.0);
+    // Only using instancing for translation at the moment, so normals won't change per-instance.
+    // vertex_normal = mat3(transpose(inverse(aInstanceModel))) * aNormal;
 }

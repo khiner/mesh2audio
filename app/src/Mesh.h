@@ -88,7 +88,7 @@ private:
     Worker RealImpactLoader{
         "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
 
-    std::vector<Sphere> RealImpactListenerPoints;
+    Sphere RealImpactListenerPoints{0.01};
 
     void Bind(); // Bind active geometry.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.

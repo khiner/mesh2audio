@@ -7,15 +7,20 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/string_cast.hpp>
 
-using glm::vec2, glm::vec3;
+using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
+
+static const mat4 Identity(1.f);
 
 Geometry::Geometry() {
     glGenVertexArrays(1, &VertexArray);
     glGenBuffers(1, &VertexBuffer);
     glGenBuffers(1, &NormalBuffer);
     glGenBuffers(1, &IndexBuffer);
+    glGenBuffers(1, &InstanceModelBuffer);
+    InstanceModels.push_back(Identity);
 }
+
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices) : Geometry() {
     Vertices.reserve(num_vertices);
     Normals.reserve(num_normals);
@@ -23,6 +28,14 @@ Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices) : Geom
 }
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
+
+Geometry::~Geometry() {
+    glDeleteBuffers(1, &IndexBuffer);
+    glDeleteBuffers(1, &NormalBuffer);
+    glDeleteBuffers(1, &VertexBuffer);
+    glDeleteBuffers(1, &InstanceModelBuffer);
+    glDeleteVertexArrays(1, &VertexArray);
+}
 
 void Geometry::Load(fs::path file_path) {
     if (file_path.extension() != ".obj") throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -70,27 +83,31 @@ void Geometry::Load(fs::path file_path) {
     Bind();
 }
 
-Geometry::~Geometry() {
-    glDeleteBuffers(1, &IndexBuffer);
-    glDeleteBuffers(1, &NormalBuffer);
-    glDeleteBuffers(1, &VertexBuffer);
-    glDeleteVertexArrays(1, &VertexArray);
-}
-
 void Geometry::Bind() const {
     glBindVertexArray(VertexArray);
 
-    // Bind vertices to layout location 0
+    // Bind vertices to layout location 0.
     glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader
+    glEnableVertexAttribArray(0); // This allows usage of layout location 0 in the vertex shader.
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 
-    // Bind normals to layout location 1
+    // Bind normals to layout location 1.
     glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader
+    glEnableVertexAttribArray(1); // This allows usage of layout location 1 in the vertex shader.
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    // Create a VBO for the instance model matrix and set it to identity.
+    glBindBuffer(GL_ARRAY_BUFFER, InstanceModelBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(mat4) * InstanceModels.size(), &InstanceModels[0], GL_STATIC_DRAW);
+
+    // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
+    for (int i = 0; i < 4; i++) {
+        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(vec4), (GLvoid *)(i * sizeof(vec4)));
+        glEnableVertexAttribArray(2 + i);
+        glVertexAttribDivisor(2 + i, 1); // This makes it so that the attribute is updated once per instance.
+    }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * Indices.size(), &Indices[0], GL_STATIC_DRAW);

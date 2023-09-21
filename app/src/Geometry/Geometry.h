@@ -6,6 +6,7 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 namespace fs = std::filesystem;
 
@@ -39,7 +40,9 @@ struct Geometry {
 
     vector<glm::vec3> Vertices, Normals;
     vector<uint> Indices;
+    std::vector<glm::mat4> InstanceModels;
     glm::vec3 Min, Max; // The bounding box of the mesh.
 
     uint VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
+    uint InstanceModelBuffer;
 };

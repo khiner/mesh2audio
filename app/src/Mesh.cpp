@@ -25,6 +25,7 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
+static const mat4 Identity(1.f);
 static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
@@ -288,9 +289,7 @@ void Mesh::Render() {
     }
     Scene.Draw(GetActiveGeometry());
     DrawGl();
-    for (const auto &point : RealImpactListenerPoints) {
-        Scene.Draw(point);
-    }
+    Scene.Draw(RealImpactListenerPoints);
     Scene.Render();
 
     const auto &geometry = GetActiveGeometry();
@@ -489,12 +488,12 @@ void Mesh::RenderConfig() {
             }
             if (RealImpactLoader.Render() && RealImpact) {
                 const size_t num_points = RealImpact->NumListenerPoints();
-                static const float point_radius = 0.01f;
+                RealImpactListenerPoints.InstanceModels.clear();
                 for (size_t i = 0; i < num_points; i++) {
-                    RealImpactListenerPoints.emplace_back(point_radius);
-                    RealImpactListenerPoints.back().Translate(RealImpact->ListenerPoint(i));
-                    RealImpactListenerPoints.back().Bind();
+                    const auto translate_to = RealImpact->ListenerPoint(i);
+                    RealImpactListenerPoints.InstanceModels.push_back(glm::translate(Identity, translate_to));
                 }
+                RealImpactListenerPoints.Bind();
             }
             EndTabItem();
         }

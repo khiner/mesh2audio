@@ -120,7 +120,11 @@ void Scene::Draw(const Geometry &geometry) {
     }
 
     // All render modes:
-    glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+    if (geometry.InstanceModels.size() == 1) {
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+    } else {
+        glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry.InstanceModels.size());
+    }
 }
 
 void Scene::DrawPoints(int first, int count, const float color[]) {
