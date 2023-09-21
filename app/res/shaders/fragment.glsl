@@ -3,6 +3,7 @@
 // Inputs passed in from the vertex shader.
 in vec3 vertex_normal;
 in vec4 vertex_position;
+in vec4 instance_color;
 
 // Output of the fragment shader.
 out vec4 frag_color;
@@ -43,5 +44,5 @@ void main (void) {
         final_color += compute_lighting(dir, light_color[i], normal, half_vector, diffuse_color, specular_color, shininess_factor);
     }
 
-    frag_color = final_color;
+    frag_color = final_color * instance_color;
 }

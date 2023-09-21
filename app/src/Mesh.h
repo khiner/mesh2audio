@@ -69,11 +69,14 @@ struct Mesh {
     fs::path FilePath; // Most recently loaded file path.
 
 private:
+    void UpdateExcitableVertexColors();
     void UpdateExcitableVertices();
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
+
+    void Bind(); // Bind active geometry.
 
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
@@ -88,8 +91,7 @@ private:
     Worker RealImpactLoader{
         "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
 
-    Sphere RealImpactListenerPoints{0.01};
-
-    void Bind(); // Bind active geometry.
-    void DrawGl() const; // Draw the active mesh to the OpenGL context.
+    vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
+    Sphere ExcitableVertexPoints{0.0025}; // Instanced spheres for each excitable vertex.
+    Sphere RealImpactListenerPoints{0.01}; // Instanced spheres for each listener point.
 };

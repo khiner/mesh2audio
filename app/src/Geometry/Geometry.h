@@ -4,9 +4,12 @@
 
 #include <filesystem>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include <glm/mat4x4.hpp>
+
+inline static const glm::mat4 Identity(1.f);
+inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
 
@@ -40,9 +43,10 @@ struct Geometry {
 
     vector<glm::vec3> Vertices, Normals;
     vector<uint> Indices;
-    std::vector<glm::mat4> InstanceModels;
+    std::vector<glm::mat4> InstanceModels{Identity};
+    std::vector<glm::vec4> InstanceColors{glm::vec4{1, 1, 1, 1}};
     glm::vec3 Min, Max; // The bounding box of the mesh.
 
     uint VertexArray, VertexBuffer, NormalBuffer, IndexBuffer;
-    uint InstanceModelBuffer;
+    uint InstanceModelBuffer, InstanceColorBuffer;
 };

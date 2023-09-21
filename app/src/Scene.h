@@ -23,9 +23,9 @@ struct Scene {
     inline static const int NumLights = 5;
     float LightPositions[NumLights * 4] = {0.0f};
     float LightColors[NumLights * 4] = {0.0f};
-    float Ambient[4] = {0.05, 0.05, 0.05, 1};
-    float Diffusion[4] = {0.2, 0.2, 0.2, 1};
-    float Specular[4] = {0.5, 0.5, 0.5, 1};
+    float AmbientColor[4] = {0.05, 0.05, 0.05, 1};
+    float DiffusionColor[4] = {0.2, 0.2, 0.2, 1};
+    float SpecularColor[4] = {0.5, 0.5, 0.5, 1};
     float Shininess = 10;
     bool CustomColors = false;
 
@@ -46,8 +46,6 @@ struct Scene {
     void RestoreDefaultMaterial();
 
     void Draw(const Geometry &);
-    void DrawPoint(int vertex_index, const float color[]);
-    void DrawPoints(int first, int count, const float color[]);
 
     void SetupRender();
     void Render();

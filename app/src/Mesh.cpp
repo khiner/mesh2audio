@@ -25,11 +25,7 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
-static const mat4 Identity(1.f);
-static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
-
 static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-static vector<int> ExcitableVertexIndices;
 
 Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     const bool is_svg = file_path.extension() == ".svg";
@@ -43,6 +39,8 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     } else {
         TriangularMesh.Load(FilePath);
     }
+    UpdateExcitableVertices();
+    ExcitableVertexPoints.Bind();
 }
 
 Mesh::~Mesh() {}
@@ -87,7 +85,7 @@ void Mesh::ExtrudeProfile() {
     HoveredVertexIndex = CameraTargetVertexIndex = -1;
     TetMesh.Clear();
     TetMeshPath.clear();
-    ExcitableVertexIndices.clear();
+    UpdateExcitableVertices();
     TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     ActiveViewMeshType = MeshType_Triangular;
     Bind();
@@ -104,9 +102,10 @@ static void SetColor(const float to[], float result[]) {
     for (int i = 0; i < 4; i++) result[i] = to[i];
 }
 
-void Mesh::DrawGl() const {
+void Mesh::UpdateExcitableVertexColors() {
     if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+            // todo update to use vec4 for all colors.
             static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
             static const float ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
             static const float ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
@@ -120,25 +119,35 @@ void Mesh::DrawGl() const {
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
-
-            Scene.DrawPoint(ExcitableVertexIndices[i], vertex_color);
+            ExcitableVertexPoints.InstanceColors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
-        Scene.RestoreDefaultMaterial();
+        ExcitableVertexPoints.Bind(); // todo only re-bind colors.
     }
-    glBindVertexArray(0);
 }
 
-static string FormatTime(seconds_t seconds) {
-    return date::format("{:%m-%d %H:%M:%S %Z}", seconds);
+void Mesh::UpdateExcitableVertices() {
+    ExcitableVertexPoints.InstanceModels.clear();
+    ExcitableVertexPoints.InstanceColors.clear();
+    ExcitableVertexIndices.clear();
+    if (TetMesh.Vertices.empty()) return;
+
+    // Linearly sample excitable vertices from all available vertices.
+    ExcitableVertexIndices.resize(NumExcitableVertices);
+    for (int i = 0; i < NumExcitableVertices; i++) {
+        const float t = float(i) / (NumExcitableVertices - 1);
+        ExcitableVertexIndices[i] = int(t * (TetMesh.Vertices.size() - 1));
+    }
+
+    for (auto vertex_index : ExcitableVertexIndices) {
+        ExcitableVertexPoints.InstanceModels.push_back(glm::translate(Identity, TetMesh.Vertices[vertex_index]));
+        ExcitableVertexPoints.InstanceColors.push_back({1, 1, 1, 1});
+    }
 }
 
-static seconds_t GetTimeFromPath(const fs::path &file_path) {
-    return seconds_t{std::chrono::seconds(std::stoi(file_path.stem()))};
-}
+static string FormatTime(seconds_t seconds) { return date::format("{:%m-%d %H:%M:%S %Z}", seconds); }
+static seconds_t GetTimeFromPath(const fs::path &file_path) { return seconds_t{std::chrono::seconds(std::stoi(file_path.stem()))}; }
 
-string Mesh::GetTetMeshName(fs::path file_path) {
-    return FormatTime(GetTimeFromPath(file_path));
-}
+string Mesh::GetTetMeshName(fs::path file_path) { return FormatTime(GetTimeFromPath(file_path)); }
 
 static const fs::path TempDir = "tmp";
 static const fs::path TetSaveDir = "saved_tet_meshes";
@@ -152,15 +161,6 @@ static vector<seconds_t> GetSavedTetMeshTimes() {
     // Sort by most recent first.
     std::sort(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end(), std::greater<>());
     return saved_tet_mesh_times;
-}
-
-void Mesh::UpdateExcitableVertices() {
-    // Linearly sample excitable vertices from all available vertices.
-    ExcitableVertexIndices.resize(NumExcitableVertices);
-    for (int i = 0; i < NumExcitableVertices; i++) {
-        const float t = float(i) / (NumExcitableVertices - 1);
-        ExcitableVertexIndices[i] = int(t * (TetMesh.Vertices.size() - 1));
-    }
 }
 
 void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
@@ -287,9 +287,10 @@ void Mesh::Render() {
         ActiveViewMeshType = ViewMeshType;
         Bind();
     }
+    UpdateExcitableVertexColors();
     Scene.Draw(GetActiveGeometry());
-    DrawGl();
-    Scene.Draw(RealImpactListenerPoints);
+    Scene.Draw(ExcitableVertexPoints);
+    if (RealImpact) Scene.Draw(RealImpactListenerPoints);
     Scene.Render();
 
     const auto &geometry = GetActiveGeometry();
@@ -489,9 +490,10 @@ void Mesh::RenderConfig() {
             if (RealImpactLoader.Render() && RealImpact) {
                 const size_t num_points = RealImpact->NumListenerPoints();
                 RealImpactListenerPoints.InstanceModels.clear();
+                RealImpactListenerPoints.InstanceColors.clear();
                 for (size_t i = 0; i < num_points; i++) {
-                    const auto translate_to = RealImpact->ListenerPoint(i);
-                    RealImpactListenerPoints.InstanceModels.push_back(glm::translate(Identity, translate_to));
+                    RealImpactListenerPoints.InstanceModels.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
+                    RealImpactListenerPoints.InstanceColors.push_back({1, 1, 1, 1});
                 }
                 RealImpactListenerPoints.Bind();
             }

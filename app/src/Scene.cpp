@@ -17,9 +17,6 @@ using namespace ImGui;
 
 static GlCanvas Canvas;
 
-static const mat4 Identity(1.f);
-static const vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
-
 // Variables to set uniform params for lighting fragment shader
 static GLuint LightColorLoc, LightPositionLoc,
     AmbientColorLoc, DiffuseColorLoc, SpecularColorLoc, ShininessColorLoc,
@@ -84,13 +81,15 @@ void Scene::SetupRender() {
     glUniform4fv(LightPositionLoc, NumLights, LightPositions);
     glUniform4fv(LightColorLoc, NumLights, LightColors);
 
-    glUniform4fv(AmbientColorLoc, 1, Ambient);
-    glUniform4fv(DiffuseColorLoc, 1, Diffusion);
-    glUniform4fv(SpecularColorLoc, 1, Specular);
+    glUniform4fv(AmbientColorLoc, 1, AmbientColor);
+    glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
+    glUniform4fv(SpecularColorLoc, 1, SpecularColor);
     glUniform1f(ShininessColorLoc, Shininess);
 }
 
 void Scene::Draw(const Geometry &geometry) {
+    if (geometry.InstanceModels.empty()) return;
+
     const int num_indices = geometry.Indices.size();
     glBindVertexArray(geometry.VertexArray);
     if (RenderMode == RenderType_Smooth) {
@@ -127,23 +126,9 @@ void Scene::Draw(const Geometry &geometry) {
     }
 }
 
-void Scene::DrawPoints(int first, int count, const float color[]) {
-    glUniform4fv(DiffuseColorLoc, 1, color);
-    glUniform4fv(SpecularColorLoc, 1, color);
-
-    // Draw the excite vertex as a single point
-    glPointSize(8.0);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-    glDrawArrays(GL_POINTS, first, count);
-}
-
-void Scene::DrawPoint(int vertex_index, const float color[]) {
-    DrawPoints(vertex_index, 1, color);
-}
-
 void Scene::RestoreDefaultMaterial() {
-    glUniform4fv(DiffuseColorLoc, 1, Diffusion);
-    glUniform4fv(SpecularColorLoc, 1, Specular);
+    glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
+    glUniform4fv(SpecularColorLoc, 1, SpecularColor);
 }
 
 void Scene::Render() {
@@ -230,19 +215,19 @@ void Scene::RenderConfig() {
             SeparatorText("Colors");
             Checkbox("Custom colors", &CustomColors);
             if (CustomColors) {
-                ColorEdit3("Ambient", &Ambient[0]);
-                ColorEdit3("Diffusion", &Diffusion[0]);
-                ColorEdit3("Specular", &Specular[0]);
+                ColorEdit3("Ambient", &AmbientColor[0]);
+                ColorEdit3("Diffusion", &DiffusionColor[0]);
+                ColorEdit3("Specular", &SpecularColor[0]);
                 SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
             } else {
                 for (int i = 1; i < 3; i++) {
-                    Ambient[i] = Ambient[0];
-                    Diffusion[i] = Diffusion[0];
-                    Specular[i] = Specular[0];
+                    AmbientColor[i] = AmbientColor[0];
+                    DiffusionColor[i] = DiffusionColor[0];
+                    SpecularColor[i] = SpecularColor[0];
                 }
-                SliderFloat("Ambient", &Ambient[0], 0.0f, 1.0f);
-                SliderFloat("Diffusion", &Diffusion[0], 0.0f, 1.0f);
-                SliderFloat("Specular", &Specular[0], 0.0f, 1.0f);
+                SliderFloat("Ambient", &AmbientColor[0], 0.0f, 1.0f);
+                SliderFloat("Diffusion", &DiffusionColor[0], 0.0f, 1.0f);
+                SliderFloat("Specular", &SpecularColor[0], 0.0f, 1.0f);
                 SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
             }
 
