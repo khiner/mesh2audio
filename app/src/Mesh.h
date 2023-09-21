@@ -4,7 +4,8 @@
 
 #include <cinolib/geometry/vec_mat.h>
 
-#include "Geometry.h"
+#include "Geometry/Geometry.h"
+#include "Geometry/Primitive/Sphere.h"
 #include "Material.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
@@ -49,9 +50,7 @@ struct Mesh {
     static std::string GetTetMeshName(fs::path file_path);
 
     std::string GenerateDsp() const;
-    std::string GenerateDspAxisymmetric() const {
-        return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : "";
-    }
+    std::string GenerateDspAxisymmetric() const { return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : ""; }
     int Num3DExcitationVertices() const { return NumExcitableVertices; }
     int Num2DExcitationVertices() const { return Profile != nullptr ? Profile->NumExcitationVertices() : 0; }
 
@@ -80,7 +79,7 @@ private:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 
-    Geometry TriangularMesh, TetMesh, RealImpactListenerPoints;
+    Geometry TriangularMesh, TetMesh;
     Type ActiveViewMeshType = MeshType_Triangular;
 
     ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
@@ -88,6 +87,8 @@ private:
     Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
     Worker RealImpactLoader{
         "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
+
+    std::vector<Sphere> RealImpactListenerPoints;
 
     void Bind(); // Bind active geometry.
     void DrawGl() const; // Draw the active mesh to the OpenGL context.

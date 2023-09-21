@@ -29,8 +29,9 @@ struct Geometry {
 
     void Flip(bool x, bool y, bool z);
     void Rotate(const glm::vec3 &axis, float angle);
-    void Scale(const glm::vec3 &scale);
+    void Scale(const glm::vec3 &);
     void Center();
+    void Translate(const glm::vec3 &);
 
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).

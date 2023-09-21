@@ -94,22 +94,22 @@ void Mesh::ExtrudeProfile() {
 
 void Mesh::Bind() { GetActiveGeometry().Bind(); }
 
-static void InterpolateColors(float a[], float b[], float interpolation, float result[]) {
+static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
     for (int i = 0; i < 4; i++) {
         result[i] = a[i] * (1.0 - interpolation) + b[i] * interpolation;
     }
 }
-static void SetColor(float to[], float result[]) {
+static void SetColor(const float to[], float result[]) {
     for (int i = 0; i < 4; i++) result[i] = to[i];
 }
 
 void Mesh::DrawGl() const {
     if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-            static float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
-            static float ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
-            static float ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
-            static float ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
+            static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
+            static const float ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
+            static const float ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
+            static const float ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
 
             static float vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
             if (!Audio::FaustState::IsRunning()) {
@@ -288,14 +288,9 @@ void Mesh::Render() {
     }
     Scene.Draw(GetActiveGeometry());
     DrawGl();
-    // todo points not rendering. Going to work on multiple geometries first.
-    // if (RealImpact) {
-    //     // Draw RealImpact listener points.
-    //     static const float color[4] = {0, 1, 0, 1};
-    //     glBindVertexArray(RealImpactListenerPoints.VertexArray);
-    //     Scene.DrawPoints(0, RealImpact->NumListenerPoints(), color);
-    //     Scene.RestoreDefaultMaterial();
-    // }
+    for (const auto &point : RealImpactListenerPoints) {
+        Scene.Draw(point);
+    }
     Scene.Render();
 
     const auto &geometry = GetActiveGeometry();
@@ -494,17 +489,12 @@ void Mesh::RenderConfig() {
             }
             if (RealImpactLoader.Render() && RealImpact) {
                 const size_t num_points = RealImpact->NumListenerPoints();
-                RealImpactListenerPoints = Geometry(num_points, num_points, num_points);
+                static const float point_radius = 0.01f;
                 for (size_t i = 0; i < num_points; i++) {
-                    RealImpactListenerPoints.Indices.push_back(i);
-                    const auto v = RealImpact->ListenerPoint(i);
-                    RealImpactListenerPoints.Vertices.push_back(v);
-                    const float x = v[0], y = v[1], z = v[2];
-                    const float angle = atan2(z, x);
-                    RealImpactListenerPoints.Normals.push_back({cos(angle), 0, sin(angle)});
+                    RealImpactListenerPoints.emplace_back(point_radius);
+                    RealImpactListenerPoints.back().Translate(RealImpact->ListenerPoint(i));
+                    RealImpactListenerPoints.back().Bind();
                 }
-                RealImpactListenerPoints.UpdateBounds();
-                RealImpactListenerPoints.Bind();
             }
             EndTabItem();
         }

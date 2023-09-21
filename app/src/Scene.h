@@ -7,7 +7,7 @@
 
 #include "ImGuizmo.h"
 
-#include "Geometry.h"
+#include "Geometry/Geometry.h"
 
 struct ImVec2;
 

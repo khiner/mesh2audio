@@ -150,6 +150,11 @@ void Geometry::Center() {
     UpdateBounds();
 }
 
+void Geometry::Translate(const glm::vec3 &translation) {
+    for (auto &vertex : Vertices) vertex += translation;
+    UpdateBounds();
+}
+
 void Geometry::ComputeNormals() {
     if (!Normals.empty()) return;
 

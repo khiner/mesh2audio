@@ -85,6 +85,10 @@
     "utility": "cpp",
     "memory_resource": "cpp",
     "random": "cpp",
-    "semaphore": "cpp"
+    "semaphore": "cpp",
+    "numbers": "cpp",
+    "*.ipp": "cpp",
+    "*.expression": "cpp",
+    "fft": "cpp"
   }
 }
