@@ -1,6 +1,6 @@
 #include "Scene.h"
 
-#include "GlCanvas.h"
+#include "GLCanvas.h"
 #include "Shader.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,7 +15,7 @@ using std::string;
 
 using namespace ImGui;
 
-static GlCanvas Canvas;
+static GLCanvas Canvas;
 
 // Variables to set uniform params for lighting fragment shader
 static GLuint LightColorLoc, LightPositionLoc,
@@ -89,6 +89,8 @@ void Scene::SetupRender() {
 
 void Scene::Draw(const Geometry &geometry) {
     if (geometry.InstanceModels.empty()) return;
+
+    geometry.BindData(); // Only rebinds the data if it has changed.
 
     const int num_indices = geometry.Indices.size();
     glBindVertexArray(geometry.VertexArray);

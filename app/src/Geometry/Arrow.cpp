@@ -20,7 +20,7 @@ Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length
         Normals.push_back({x, 0.0f, z});
     }
     for (uint i = 0; i < segments * 2; i += 2) {
-        Indices.insert(Indices.end(), {i, i + 1, i + 2, i + 1, i + 3, i + 2});
+        Indices.append({i, i + 1, i + 2, i + 1, i + 3, i + 2});
     }
 
     // Add top cap of the cylinder base
@@ -28,7 +28,7 @@ Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length
     Normals.push_back({0.0f, 1.0f, 0.0f});
     const uint base_cap_center_index = Vertices.size() - 1;
     for (uint i = 0; i < segments; ++i) {
-        Indices.insert(Indices.end(), {base_cap_center_index, 2 * i + 1, 2 * ((i + 1) % segments) + 1});
+        Indices.append({base_cap_center_index, 2 * i + 1, 2 * ((i + 1) % segments) + 1});
     }
 
     const int base_vertex_count = Vertices.size();
@@ -49,8 +49,6 @@ Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length
 
     // Tip indices.
     for (uint i = 0; i < segments; ++i) {
-        Indices.insert(Indices.end(), {base_vertex_count + i, base_vertex_count + i + 1, base_vertex_count + segments + 1});
+        Indices.append({base_vertex_count + i, base_vertex_count + i + 1, base_vertex_count + segments + 1});
     }
-
-    Bind();
 }

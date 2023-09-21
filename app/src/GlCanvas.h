@@ -1,8 +1,8 @@
 #pragma once
 
 // Render an OpenGL frame buffer to a texture.
-struct GlCanvas {
-    ~GlCanvas();
+struct GLCanvas {
+    ~GLCanvas();
 
     // RGBA background color.
     void SetupRender(float width, float height, float r, float g, float b, float a);

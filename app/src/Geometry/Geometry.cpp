@@ -3,35 +3,44 @@
 #include <fstream>
 #include <iostream>
 
-#include <GL/glew.h>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/string_cast.hpp>
 
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
-Geometry::Geometry() {
+Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
+    : Vertices(num_vertices), Normals(num_normals), Indices(num_indices) {
     glGenVertexArrays(1, &VertexArray);
-    glGenBuffers(1, &VertexBuffer);
-    glGenBuffers(1, &NormalBuffer);
-    glGenBuffers(1, &IndexBuffer);
-    glGenBuffers(1, &InstanceModelBuffer);
-    glGenBuffers(1, &InstanceColorBuffer);
-}
+    glBindVertexArray(VertexArray);
 
-Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices) : Geometry() {
-    Vertices.reserve(num_vertices);
-    Normals.reserve(num_normals);
-    Indices.reserve(num_indices);
+    Vertices.Bind();
+    glEnableVertexAttribArray(0); // `layout (location = 0)` in the vertex shader
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    Normals.Bind();
+    glEnableVertexAttribArray(1); // `layout (location = 1)` in the vertex shader
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+
+    InstanceModels.Bind();
+    // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
+    for (int i = 0; i < 4; i++) {
+        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(vec4), (GLvoid *)(i * sizeof(vec4)));
+        glEnableVertexAttribArray(2 + i);
+        glVertexAttribDivisor(2 + i, 1); // Attribute is updated once per instance.
+    }
+
+    InstanceColors.Bind();
+    glEnableVertexAttribArray(6); // `layout (location = 6)` in the vertex shader
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+    glVertexAttribDivisor(6, 1); // Attribute is updated once per instance.
+
+    glBindVertexArray(0);
 }
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
 
 Geometry::~Geometry() {
-    glDeleteBuffers(1, &IndexBuffer);
-    glDeleteBuffers(1, &NormalBuffer);
-    glDeleteBuffers(1, &VertexBuffer);
-    glDeleteBuffers(1, &InstanceModelBuffer);
     glDeleteVertexArrays(1, &VertexArray);
 }
 
@@ -78,47 +87,15 @@ void Geometry::Load(fs::path file_path) {
     ComputeNormals();
     UpdateBounds();
     Center();
-    Bind();
 }
 
-void Geometry::Bind() const {
+void Geometry::BindData() const {
     glBindVertexArray(VertexArray);
-
-    // Bind vertices.
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Vertices.size(), &Vertices[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0); // `layout (location = 0)` in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-
-    // Bind normals.
-    glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * Normals.size(), &Normals[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(1); // `layout (location = 1)` in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-
-    // Bind instance models.
-    glBindBuffer(GL_ARRAY_BUFFER, InstanceModelBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(mat4) * InstanceModels.size(), &InstanceModels[0], GL_STATIC_DRAW);
-
-    // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
-    for (int i = 0; i < 4; i++) {
-        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(vec4), (GLvoid *)(i * sizeof(vec4)));
-        glEnableVertexAttribArray(2 + i);
-        glVertexAttribDivisor(2 + i, 1); // Attribute is updated once per instance.
-    }
-
-    // Bind instance colors.
-    glBindBuffer(GL_ARRAY_BUFFER, InstanceColorBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4) * InstanceColors.size(), &InstanceColors[0], GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(6); // `layout (location = 6)` in the vertex shader
-    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glVertexAttribDivisor(6, 1); // Attribute is updated once per instance.
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * Indices.size(), &Indices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    Vertices.BindData();
+    Normals.BindData();
+    Indices.BindData();
+    InstanceModels.BindData();
+    InstanceColors.BindData();
     glBindVertexArray(0);
 }
 
@@ -178,6 +155,11 @@ void Geometry::Translate(const glm::vec3 &translation) {
     UpdateBounds();
 }
 
+void Geometry::SetColor(const vec4 &color) {
+    InstanceColors.clear();
+    InstanceColors.resize(InstanceModels.size(), color);
+}
+
 void Geometry::ComputeNormals() {
     if (!Normals.empty()) return;
 
@@ -189,7 +171,7 @@ void Geometry::ComputeNormals() {
         const vec3 &v1 = Vertices[Indices[i + 1]];
         const vec3 &v2 = Vertices[Indices[i + 2]];
         const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-        Normals[Indices[i]] = Normals[Indices[i + 1]] = Normals[Indices[i + 2]] = normal;
+        for (int j = 0; j < 3; j++) Normals.Set(Indices[i + j], normal);
     }
 }
 

@@ -1,13 +1,13 @@
-#include "GlCanvas.h"
+#include "GLCanvas.h"
 
 #include "GL/glew.h"
 #include <stdexcept>
 
-GlCanvas::~GlCanvas() {
+GLCanvas::~GLCanvas() {
     Destroy();
 }
 
-void GlCanvas::SetupRender(float width, float height, float r, float g, float b, float a) {
+void GLCanvas::SetupRender(float width, float height, float r, float g, float b, float a) {
     if (width != Width || height != Height) {
         // Render image to twice the dimensions, for better quality.
         Width = width * 2;
@@ -45,14 +45,14 @@ void GlCanvas::SetupRender(float width, float height, float r, float g, float b,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-unsigned int GlCanvas::Render() {
+unsigned int GLCanvas::Render() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return TextureId;
 }
 
 // Private
 
-void GlCanvas::Destroy() {
+void GLCanvas::Destroy() {
     glDeleteRenderbuffers(1, &DepthRenderBufferId);
     glDeleteTextures(1, &TextureId);
     glDeleteFramebuffers(1, &FrameBufferId);

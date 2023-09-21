@@ -78,8 +78,6 @@ private:
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
 
-    void Bind(); // Bind active geometry.
-
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;

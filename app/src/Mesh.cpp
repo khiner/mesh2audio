@@ -14,7 +14,6 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "Audio.h"
-#include <GL/glew.h>
 
 // auto start = std::chrono::high_resolution_clock::now();
 // auto end = std::chrono::high_resolution_clock::now();
@@ -38,11 +37,8 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
         TriangularMesh.Load(FilePath);
     }
 
-    HoveredVertexArrow.InstanceColors = {vec4{1, 0, 0, 1}};
-    HoveredVertexArrow.Bind(); // todo only re-bind colors.
-
+    HoveredVertexArrow.SetColor({1, 0, 0, 1});
     UpdateExcitableVertices();
-    ExcitableVertexPoints.Bind();
 }
 
 Mesh::~Mesh() {}
@@ -63,22 +59,18 @@ void Mesh::Save(fs::path file_path) const {
 void Mesh::Flip(bool x, bool y, bool z) {
     TriangularMesh.Flip(x, y, z);
     TetMesh.Flip(x, y, z);
-    Bind();
 }
 void Mesh::Rotate(const vec3 &axis, float angle) {
     TriangularMesh.Rotate(axis, angle);
     TetMesh.Rotate(axis, angle);
-    Bind();
 }
 void Mesh::Scale(const vec3 &scale) {
     TriangularMesh.Scale(scale);
     TetMesh.Scale(scale);
-    Bind();
 }
 void Mesh::Center() {
     TriangularMesh.Center();
     TetMesh.Center();
-    Bind();
 }
 
 void Mesh::ExtrudeProfile() {
@@ -90,10 +82,7 @@ void Mesh::ExtrudeProfile() {
     UpdateExcitableVertices();
     TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     ActiveViewMeshType = MeshType_Triangular;
-    Bind();
 }
-
-void Mesh::Bind() { GetActiveGeometry().Bind(); }
 
 static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
     for (int i = 0; i < 4; i++) {
@@ -121,9 +110,8 @@ void Mesh::UpdateExcitableVertexColors() {
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
-            ExcitableVertexPoints.InstanceColors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
+            ExcitableVertexPoints.InstanceColors.Set(i, {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]});
         }
-        ExcitableVertexPoints.Bind(); // todo only re-bind colors.
     }
 }
 
@@ -312,6 +300,7 @@ void Mesh::UpdateHoveredVertex() {
         }
     }
 
+    HoveredVertexArrow.InstanceModels.clear();
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.Vertices.size())) {
         // Point the arrow at the hovered vertex.
         const auto &hovered_vertex = geometry.Vertices[HoveredVertexIndex];
@@ -319,10 +308,7 @@ void Mesh::UpdateHoveredVertex() {
 
         mat4 translate = glm::translate(Identity, hovered_vertex);
         mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(hovered_normal)));
-        HoveredVertexArrow.InstanceModels = {translate * rotate};
-        HoveredVertexArrow.Bind();
-    } else {
-        HoveredVertexArrow.InstanceModels.clear();
+        HoveredVertexArrow.InstanceModels.push_back({translate * rotate});
     }
 }
 
@@ -332,12 +318,12 @@ void Mesh::Render() {
     }
     if (ActiveViewMeshType != ViewMeshType) {
         ActiveViewMeshType = ViewMeshType;
-        Bind();
     }
 
-    const auto &geometry = GetActiveGeometry();
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
+
+    const auto &geometry = GetActiveGeometry();
     Scene.Draw(geometry);
     Scene.Draw(ExcitableVertexPoints);
     Scene.Draw(HoveredVertexArrow);
@@ -499,7 +485,6 @@ void Mesh::RenderConfig() {
                     RealImpactListenerPoints.InstanceModels.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
                     RealImpactListenerPoints.InstanceColors.push_back({1, 1, 1, 1});
                 }
-                RealImpactListenerPoints.Bind();
             }
             EndTabItem();
         }
