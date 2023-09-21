@@ -1,53 +1,47 @@
-# version 330 core
+#version 330 core
 
 // Inputs passed in from the vertex shader.
-in vec3 mynormal;
-in vec4 myvertex;
+in vec3 vertex_normal;
+in vec4 vertex_position;
 
 // Output of the fragment shader.
-out vec4 fragColor;
+out vec4 frag_color;
 
 // Max number of light sources.
 const int num_lights = 5;
 
-// Uniform variable modelview.
-uniform mat4 modelview;
+uniform mat4 model_view;
 
-// Uniform variables to do with lighting.
-uniform vec4 light_posn[num_lights], light_col[num_lights];
+// Uniform variables related to lighting.
+uniform vec4 light_position[num_lights], light_color[num_lights];
 
-// Uniform variable for object properties.
-uniform vec4 ambient, diffuse, specular;
-uniform float shininess;
+// Uniform variables for object properties.
+uniform vec4 ambient_color, diffuse_color, specular_color;
+uniform float shininess_factor;
 
-vec4 compute_lighting(vec3 direction, vec4 lightcolor, vec3 normal, vec3 halfvec, vec4 mydiffuse, vec4 myspecular, float myshininess) {
+vec4 compute_lighting(vec3 direction, vec4 light_color, vec3 normal, vec3 half_vector, vec4 object_diffuse, vec4 object_specular, float object_shininess) {
     float n_dot_l = dot(normal, direction);
-    vec4 lambert = mydiffuse * lightcolor * max(n_dot_l, 0.0);
-    vec4 phong = myspecular * lightcolor * pow(max(dot(normal, halfvec), 0.0), myshininess);
+    vec4 lambert = object_diffuse * light_color * max(n_dot_l, 0.0);
+    vec4 phong = object_specular * light_color * pow(max(dot(normal, half_vector), 0.0), object_shininess);
     return lambert + phong;
 }       
 
 void main (void) {
-    // Calculate camera direction
-    vec3 eyepos = vec3(0,0,0);
-    vec3 mypos = myvertex.xyz / myvertex.w;
-    vec3 eyedirn = normalize(eyepos - mypos);
+    vec3 eye_position = vec3(0,0,0);
+    vec3 fragment_position = vertex_position.xyz / vertex_position.w;
+    vec3 eye_direction = normalize(eye_position - fragment_position);
 
-    // Normalise the normal at that point.
-    vec3 normal = normalize(mynormal);
+    vec3 normal = normalize(vertex_normal);
 
-    // Start with ambient color, and iterate through each light source (on or off).
-    vec4 finalcolor = vec4(ambient);
+    vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
-        vec4 light_position = inverse(modelview) * light_posn[i];
-        vec3 position = light_position.xyz / light_position.w;
-        vec3 direction = normalize(position - mypos);
-        vec3 half_i = normalize(direction + eyedirn);
-        vec4 light_color = light_col[i];
+        vec4 light_pos = inverse(model_view) * light_position[i];
+        vec3 pos = light_pos.xyz / light_pos.w;
+        vec3 dir = normalize(pos - fragment_position);
+        vec3 half_vector = normalize(dir + eye_direction);
 
-        // Compute light based on the normal at the point and the light direction.
-        finalcolor += compute_lighting(direction, light_color, normal, half_i, diffuse, specular, shininess);
+        final_color += compute_lighting(dir, light_color[i], normal, half_vector, diffuse_color, specular_color, shininess_factor);
     }
 
-    fragColor = finalcolor;
+    frag_color = final_color;
 }
