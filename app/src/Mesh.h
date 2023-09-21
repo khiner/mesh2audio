@@ -69,8 +69,9 @@ struct Mesh {
     fs::path FilePath; // Most recently loaded file path.
 
 private:
-    void UpdateExcitableVertexColors();
+    void UpdateHoveredVertex();
     void UpdateExcitableVertices();
+    void UpdateExcitableVertexColors();
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
@@ -90,6 +91,9 @@ private:
     Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
     Worker RealImpactLoader{
         "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
+
+    int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
+    Sphere HoveredVertexPoint{0.0015}; // Sphere shown at the nearest vertex under the mouse.
 
     vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
     Sphere ExcitableVertexPoints{0.0025}; // Instanced spheres for each excitable vertex.

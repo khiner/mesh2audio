@@ -25,8 +25,6 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
-static int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-
 Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     const bool is_svg = file_path.extension() == ".svg";
     const bool is_obj = file_path.extension() == ".obj";
@@ -39,6 +37,8 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     } else {
         TriangularMesh.Load(FilePath);
     }
+    HoveredVertexPoint.InstanceColors = {vec4{1, 0, 0, 1}};
+    HoveredVertexPoint.Bind(); // todo only re-bind colors.
     UpdateExcitableVertices();
     ExcitableVertexPoints.Bind();
 }
@@ -279,34 +279,17 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 
 using namespace ImGui;
 
-void Mesh::Render() {
-    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
-        ViewMeshType = MeshType_Triangular;
-    }
-    if (ActiveViewMeshType != ViewMeshType) {
-        ActiveViewMeshType = ViewMeshType;
-        Bind();
-    }
-    UpdateExcitableVertexColors();
-    Scene.Draw(GetActiveGeometry());
-    Scene.Draw(ExcitableVertexPoints);
-    if (RealImpact) Scene.Draw(RealImpactListenerPoints);
-    Scene.Render();
-
-    const auto &geometry = GetActiveGeometry();
-    const auto &vertices = geometry.Vertices;
-
-    const auto content_region = GetContentRegionAvail();
-    const bool window_hovered = IsWindowHovered();
-    const auto &window_pos = GetWindowPos();
+void Mesh::UpdateHoveredVertex() {
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
-    const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
-    if (window_hovered) {
+    const auto &vertices = GetActiveGeometry().Vertices;
+    if (IsWindowHovered()) {
+        const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
+        const auto content_region = GetContentRegionAvail();
         const auto &io = ImGui::GetIO();
         // Transform each vertex position to screen space and check if the mouse is hovering over it.
         const auto &mouse_pos = io.MousePos;
-        const auto &content_pos = window_pos + GetWindowContentRegionMin();
+        const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
         const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
         for (size_t i = 0; i < vertices.size(); i++) {
@@ -325,27 +308,38 @@ void Mesh::Render() {
         }
     }
 
-    // Visualize the hovered index.
     if (HoveredVertexIndex >= 0) {
-        const auto &content_pos = window_pos + GetWindowContentRegionMin();
-        const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
-        auto *dl = GetWindowDrawList();
         const auto &hovered_vertex = vertices[HoveredVertexIndex];
-        const vec4 pos_clip_space = view_projection * vec4{hovered_vertex.x, hovered_vertex.y, hovered_vertex.z, 1.0f};
-        const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
-        const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
-
-        // Adjust the circle radius based on the distance
-        static const float base_radius = 1.0f;
-        static const float distance_scale_factor = 2.f;
-        const float vertex_camera_distance = glm::distance(camera_position, hovered_vertex);
-        const float scaled_radius = base_radius + (1.f / vertex_camera_distance) * distance_scale_factor;
-        dl->AddCircleFilled(vertex_screen, scaled_radius, IM_COL32(255, 0, 0, 255));
+        HoveredVertexPoint.InstanceModels = {glm::translate(Identity, hovered_vertex)};
+        HoveredVertexPoint.Bind();
+    } else {
+        HoveredVertexPoint.InstanceModels.clear();
     }
+}
+
+void Mesh::Render() {
+    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
+        ViewMeshType = MeshType_Triangular;
+    }
+    if (ActiveViewMeshType != ViewMeshType) {
+        ActiveViewMeshType = ViewMeshType;
+        Bind();
+    }
+
+    const auto &geometry = GetActiveGeometry();
+    UpdateHoveredVertex();
+    UpdateExcitableVertexColors();
+    Scene.Draw(geometry);
+    Scene.Draw(ExcitableVertexPoints);
+    Scene.Draw(HoveredVertexPoint);
+    if (RealImpact) Scene.Draw(RealImpactListenerPoints);
+    Scene.Render();
+
+    const auto &vertices = geometry.Vertices;
 
     // Handle mouse interactions.
     const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
-    if (window_hovered) {
+    if (IsWindowHovered()) {
         if (mouse_clicked) CameraTargetVertexIndex = -1;
         else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
@@ -378,6 +372,7 @@ void Mesh::Render() {
     if (CameraTargetVertexIndex >= 0) {
         static const float CameraMovementSpeed = 0.5;
 
+        const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
         const auto &target_vertex = vertices[CameraTargetVertexIndex];
         const vec3 target_direction = glm::normalize(target_vertex - Origin);
         // Calculate the direction from the origin to the camera position
