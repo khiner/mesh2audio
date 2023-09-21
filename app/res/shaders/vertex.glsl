@@ -18,8 +18,11 @@ out vec4 instance_color;
 void main() {
     vertex_position = aInstanceModel * vec4(aPos, 1.0);
     gl_Position = projection * model_view * vertex_position;
-    vertex_normal = aNormal;
-    instance_color = aInstanceColor;
-    // Only using instancing for translation at the moment, so normals won't change per-instance.
+    // This simplified normal calculation assumes the `aInstanceModel` transformation only scales and rotates,
+    // which is currently true in this application.
+    // If we introduce scaling or skewing, we'll need to use the more general form below.
+    vertex_normal = mat3(aInstanceModel) * aNormal;
     // vertex_normal = mat3(transpose(inverse(aInstanceModel))) * aNormal;
+
+    instance_color = aInstanceColor;
 }

@@ -37,8 +37,10 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     } else {
         TriangularMesh.Load(FilePath);
     }
-    HoveredVertexPoint.InstanceColors = {vec4{1, 0, 0, 1}};
-    HoveredVertexPoint.Bind(); // todo only re-bind colors.
+
+    HoveredVertexArrow.InstanceColors = {vec4{1, 0, 0, 1}};
+    HoveredVertexArrow.Bind(); // todo only re-bind colors.
+
     UpdateExcitableVertices();
     ExcitableVertexPoints.Bind();
 }
@@ -280,9 +282,10 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 using namespace ImGui;
 
 void Mesh::UpdateHoveredVertex() {
+    const auto &geometry = GetActiveGeometry();
+
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
-    const auto &vertices = GetActiveGeometry().Vertices;
     if (IsWindowHovered()) {
         const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
         const auto content_region = GetContentRegionAvail();
@@ -292,6 +295,7 @@ void Mesh::UpdateHoveredVertex() {
         const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
         const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
+        const auto &vertices = geometry.Vertices;
         for (size_t i = 0; i < vertices.size(); i++) {
             const auto &v = vertices[i];
             const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
@@ -308,12 +312,17 @@ void Mesh::UpdateHoveredVertex() {
         }
     }
 
-    if (HoveredVertexIndex >= 0) {
-        const auto &hovered_vertex = vertices[HoveredVertexIndex];
-        HoveredVertexPoint.InstanceModels = {glm::translate(Identity, hovered_vertex)};
-        HoveredVertexPoint.Bind();
+    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.Vertices.size())) {
+        // Point the arrow at the hovered vertex.
+        const auto &hovered_vertex = geometry.Vertices[HoveredVertexIndex];
+        const auto &hovered_normal = geometry.Normals[HoveredVertexIndex];
+
+        mat4 translate = glm::translate(Identity, hovered_vertex);
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(hovered_normal)));
+        HoveredVertexArrow.InstanceModels = {translate * rotate};
+        HoveredVertexArrow.Bind();
     } else {
-        HoveredVertexPoint.InstanceModels.clear();
+        HoveredVertexArrow.InstanceModels.clear();
     }
 }
 
@@ -331,7 +340,7 @@ void Mesh::Render() {
     UpdateExcitableVertexColors();
     Scene.Draw(geometry);
     Scene.Draw(ExcitableVertexPoints);
-    Scene.Draw(HoveredVertexPoint);
+    Scene.Draw(HoveredVertexArrow);
     if (RealImpact) Scene.Draw(RealImpactListenerPoints);
     Scene.Render();
 

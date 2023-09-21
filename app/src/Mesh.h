@@ -4,13 +4,14 @@
 
 #include <cinolib/geometry/vec_mat.h>
 
-#include "Geometry/Geometry.h"
-#include "Geometry/Primitive/Sphere.h"
 #include "Material.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
 #include "Scene.h"
 #include "Worker.h"
+
+#include "Geometry/Arrow.h"
+#include "Geometry/Primitive/Sphere.h"
 
 struct ImVec2;
 
@@ -93,7 +94,7 @@ private:
         "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-    Sphere HoveredVertexPoint{0.0015}; // Sphere shown at the nearest vertex under the mouse.
+    Arrow HoveredVertexArrow{0.005, 0.001, 0.002, 0.003};
 
     vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
     Sphere ExcitableVertexPoints{0.0025}; // Instanced spheres for each excitable vertex.

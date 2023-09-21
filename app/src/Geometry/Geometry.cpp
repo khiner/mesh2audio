@@ -225,11 +225,10 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
     Normals.reserve(num_vertices);
     Indices.reserve(num_indices);
 
-    const double angle_increment = 2.0 * M_PI / slices;
     for (uint slice = 0; slice < slices; slice++) {
-        const double angle = slice * angle_increment;
-        const double c = cos(angle);
-        const double s = sin(angle);
+        const float ratio = 2 * float(slice) / slices;
+        const double c = __cospif(ratio);
+        const double s = __sinpif(ratio);
         // Exclude the top/bottom vertices, which will be connected later.
         for (int i = start_index; i < end_index; i++) {
             const auto &p = profile_vertices[i];

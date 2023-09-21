@@ -25,12 +25,12 @@ static GLuint LightColorLoc, LightPositionLoc,
 Scene::Scene() {
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
     std::fill_n(LightColors, NumLights * 4, 1.0f);
-    for (int i = 0; i < NumLights; i++) {
-        const float angle = 2 * M_PI * i / NumLights;
+    for (uint i = 0; i < NumLights; i++) {
+        const float ratio = 2 * float(i) / NumLights;
         const float dist = 15.0f;
-        LightPositions[i * 4 + 0] = dist * cosf(angle);
+        LightPositions[i * 4 + 0] = dist * __cospif(ratio);
         LightPositions[i * 4 + 1] = 0;
-        LightPositions[i * 4 + 2] = dist * sinf(angle);
+        LightPositions[i * 4 + 2] = dist * __sinpif(ratio);
         LightPositions[4 * i + 3] = 1.0f;
         LightColors[4 * i + 3] = 1.0f;
     }
@@ -43,8 +43,8 @@ Scene::Scene() {
       This would put the camera `eye` at position (0, 0, camDistance) in world space, pointing at the origin.
       We offset the camera angle slightly from this point along spherical coordinates to make the initial view more interesting.
     */
-    static const float x_angle = M_PI / 10; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
-    static const float y_angle = M_PI / 2 - M_PI / 10; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
+    static const float x_angle = M_PI * 0.1; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
+    static const float y_angle = M_PI * 0.4; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
     static const vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
     CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
