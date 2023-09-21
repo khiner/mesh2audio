@@ -22,6 +22,15 @@ Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length
     for (uint i = 0; i < segments * 2; i += 2) {
         Indices.insert(Indices.end(), {i, i + 1, i + 2, i + 1, i + 3, i + 2});
     }
+
+    // Add top cap of the cylinder base
+    Vertices.push_back({0.0f, tip_length + length, 0.0f});
+    Normals.push_back({0.0f, 1.0f, 0.0f});
+    const uint base_cap_center_index = Vertices.size() - 1;
+    for (uint i = 0; i < segments; ++i) {
+        Indices.insert(Indices.end(), {base_cap_center_index, 2 * i + 1, 2 * ((i + 1) % segments) + 1});
+    }
+
     const int base_vertex_count = Vertices.size();
 
     // Cone tip.

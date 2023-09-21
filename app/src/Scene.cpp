@@ -106,9 +106,9 @@ void Scene::Draw(const Geometry &geometry) {
     if (RenderMode == RenderType_Mesh) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-        // const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
-        // glUniform4fv(DiffuseColorLoc, 1, black);
-        // glUniform4fv(SpecularColorLoc, 1, white);
+        const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
+        glUniform4fv(DiffuseColorLoc, 1, black);
+        glUniform4fv(SpecularColorLoc, 1, white);
 
         glPointSize(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
