@@ -10,8 +10,6 @@
 
 #include <cinolib/meshes/meshes.h>
 #include <cinolib/tetgen_wrap.h>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
 
 #include "Audio.h"
 
@@ -32,7 +30,7 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     FilePath = file_path; // Store the most recent file path.
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(FilePath);
-        ExtrudeProfile();
+        TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     } else {
         TriangularMesh.Load(FilePath);
     }
@@ -110,7 +108,7 @@ void Mesh::UpdateExcitableVertexColors() {
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
-            ExcitableVertexPoints.InstanceColors.Set(i, {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]});
+            ExcitableVertexPoints.InstanceColors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
     }
 }

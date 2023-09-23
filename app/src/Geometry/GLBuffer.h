@@ -3,9 +3,6 @@
 #include <vector>
 
 #include <GL/glew.h>
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
 
 using uint = unsigned int;
 using GLuint = uint;
@@ -13,7 +10,7 @@ using GLenum = uint;
 
 template<typename DataType>
 struct GLBuffer {
-    GLBuffer(GLenum type, uint size = 0) : Type(type) {
+    GLBuffer(GLenum type, size_t size = 0) : Type(type) {
         glGenBuffers(1, &BufferId);
         Data.reserve(size);
     }
@@ -36,9 +33,11 @@ struct GLBuffer {
         glBindBuffer(Type, 0);
     }
 
-    void Set(size_t i, const DataType &v) {
-        Data[i] = v;
+    const DataType *data() const { return Data.data(); }
+
+    DataType &operator[](size_t index) {
         Dirty = true;
+        return Data[index];
     }
 
     void push_back(const DataType &v) {
@@ -62,8 +61,6 @@ struct GLBuffer {
         Dirty = true;
     }
 
-    const DataType *data() const { return Data.data(); }
-
     void resize(size_t size) {
         Data.resize(size);
         Dirty = true;
@@ -81,8 +78,15 @@ struct GLBuffer {
 
     auto begin() const { return Data.cbegin(); }
     auto end() const { return Data.cend(); }
-    auto begin() { return Data.begin(); }
-    auto end() { return Data.end(); }
+
+    auto begin() {
+        Dirty = true;
+        return Data.begin();
+    }
+    auto end() {
+        Dirty = true;
+        return Data.end();
+    }
 
     GLuint BufferId;
     GLenum Type;
@@ -91,26 +95,65 @@ struct GLBuffer {
     std::vector<DataType> Data;
 };
 
-struct VertexBuffer : GLBuffer<glm::vec3> {
-    VertexBuffer(uint size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {}
+#include <glm/gtx/quaternion.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+
+struct PointBuffer : GLBuffer<glm::vec3> {
+    PointBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {}
+
+    const PointBuffer &operator*=(const glm::vec3 &value) {
+        for (auto &elem : Data) elem *= value;
+        Dirty = true;
+        return *this;
+    }
+
+    const PointBuffer &operator*=(float value) {
+        for (auto &elem : Data) elem *= value;
+        Dirty = true;
+        return *this;
+    }
+
+    const PointBuffer &operator*=(const glm::qua<float> &value) {
+        for (auto &elem : Data) elem = value * elem;
+        Dirty = true;
+        return *this;
+    }
+
+    const PointBuffer &operator+=(const glm::vec3 &value) {
+        for (auto &elem : Data) elem += value;
+        Dirty = true;
+        return *this;
+    }
+
+    const PointBuffer &operator-=(const glm::vec3 &value) {
+        for (auto &elem : Data) elem -= value;
+        Dirty = true;
+        return *this;
+    }
 };
 
-struct NormalBuffer : GLBuffer<glm::vec3> {
-    NormalBuffer(uint size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {}
+struct VertexBuffer : PointBuffer {
+    VertexBuffer(size_t size = 0) : PointBuffer(size) {}
+};
+
+struct NormalBuffer : PointBuffer {
+    NormalBuffer(size_t size = 0) : PointBuffer(size) {}
 };
 
 struct IndexBuffer : GLBuffer<uint> {
-    IndexBuffer(uint size = 0) : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, size) {}
+    IndexBuffer(size_t size = 0) : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, size) {}
 };
 
 struct InstanceModelsBuffer : GLBuffer<glm::mat4> {
-    InstanceModelsBuffer(uint size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
+    InstanceModelsBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
         push_back(glm::mat4{1});
     }
 };
 
 struct InstanceColorsBuffer : GLBuffer<glm::vec4> {
-    InstanceColorsBuffer(uint size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
+    InstanceColorsBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
         push_back({1, 1, 1, 1});
     }
 };

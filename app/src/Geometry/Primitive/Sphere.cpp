@@ -1,6 +1,5 @@
 #include "Sphere.h"
 
-#include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>
 
 using glm::vec3;
@@ -33,6 +32,7 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
         4, 9, 5,   2, 4, 11,  6, 2, 10,   8, 6, 7,   9, 8, 1,
     };
     // clang-format on
+
     for (auto &vertex : InitialVertices) AddVertex(Vertices, vertex);
     Indices.assign(InitialIndices.begin(), InitialIndices.end());
 
@@ -50,5 +50,5 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
     }
 
     Normals.assign(Vertices.begin(), Vertices.end());
-    for (auto &vertex : Vertices) vertex *= radius;
+    Vertices *= radius;
 }

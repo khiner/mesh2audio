@@ -1,7 +1,5 @@
 #pragma once
 
-#include <glm/mat4x4.hpp>
-
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 

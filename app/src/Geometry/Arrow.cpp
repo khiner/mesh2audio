@@ -1,6 +1,5 @@
 #include "Arrow.h"
 
-#include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 
 using glm::vec3;
