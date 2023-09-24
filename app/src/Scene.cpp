@@ -18,7 +18,7 @@ static GLCanvas Canvas;
 // Variables to set uniform params for lighting fragment shader
 static GLuint LightColorLoc, LightPositionLoc,
     AmbientColorLoc, DiffuseColorLoc, SpecularColorLoc, ShininessColorLoc,
-    ProjectionLoc, CameraViewLoc;
+    ProjectionLoc, CameraViewLoc, FlatShadingLoc;
 
 Scene::Scene() {
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
@@ -58,6 +58,7 @@ Scene::Scene() {
     ShininessColorLoc = glGetUniformLocation(shader_program, "shininess_factor");
     ProjectionLoc = glGetUniformLocation(shader_program, "projection");
     CameraViewLoc = glGetUniformLocation(shader_program, "camera_view");
+    FlatShadingLoc = glGetUniformLocation(shader_program, "flat_shading");
 }
 
 void Scene::SetupRender() {
@@ -78,11 +79,11 @@ void Scene::SetupRender() {
 
     glUniform4fv(LightPositionLoc, NumLights, LightPositions);
     glUniform4fv(LightColorLoc, NumLights, LightColors);
-
     glUniform4fv(AmbientColorLoc, 1, AmbientColor);
     glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
     glUniform4fv(SpecularColorLoc, 1, SpecularColor);
     glUniform1f(ShininessColorLoc, Shininess);
+    glUniform1i(FlatShadingLoc, UseFlatShading && (RenderMode == RenderType_Smooth || RenderMode == RenderType_Mesh) ? 1 : 0);
 }
 
 void Scene::Draw(const Geometry &geometry) {
@@ -96,7 +97,7 @@ void Scene::Draw(const Geometry &geometry) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
     if (RenderMode == RenderType_Lines) {
-        glLineWidth(1);
+        glLineWidth(2.5);
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
     if (RenderMode == RenderType_Points) {
@@ -119,7 +120,7 @@ void Scene::Draw(const Geometry &geometry) {
     }
 
     // All render modes:
-    if (geometry.InstanceModels.size() == 1) {
+    if (geometry.InstanceModels.size() <= 1) {
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     } else {
         glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry.InstanceModels.size());
@@ -200,6 +201,11 @@ void Scene::RenderConfig() {
             RadioButton("Point cloud", &RenderMode, RenderType_Points);
             SameLine();
             RadioButton("Mesh", &RenderMode, RenderType_Mesh);
+            Separator();
+            bool supports_flat_shading = RenderMode == RenderType_Smooth || RenderMode == RenderType_Mesh;
+            if (!supports_flat_shading) BeginDisabled();
+            Checkbox("Flat shading", &UseFlatShading);
+            if (!supports_flat_shading) EndDisabled();
             EndTabItem();
         }
         if (BeginTabItem("Camera")) {

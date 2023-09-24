@@ -20,6 +20,8 @@ uniform vec4 light_position[num_lights], light_color[num_lights];
 uniform vec4 ambient_color, diffuse_color, specular_color;
 uniform float shininess_factor;
 
+uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
+
 vec4 compute_lighting(vec3 direction, vec4 light_color, vec3 normal, vec3 half_vector, vec4 object_diffuse, vec4 object_specular, float object_shininess) {
     float n_dot_l = dot(normal, direction);
     vec4 lambert = object_diffuse * light_color * max(n_dot_l, 0.0);
@@ -32,7 +34,7 @@ void main (void) {
     vec3 fragment_position = vertex_position.xyz / vertex_position.w;
     vec3 eye_direction = normalize(eye_position - fragment_position);
 
-    vec3 normal = normalize(vertex_normal);
+    vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : vertex_normal);
 
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {

@@ -140,10 +140,10 @@ int main(int, char **) {
     // IM_ASSERT(font != NULL);
 
     if (!MainScene) MainScene = std::make_unique<Scene>();
-    // mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
+    mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
     // Alternatively, we could initialize with a mesh obj file:
     // mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "obj" / "bell" / "english.obj");
-    mesh = std::make_unique<Mesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
+    // mesh = std::make_unique<Mesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
 
     glEnable(GL_DEPTH_TEST);
 
