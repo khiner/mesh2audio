@@ -83,9 +83,22 @@ void Geometry::Load(fs::path file_path) {
     }
     fclose(fp);
 
+    CenterVertices();
     ComputeNormals();
-    UpdateBounds();
-    Center();
+}
+
+void Geometry::CenterVertices() {
+    vec3 min = vec3(INFINITY, INFINITY, INFINITY);
+    vec3 max = vec3(-INFINITY, -INFINITY, -INFINITY);
+    for (const vec3 &v : Vertices) {
+        if (v.x < min.x) min.x = v.x;
+        if (v.y < min.y) min.y = v.y;
+        if (v.z < min.z) min.z = v.z;
+        if (v.x > max.x) max.x = v.x;
+        if (v.y > max.y) max.y = v.y;
+        if (v.z > max.z) max.z = v.z;
+    }
+    Vertices -= (min + max) / 2.0f;
 }
 
 void Geometry::BindData() const {
@@ -102,8 +115,6 @@ void Geometry::Clear() {
     Vertices.clear();
     Normals.clear();
     Indices.clear();
-    Min = {};
-    Max = {};
 }
 
 void Geometry::Save(fs::path file_path) const {
@@ -126,35 +137,9 @@ void Geometry::Save(fs::path file_path) const {
     out.close();
 }
 
-void Geometry::Flip(bool x, bool y, bool z) {
-    const vec3 flip(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
-    const vec3 center = (Min + Max) / 2.0f;
-    Vertices -= center;
-    Vertices *= flip;
-    Vertices += center;
-    Normals *= flip;
-    UpdateBounds();
+void Geometry::SetTransform(const mat4 &transform) {
+    for (auto &instance_model : InstanceModels) instance_model = transform;
 }
-void Geometry::Rotate(const vec3 &axis, float angle) {
-    const glm::qua rotation = glm::angleAxis(glm::radians(angle), glm::normalize(axis));
-    Vertices *= rotation;
-    Normals *= rotation;
-    UpdateBounds();
-}
-void Geometry::Scale(const vec3 &scale) {
-    Vertices *= scale;
-    UpdateBounds();
-}
-void Geometry::Center() {
-    Vertices -= (Min + Max) / 2.0f;
-    UpdateBounds();
-}
-
-void Geometry::Translate(const glm::vec3 &translation) {
-    Vertices += translation;
-    UpdateBounds();
-}
-
 void Geometry::SetColor(const vec4 &color) {
     InstanceColors.clear();
     InstanceColors.resize(InstanceModels.size(), color);
@@ -172,20 +157,6 @@ void Geometry::ComputeNormals() {
         const vec3 &v2 = Vertices[Indices[i + 2]];
         const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
         for (int j = 0; j < 3; j++) Normals[Indices[i + j]] = normal;
-    }
-}
-
-void Geometry::UpdateBounds() {
-    // Update `Min`/`Max` based on the current vertices.
-    Min = vec3(INFINITY, INFINITY, INFINITY);
-    Max = vec3(-INFINITY, -INFINITY, -INFINITY);
-    for (const vec3 &v : Vertices) {
-        if (v.x < Min.x) Min.x = v.x;
-        if (v.y < Min.y) Min.y = v.y;
-        if (v.z < Min.z) Min.z = v.z;
-        if (v.x > Max.x) Max.x = v.x;
-        if (v.y > Max.y) Max.y = v.y;
-        if (v.z > Max.z) Max.z = v.z;
     }
 }
 
@@ -261,7 +232,6 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
 
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
     // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the y-axis (the up/down axis).
-    UpdateBounds();
-    Flip(false, true, false);
-    Center();
+    // Flip(false, true, false);
+    CenterVertices();
 }

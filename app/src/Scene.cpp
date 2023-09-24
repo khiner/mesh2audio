@@ -18,7 +18,7 @@ static GLCanvas Canvas;
 // Variables to set uniform params for lighting fragment shader
 static GLuint LightColorLoc, LightPositionLoc,
     AmbientColorLoc, DiffuseColorLoc, SpecularColorLoc, ShininessColorLoc,
-    ProjectionLoc, ModelViewLoc;
+    ProjectionLoc, CameraViewLoc;
 
 Scene::Scene() {
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
@@ -57,7 +57,7 @@ Scene::Scene() {
     SpecularColorLoc = glGetUniformLocation(shader_program, "specular_color");
     ShininessColorLoc = glGetUniformLocation(shader_program, "shininess_factor");
     ProjectionLoc = glGetUniformLocation(shader_program, "projection");
-    ModelViewLoc = glGetUniformLocation(shader_program, "model_view");
+    CameraViewLoc = glGetUniformLocation(shader_program, "camera_view");
 }
 
 void Scene::SetupRender() {
@@ -74,7 +74,7 @@ void Scene::SetupRender() {
     Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
 
     glUniformMatrix4fv(ProjectionLoc, 1, GL_FALSE, &CameraProjection[0][0]);
-    glUniformMatrix4fv(ModelViewLoc, 1, GL_FALSE, &(CameraView * ObjectMatrix)[0][0]);
+    glUniformMatrix4fv(CameraViewLoc, 1, GL_FALSE, &CameraView[0][0]);
 
     glUniform4fv(LightPositionLoc, NumLights, LightPositions);
     glUniform4fv(LightColorLoc, NumLights, LightColors);
@@ -149,17 +149,45 @@ void Scene::Render() {
     if (ShowGrid) {
         ImGuizmo::DrawGrid(&CameraView[0][0], &CameraProjection[0][0], &Identity[0][0], 100.f);
     }
-    if (ShowGizmo) {
-        ImGuizmo::Manipulate(
-            &CameraView[0][0], &CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &ObjectMatrix[0][0], nullptr,
-            nullptr, ShowBounds ? Bounds : nullptr, nullptr
-        );
+    if (GizmoCallback) {
+        if (ImGuizmo::Manipulate(
+                &CameraView[0][0], &CameraProjection[0][0], GizmoOp, ImGuizmo::LOCAL, &GizmoTransform[0][0], nullptr,
+                nullptr, ShowBounds ? Bounds : nullptr, nullptr
+            )) {
+            GizmoCallback(GizmoTransform);
+        }
     }
     if (ShowCameraGizmo) {
         static const float ViewManipulateSize = 128;
         const auto view_manipulate_pos = window_pos + ImVec2{GetWindowContentRegionMax().x - ViewManipulateSize, GetWindowContentRegionMin().y};
         ImGuizmo::ViewManipulate(&CameraView[0][0], CameraDistance, view_manipulate_pos, {ViewManipulateSize, ViewManipulateSize}, 0);
     }
+}
+
+void Scene::RenderGizmoDebug() {
+    if (!ShowGizmo) return;
+
+    SeparatorText("Gizmo");
+    using namespace ImGuizmo;
+    const string interaction_text = std::format(
+        "Interaction: {}",
+        IsUsing()             ? "Using Gizmo" :
+            IsOver(TRANSLATE) ? "Translate hovered" :
+            IsOver(ROTATE)    ? "Rotate hovered" :
+            IsOver(SCALE)     ? "Scale hovered" :
+            IsOver()          ? "Hovered" :
+                                "Not interacting"
+    );
+    TextUnformatted(interaction_text.c_str());
+
+    if (IsKeyPressed(ImGuiKey_T)) GizmoOp = TRANSLATE;
+    if (IsKeyPressed(ImGuiKey_R)) GizmoOp = ROTATE;
+    if (IsKeyPressed(ImGuiKey_S)) GizmoOp = SCALE;
+    if (RadioButton("Translate (T)", GizmoOp == TRANSLATE)) GizmoOp = TRANSLATE;
+    if (RadioButton("Rotate (R)", GizmoOp == ROTATE)) GizmoOp = ROTATE;
+    if (RadioButton("Scale (S)", GizmoOp == SCALE)) GizmoOp = SCALE;
+    if (RadioButton("Universal", GizmoOp == UNIVERSAL)) GizmoOp = UNIVERSAL;
+    Checkbox("Bound sizing", &ShowBounds);
 }
 
 void Scene::RenderConfig() {
@@ -172,31 +200,6 @@ void Scene::RenderConfig() {
             RadioButton("Point cloud", &RenderMode, RenderType_Points);
             SameLine();
             RadioButton("Mesh", &RenderMode, RenderType_Mesh);
-            NewLine();
-            SeparatorText("Gizmo");
-            Checkbox("Show gizmo", &ShowGizmo);
-            if (ShowGizmo) {
-                using namespace ImGuizmo;
-                const string interaction_text = std::format(
-                    "Interaction: {}",
-                    IsUsing()             ? "Using Gizmo" :
-                        IsOver(TRANSLATE) ? "Translate hovered" :
-                        IsOver(ROTATE)    ? "Rotate hovered" :
-                        IsOver(SCALE)     ? "Scale hovered" :
-                        IsOver()          ? "Hovered" :
-                                            "Not interacting"
-                );
-                TextUnformatted(interaction_text.c_str());
-
-                if (IsKeyPressed(ImGuiKey_T)) GizmoOp = TRANSLATE;
-                if (IsKeyPressed(ImGuiKey_R)) GizmoOp = ROTATE;
-                if (IsKeyPressed(ImGuiKey_S)) GizmoOp = SCALE;
-                if (RadioButton("Translate (T)", GizmoOp == TRANSLATE)) GizmoOp = TRANSLATE;
-                if (RadioButton("Rotate (R)", GizmoOp == ROTATE)) GizmoOp = ROTATE;
-                if (RadioButton("Scale (S)", GizmoOp == SCALE)) GizmoOp = SCALE;
-                if (RadioButton("Universal", GizmoOp == UNIVERSAL)) GizmoOp = UNIVERSAL;
-                Checkbox("Bound sizing", &ShowBounds);
-            }
             EndTabItem();
         }
         if (BeginTabItem("Camera")) {

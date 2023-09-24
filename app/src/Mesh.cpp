@@ -54,21 +54,23 @@ void Mesh::Save(fs::path file_path) const {
     GetActiveGeometry().Save(file_path);
 }
 
-void Mesh::Flip(bool x, bool y, bool z) {
-    TriangularMesh.Flip(x, y, z);
-    TetMesh.Flip(x, y, z);
+mat4 Mesh::GetTransform() const {
+    mat4 transform = Identity;
+    transform = glm::translate(transform, Translation);
+
+    mat4 rot_x = glm::rotate(Identity, glm::radians(RotationAngles.x), {1, 0, 0});
+    mat4 rot_y = glm::rotate(Identity, glm::radians(RotationAngles.y), {0, 1, 0});
+    mat4 rot_z = glm::rotate(Identity, glm::radians(RotationAngles.z), {0, 0, 1});
+    transform *= (rot_z * rot_y * rot_x);
+
+    return glm::scale(transform, Scale);
 }
-void Mesh::Rotate(const vec3 &axis, float angle) {
-    TriangularMesh.Rotate(axis, angle);
-    TetMesh.Rotate(axis, angle);
-}
-void Mesh::Scale(const vec3 &scale) {
-    TriangularMesh.Scale(scale);
-    TetMesh.Scale(scale);
-}
-void Mesh::Center() {
-    TriangularMesh.Center();
-    TetMesh.Center();
+
+void Mesh::ApplyTransform() {
+    const mat4 transform = GetTransform();
+    TriangularMesh.SetTransform(transform);
+    TetMesh.SetTransform(transform);
+    Scene.GizmoTransform = transform;
 }
 
 void Mesh::ExtrudeProfile() {
@@ -185,8 +187,7 @@ void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vect
     //     }
     // }
 
-    TetMesh.UpdateBounds();
-    TetMesh.Center();
+    TetMesh.CenterVertices();
     UpdateExcitableVertices();
 
     ViewMeshType = MeshType_Tetrahedral; // Automatically switch to tetrahedral view.
@@ -332,7 +333,7 @@ void Mesh::Render() {
 
     // Handle mouse interactions.
     const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
-    if (IsWindowHovered()) {
+    if (!Scene.ShowGizmo && IsWindowHovered()) {
         if (mouse_clicked) CameraTargetVertexIndex = -1;
         else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
@@ -435,23 +436,46 @@ void Mesh::RenderConfig() {
                 TextUnformatted("No tetrahedral mesh loaded");
             }
 
-            SeparatorText("Modify");
-            if (Button("Center")) Center();
-            Text("Flip");
-            SameLine();
-            if (Button("X##Flip")) Flip(true, false, false);
-            SameLine();
-            if (Button("Y##Flip")) Flip(false, true, false);
-            SameLine();
-            if (Button("Z##Flip")) Flip(false, false, true);
+            SeparatorText("Transform");
+            if (Checkbox("Gizmo##Transform", &Scene.ShowGizmo)) {
+                if (Scene.ShowGizmo) {
+                    Scene.GizmoTransform = GetTransform();
+                    Scene.GizmoCallback = [this](const glm::mat4 &transform) {
+                        TriangularMesh.SetTransform(transform);
+                        TetMesh.SetTransform(transform);
+                        Translation = glm::vec3{transform[3]};
+                        Scale = glm::vec3{glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
+                        RotationAngles = glm::eulerAngles(glm::quat_cast(transform));
+                    };
+                } else {
+                    Scene.GizmoCallback = nullptr;
+                }
+            }
+            Scene.RenderGizmoDebug();
 
-            Text("Rotate 90 deg.");
-            SameLine();
-            if (Button("X##Rotate")) Rotate({1, 0, 0}, 90);
-            SameLine();
-            if (Button("Y##Rotate")) Rotate({0, 1, 0}, 90);
-            SameLine();
-            if (Button("Z##Rotate")) Rotate({0, 0, 1}, 90);
+            Text("Translate");
+            if (SliderFloat("x##Translate", &Translation.x, -1, 1)) ApplyTransform();
+            if (SliderFloat("y##Translate", &Translation.y, -1, 1)) ApplyTransform();
+            if (SliderFloat("z##Translate", &Translation.z, -1, 1)) ApplyTransform();
+
+            Text("Scale");
+            static bool lock_scale = true;
+            Checkbox("Lock##Scale", &lock_scale);
+            if (lock_scale) {
+                if (SliderFloat("Scale##Scale", &Scale.x, 0.1, 10, "%.3f", ImGuiSliderFlags_Logarithmic)) {
+                    Scale.y = Scale.z = Scale.x;
+                    ApplyTransform();
+                }
+            } else {
+                if (SliderFloat("x##Scale", &Scale.x, 0.1, 10, "%.3f", ImGuiSliderFlags_Logarithmic)) ApplyTransform();
+                if (SliderFloat("y##Scale", &Scale.y, 0.1, 10, "%.3f", ImGuiSliderFlags_Logarithmic)) ApplyTransform();
+                if (SliderFloat("z##Scale", &Scale.z, 0.1, 10, "%.3f", ImGuiSliderFlags_Logarithmic)) ApplyTransform();
+            }
+
+            Text("Rotate");
+            if (SliderFloat("x##Rotate", &RotationAngles.x, -180.f, 180.f)) ApplyTransform();
+            if (SliderFloat("y##Rotate", &RotationAngles.y, -180.f, 180.f)) ApplyTransform();
+            if (SliderFloat("z##Rotate", &RotationAngles.z, -180.f, 180.f)) ApplyTransform();
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {

@@ -31,16 +31,12 @@ struct Geometry {
 
     bool Empty() const { return Vertices.empty(); }
 
-    void Flip(bool x, bool y, bool z);
-    void Rotate(const glm::vec3 &axis, float angle);
-    void Scale(const glm::vec3 &);
-    void Center();
-    void Translate(const glm::vec3 &);
+    void CenterVertices();
 
+    void SetTransform(const glm::mat4 &);
     void SetColor(const glm::vec4 &);
 
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
-    void UpdateBounds(); // Updates the bounding box (`Min` and `Max`).
     void ExtrudeProfile(const vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
     VertexBuffer Vertices;
@@ -48,7 +44,6 @@ struct Geometry {
     IndexBuffer Indices;
     InstanceModelsBuffer InstanceModels;
     InstanceColorsBuffer InstanceColors;
-    glm::vec3 Min, Max; // The bounding box of the mesh.
 
     uint VertexArray;
 };

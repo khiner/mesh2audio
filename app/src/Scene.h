@@ -28,9 +28,13 @@ struct Scene {
     bool CustomColors = false;
 
     bool ShowCameraGizmo = true, ShowGrid = false, ShowGizmo = false, ShowBounds = false;
+
+    glm::mat4 GizmoTransform{1};
+    std::function<void(const glm::mat4 &)> GizmoCallback;
+
     ImGuizmo::OPERATION GizmoOp{ImGuizmo::TRANSLATE};
 
-    glm::mat4 ObjectMatrix{1.f}, CameraView, CameraProjection;
+    glm::mat4 CameraView, CameraProjection;
     float CameraDistance = 4, fov = 27;
 
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
@@ -48,4 +52,5 @@ struct Scene {
     void SetupRender();
     void Render();
     void RenderConfig();
+    void RenderGizmoDebug();
 };

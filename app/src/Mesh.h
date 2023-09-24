@@ -55,10 +55,8 @@ struct Mesh {
     int Num3DExcitationVertices() const { return NumExcitableVertices; }
     int Num2DExcitationVertices() const { return Profile != nullptr ? Profile->NumExcitationVertices() : 0; }
 
-    void Flip(bool x, bool y, bool z); // Flip vertices across the given axes, about the center of the mesh.
-    void Rotate(const glm::vec3 &axis, float angle);
-    void Scale(const glm::vec3 &scale); // Scale the mesh by the given amounts.
-    void Center(); // Center the mesh at the origin.
+    void ApplyTransform();
+    glm::mat4 GetTransform() const;
 
     inline static Type ViewMeshType = MeshType_Triangular;
 
@@ -97,4 +95,6 @@ private:
     vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
     Sphere ExcitableVertexPoints{0.0025}; // Instanced spheres for each excitable vertex.
     Sphere RealImpactListenerPoints{0.01}; // Instanced spheres for each listener point.
+
+    glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};
 };

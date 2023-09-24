@@ -7,7 +7,7 @@ layout (location = 2) in mat4 aInstanceModel;
 layout (location = 6) in vec4 aInstanceColor;
 
 // Uniform variables.
-uniform mat4 model_view;
+uniform mat4 camera_view;
 uniform mat4 projection;
 
 // Outputs to pass data to the fragment shader.
@@ -17,7 +17,7 @@ out vec4 instance_color;
 
 void main() {
     vertex_position = aInstanceModel * vec4(aPos, 1.0);
-    gl_Position = projection * model_view * vertex_position;
+    gl_Position = projection * camera_view * vertex_position;
     // This simplified normal calculation assumes the `aInstanceModel` transformation only scales and rotates,
     // which is currently true in this application.
     // If we introduce scaling or skewing, we'll need to use the more general form below.

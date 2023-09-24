@@ -11,7 +11,7 @@ out vec4 frag_color;
 // Max number of light sources.
 const int num_lights = 5;
 
-uniform mat4 model_view;
+uniform mat4 camera_view;
 
 // Uniform variables related to lighting.
 uniform vec4 light_position[num_lights], light_color[num_lights];
@@ -36,7 +36,7 @@ void main (void) {
 
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
-        vec4 light_pos = inverse(model_view) * light_position[i];
+        vec4 light_pos = inverse(camera_view) * light_position[i];
         vec3 pos = light_pos.xyz / light_pos.w;
         vec3 dir = normalize(pos - fragment_position);
         vec3 half_vector = normalize(dir + eye_direction);
