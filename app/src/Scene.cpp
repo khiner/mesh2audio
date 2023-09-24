@@ -18,7 +18,7 @@ static GLCanvas Canvas;
 // Variables to set uniform params for lighting fragment shader
 static GLuint LightColorLoc, LightPositionLoc,
     AmbientColorLoc, DiffuseColorLoc, SpecularColorLoc, ShininessColorLoc,
-    ProjectionLoc, CameraViewLoc, FlatShadingLoc;
+    ProjectionLoc, CameraViewLoc, FlatShadingLoc, DrawLinesLoc, LineWidthLoc;
 
 Scene::Scene() {
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
@@ -47,8 +47,9 @@ Scene::Scene() {
     CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
     static const GLuint vertex_shader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
+    static const GLuint geometry_shader = Shader::InitShader(GL_GEOMETRY_SHADER, fs::path("res") / "shaders" / "geometry.glsl");
     static const GLuint fragment_shader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
-    static const GLuint shader_program = Shader::InitProgram(vertex_shader, fragment_shader);
+    static const GLuint shader_program = Shader::InitProgram(vertex_shader, geometry_shader, fragment_shader);
 
     LightPositionLoc = glGetUniformLocation(shader_program, "light_position");
     LightColorLoc = glGetUniformLocation(shader_program, "light_color");
@@ -59,6 +60,8 @@ Scene::Scene() {
     ProjectionLoc = glGetUniformLocation(shader_program, "projection");
     CameraViewLoc = glGetUniformLocation(shader_program, "camera_view");
     FlatShadingLoc = glGetUniformLocation(shader_program, "flat_shading");
+    DrawLinesLoc = glGetUniformLocation(shader_program, "draw_lines");
+    LineWidthLoc = glGetUniformLocation(shader_program, "line_width");
 }
 
 void Scene::SetupRender() {
@@ -83,7 +86,9 @@ void Scene::SetupRender() {
     glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
     glUniform4fv(SpecularColorLoc, 1, SpecularColor);
     glUniform1f(ShininessColorLoc, Shininess);
-    glUniform1i(FlatShadingLoc, UseFlatShading && (RenderMode == RenderType_Smooth || RenderMode == RenderType_Mesh) ? 1 : 0);
+    glUniform1f(LineWidthLoc, LineWidth);
+    glUniform1i(DrawLinesLoc, 0);
+    glUniform1i(FlatShadingLoc, UseFlatShading && (RenderMode == RenderType_Smooth) ? 1 : 0);
 }
 
 void Scene::Draw(const Geometry &geometry) {
@@ -93,33 +98,11 @@ void Scene::Draw(const Geometry &geometry) {
 
     const int num_indices = geometry.Indices.size();
     glBindVertexArray(geometry.VertexArray);
-    if (RenderMode == RenderType_Smooth) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
-    if (RenderMode == RenderType_Lines) {
-        glLineWidth(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
-    if (RenderMode == RenderType_Points) {
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-    }
-    if (RenderMode == RenderType_Mesh) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-        const static float black[4] = {0, 0, 0, 0}, white[4] = {1, 1, 1, 1};
-        glUniform4fv(DiffuseColorLoc, 1, black);
-        glUniform4fv(SpecularColorLoc, 1, white);
 
-        glPointSize(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+    glUniform1i(DrawLinesLoc, RenderMode == RenderType_Lines ? 1 : 0);
 
-        glLineWidth(2.5);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    // All render modes:
     if (geometry.InstanceModels.size() <= 1) {
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     } else {
@@ -198,14 +181,12 @@ void Scene::RenderConfig() {
             RadioButton("Smooth", &RenderMode, RenderType_Smooth);
             SameLine();
             RadioButton("Lines", &RenderMode, RenderType_Lines);
-            RadioButton("Point cloud", &RenderMode, RenderType_Points);
             SameLine();
-            RadioButton("Mesh", &RenderMode, RenderType_Mesh);
-            Separator();
-            bool supports_flat_shading = RenderMode == RenderType_Smooth || RenderMode == RenderType_Mesh;
-            if (!supports_flat_shading) BeginDisabled();
-            Checkbox("Flat shading", &UseFlatShading);
-            if (!supports_flat_shading) EndDisabled();
+            RadioButton("Point cloud", &RenderMode, RenderType_Points);
+            if (RenderMode == RenderType_Smooth) Checkbox("Flat shading", &UseFlatShading);
+            if (RenderMode == RenderType_Lines) {
+                SliderFloat("Line width", &LineWidth, 0.001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);
+            }
             EndTabItem();
         }
         if (BeginTabItem("Camera")) {

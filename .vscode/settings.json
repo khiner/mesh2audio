@@ -89,6 +89,10 @@
     "numbers": "cpp",
     "*.ipp": "cpp",
     "*.expression": "cpp",
-    "fft": "cpp"
+    "fft": "cpp",
+    "hash_map": "cpp",
+    "valarray": "cpp",
+    "ranges": "cpp",
+    "*.inc": "cpp"
   }
 }

@@ -14,7 +14,6 @@ struct Scene {
         RenderType_Smooth,
         RenderType_Lines,
         RenderType_Points,
-        RenderType_Mesh
     };
     using RenderType = int;
 
@@ -25,6 +24,7 @@ struct Scene {
     float DiffusionColor[4] = {0.2, 0.2, 0.2, 1};
     float SpecularColor[4] = {0.5, 0.5, 0.5, 1};
     float Shininess = 10;
+    float LineWidth = 0.005;
     bool CustomColors = false, UseFlatShading = true;
 
     bool ShowCameraGizmo = true, ShowGrid = false, ShowGizmo = false, ShowBounds = false;

@@ -7,5 +7,5 @@ namespace fs = std::filesystem;
 
 struct Shader {
     static GLuint InitShader(GLenum type, const fs::path);
-    static GLuint InitProgram(GLuint vertexshader, GLuint fragmentshader);
+    static GLuint InitProgram(GLuint vertexshader, GLuint geometryshader, GLuint fragmentshader);
 };

@@ -55,9 +55,10 @@ GLuint Shader::InitShader(GLenum type, const fs::path path) {
     return shader;
 }
 
-GLuint Shader::InitProgram(GLuint vertexshader, GLuint fragmentshader) {
+GLuint Shader::InitProgram(GLuint vertexshader, GLuint geometryshader, GLuint fragmentshader) {
     GLuint program = glCreateProgram();
     glAttachShader(program, vertexshader);
+    glAttachShader(program, geometryshader);
     glAttachShader(program, fragmentshader);
     glLinkProgram(program);
 

@@ -1,9 +1,9 @@
 #version 330 core
 
 // Inputs passed in from the vertex shader.
-in vec3 vertex_normal;
-in vec4 vertex_position;
-in vec4 instance_color;
+in vec3 geom_vertex_normal;
+in vec4 geom_vertex_position;
+in vec4 geom_instance_color;
 
 // Output of the fragment shader.
 out vec4 frag_color;
@@ -31,10 +31,10 @@ vec4 compute_lighting(vec3 direction, vec4 light_color, vec3 normal, vec3 half_v
 
 void main (void) {
     vec3 eye_position = vec3(0,0,0);
-    vec3 fragment_position = vertex_position.xyz / vertex_position.w;
+    vec3 fragment_position = geom_vertex_position.xyz / geom_vertex_position.w;
     vec3 eye_direction = normalize(eye_position - fragment_position);
 
-    vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : vertex_normal);
+    vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : geom_vertex_normal);
 
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
@@ -46,5 +46,5 @@ void main (void) {
         final_color += compute_lighting(dir, light_color[i], normal, half_vector, diffuse_color, specular_color, shininess_factor);
     }
 
-    frag_color = final_color * instance_color;
+    frag_color = final_color * geom_instance_color;
 }

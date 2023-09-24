@@ -146,6 +146,9 @@ int main(int, char **) {
     // mesh = std::make_unique<Mesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
 
     glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_LINE_SMOOTH);
+    // glDisable(GL_CULL_FACE);
+    // glEnable(GL_MULTISAMPLE);
 
     // Main loop
     bool done = false;
