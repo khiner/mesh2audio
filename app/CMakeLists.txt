@@ -18,10 +18,20 @@ file(
     lib/ImGuizmo/ImGuizmo.cpp
 )
 
-# Recursively copy the res directory to the build directory.
-file(COPY res DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Create a dummy output that depends on all resource files,
+# so that changes in resource files trigger a re-copy of the changed files to the build directory.
+file(GLOB_RECURSE RES_FILES LIST_DIRECTORIES false "res/*.*")
+set(DUMMY_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/dummy_res")
+add_custom_command(
+    OUTPUT ${DUMMY_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "../res" "${CMAKE_CURRENT_BINARY_DIR}/res"
+    DEPENDS ${RES_FILES}
+    COMMENT "Copying resource files to build directory"
+)
+add_custom_target(CopyResources ALL DEPENDS ${DUMMY_OUTPUT})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
+add_dependencies(${PROJECT_NAME} CopyResources)
 
 set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
 set(Mesh2FaustDir ${CMAKE_CURRENT_SOURCE_DIR}/lib/faust/tools/physicalModeling/mesh2faust)
