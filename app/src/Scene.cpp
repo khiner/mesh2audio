@@ -1,7 +1,7 @@
 #include "Scene.h"
 
 #include "GLCanvas.h"
-#include "Shader.h"
+#include "Shader/ShaderProgram.h"
 
 #include <algorithm>
 #include <format>
@@ -15,10 +15,20 @@ using namespace ImGui;
 
 static GLCanvas Canvas;
 
-// Variables to set uniform params for lighting fragment shader
-static GLuint LightColorLoc, LightPositionLoc,
-    AmbientColorLoc, DiffuseColorLoc, SpecularColorLoc, ShininessColorLoc,
-    ProjectionLoc, CameraViewLoc, FlatShadingLoc, DrawLinesLoc, LineWidthLoc;
+namespace UniformName {
+inline static const string
+    LightPosition = "light_position",
+    LightColor = "light_color",
+    AmbientColor = "ambient_color",
+    DiffuseColor = "diffuse_color",
+    SpecularColor = "specular_color",
+    ShininessFactor = "shininess_factor",
+    Projection = "projection",
+    CameraView = "camera_view",
+    FlatShading = "flat_shading",
+    DrawLines = "draw_lines",
+    LineWidth = "line_width";
+} // namespace UniformName
 
 Scene::Scene() {
     // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
@@ -46,23 +56,17 @@ Scene::Scene() {
     static const vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
     CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
-    static const GLuint vertex_shader = Shader::InitShader(GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl");
-    static const GLuint geometry_shader = Shader::InitShader(GL_GEOMETRY_SHADER, fs::path("res") / "shaders" / "geometry.glsl");
-    static const GLuint fragment_shader = Shader::InitShader(GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl");
-    static const GLuint shader_program = Shader::InitProgram(vertex_shader, geometry_shader, fragment_shader);
-
-    LightPositionLoc = glGetUniformLocation(shader_program, "light_position");
-    LightColorLoc = glGetUniformLocation(shader_program, "light_color");
-    AmbientColorLoc = glGetUniformLocation(shader_program, "ambient_color");
-    DiffuseColorLoc = glGetUniformLocation(shader_program, "diffuse_color");
-    SpecularColorLoc = glGetUniformLocation(shader_program, "specular_color");
-    ShininessColorLoc = glGetUniformLocation(shader_program, "shininess_factor");
-    ProjectionLoc = glGetUniformLocation(shader_program, "projection");
-    CameraViewLoc = glGetUniformLocation(shader_program, "camera_view");
-    FlatShadingLoc = glGetUniformLocation(shader_program, "flat_shading");
-    DrawLinesLoc = glGetUniformLocation(shader_program, "draw_lines");
-    LineWidthLoc = glGetUniformLocation(shader_program, "line_width");
+    const GLuint vertex_shader = Shader{GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl"}.Id;
+    const GLuint geometry_shader = Shader{GL_GEOMETRY_SHADER, fs::path("res") / "shaders" / "geometry.glsl"}.Id;
+    const GLuint fragment_shader = Shader{GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl"}.Id;
+    namespace un = UniformName;
+    MainShaderProgram = std::make_unique<ShaderProgram>(
+        std::vector<GLuint>{vertex_shader, geometry_shader, fragment_shader},
+        std::vector<string>{un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::Projection, un::CameraView, un::FlatShading, un::DrawLines, un::LineWidth}
+    );
 }
+
+Scene::~Scene() {}
 
 void Scene::SetupRender() {
     const auto &io = ImGui::GetIO();
@@ -77,18 +81,18 @@ void Scene::SetupRender() {
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
     Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
 
-    glUniformMatrix4fv(ProjectionLoc, 1, GL_FALSE, &CameraProjection[0][0]);
-    glUniformMatrix4fv(CameraViewLoc, 1, GL_FALSE, &CameraView[0][0]);
-
-    glUniform4fv(LightPositionLoc, NumLights, LightPositions);
-    glUniform4fv(LightColorLoc, NumLights, LightColors);
-    glUniform4fv(AmbientColorLoc, 1, AmbientColor);
-    glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
-    glUniform4fv(SpecularColorLoc, 1, SpecularColor);
-    glUniform1f(ShininessColorLoc, Shininess);
-    glUniform1f(LineWidthLoc, LineWidth);
-    glUniform1i(DrawLinesLoc, 0);
-    glUniform1i(FlatShadingLoc, UseFlatShading && (RenderMode == RenderType_Smooth) ? 1 : 0);
+    namespace un = UniformName;
+    glUniformMatrix4fv(MainShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
+    glUniformMatrix4fv(MainShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
+    glUniform4fv(MainShaderProgram->GetUniform(un::LightPosition), NumLights, LightPositions);
+    glUniform4fv(MainShaderProgram->GetUniform(un::LightColor), NumLights, LightColors);
+    glUniform4fv(MainShaderProgram->GetUniform(un::AmbientColor), 1, AmbientColor);
+    glUniform4fv(MainShaderProgram->GetUniform(un::DiffuseColor), 1, DiffusionColor);
+    glUniform4fv(MainShaderProgram->GetUniform(un::SpecularColor), 1, SpecularColor);
+    glUniform1f(MainShaderProgram->GetUniform(un::ShininessFactor), Shininess);
+    glUniform1i(MainShaderProgram->GetUniform(un::FlatShading), UseFlatShading && (RenderMode == RenderType_Smooth) ? 1 : 0);
+    glUniform1i(MainShaderProgram->GetUniform(un::DrawLines), RenderMode == RenderType_Lines ? 1 : 0);
+    glUniform1f(MainShaderProgram->GetUniform(un::LineWidth), LineWidth);
 }
 
 void Scene::Draw(const Geometry &geometry) {
@@ -99,8 +103,6 @@ void Scene::Draw(const Geometry &geometry) {
     const int num_indices = geometry.Indices.size();
     glBindVertexArray(geometry.VertexArray);
 
-    glUniform1i(DrawLinesLoc, RenderMode == RenderType_Lines ? 1 : 0);
-
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     if (geometry.InstanceModels.size() <= 1) {
@@ -108,11 +110,6 @@ void Scene::Draw(const Geometry &geometry) {
     } else {
         glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry.InstanceModels.size());
     }
-}
-
-void Scene::RestoreDefaultMaterial() {
-    glUniform4fv(DiffuseColorLoc, 1, DiffusionColor);
-    glUniform4fv(SpecularColorLoc, 1, SpecularColor);
 }
 
 void Scene::Render() {

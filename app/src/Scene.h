@@ -9,6 +9,8 @@
 
 struct ImVec2;
 
+struct ShaderProgram;
+
 struct Scene {
     enum RenderType_ {
         RenderType_Smooth,
@@ -40,12 +42,13 @@ struct Scene {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderType RenderMode = RenderType_Smooth;
 
+    std::unique_ptr<ShaderProgram> MainShaderProgram;
+
     Scene();
-    ~Scene() = default;
+    ~Scene();
 
     void SetCameraDistance(float distance);
     void UpdateCameraProjection(const ImVec2 &size);
-    void RestoreDefaultMaterial();
 
     void Draw(const Geometry &);
 
