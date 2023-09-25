@@ -10,13 +10,7 @@ endif()
 
 add_subdirectory(lib)
 
-file(
-    GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp
-    lib/implot/implot.cpp lib/implot/implot_items.cpp lib/implot/implot_demo.cpp
-    lib/fmt/src/format.cc
-    lib/imgui/misc/cpp/imgui_stdlib.cpp
-    lib/ImGuizmo/ImGuizmo.cpp
-)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/*.cpp)
 
 # Create a dummy output that depends on all resource files,
 # so that changes in resource files trigger a re-copy of the changed files to the build directory.
@@ -30,7 +24,23 @@ add_custom_command(
 )
 add_custom_target(CopyResources ALL DEPENDS ${DUMMY_OUTPUT})
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+set(IMGUI_DIR lib/imgui)
+set(IMPLOT_DIR lib/implot)
+
+add_executable(${PROJECT_NAME}
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMPLOT_DIR}/implot.cpp
+    ${IMPLOT_DIR}/implot_items.cpp
+    ${IMPLOT_DIR}/implot_demo.cpp
+    lib/ImGuizmo/ImGuizmo.cpp
+    ${SOURCES}
+)
 add_dependencies(${PROJECT_NAME} CopyResources)
 
 set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
@@ -42,13 +52,15 @@ set(cinolib_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/cinolib)
 find_package(cinolib REQUIRED)
 
 include_directories(
-    lib/implot
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+    ${IMPLOT_DIR}
     lib/imspinner
+    lib/ImGuizmo
     lib/glm
     lib/miniaudio
     lib/fmt/include
     lib/faust/architecture
-    lib/ImGuizmo
     lib/nanosvg/src
     lib/earcut/include/mapbox
     lib/CDT/CDT/include
@@ -57,6 +69,7 @@ include_directories(
     ${Mesh2FaustDir}/src
 )
 
+find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 
 if(APPLE)
@@ -66,7 +79,7 @@ else()
 endif()
 
 # `dynamiclib` is faust.
-target_link_libraries(${PROJECT_NAME} PRIVATE IMGUI GLEW::GLEW nfd dynamiclib mesh2faust cinolib)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL GLEW::GLEW SDL3::SDL3 nfd dynamiclib mesh2faust cinolib)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)
