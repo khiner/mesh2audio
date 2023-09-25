@@ -230,8 +230,8 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
         }
     }
 
+    CenterVertices();
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
     // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the y-axis (the up/down axis).
-    // Flip(false, true, false);
-    CenterVertices();
+    Vertices *= {1.0, -1.0, 1.0};
 }
