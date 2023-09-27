@@ -269,7 +269,8 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
-            MainScene->SetupRender();
+            if (mesh != nullptr) mesh->Update();
+            MainScene->Draw();
             if (mesh != nullptr) mesh->Render();
             End();
             PopStyleVar();

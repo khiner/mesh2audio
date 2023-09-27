@@ -4,5 +4,5 @@
 
 // Icosphere.
 struct Sphere : Geometry {
-    Sphere(float radius, int recursion_level = 3);
+    Sphere(float radius = 1, int recursion_level = 3);
 };

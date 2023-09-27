@@ -37,17 +37,19 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
 
     HoveredVertexArrow.SetColor({1, 0, 0, 1});
     UpdateExcitableVertices();
+    Scene.AddGeometry(&GetActiveGeometry());
+    Scene.AddGeometry(&ExcitableVertexPoints);
+    Scene.AddGeometry(&HoveredVertexArrow);
 }
 
 Mesh::~Mesh() {}
 
-const Geometry &Mesh::GetActiveGeometry() const {
-    if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
-    return TetMesh;
-}
-Geometry &Mesh::GetActiveGeometry() {
-    if (ActiveViewMeshType == MeshType_Triangular) return TriangularMesh;
-    return TetMesh;
+void Mesh::SetViewMeshType(Type type) {
+    if (ViewMeshType == type) return;
+
+    Scene.RemoveGeometry(&GetActiveGeometry());
+    ViewMeshType = type;
+    Scene.AddGeometry(&GetActiveGeometry());
 }
 
 void Mesh::Save(fs::path file_path) const {
@@ -81,7 +83,7 @@ void Mesh::ExtrudeProfile() {
     TetMeshPath.clear();
     UpdateExcitableVertices();
     TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
-    ActiveViewMeshType = MeshType_Triangular;
+    SetViewMeshType(MeshType_Triangular);
 }
 
 static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
@@ -110,14 +112,14 @@ void Mesh::UpdateExcitableVertexColors() {
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
-            ExcitableVertexPoints.InstanceColors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
+            ExcitableVertexPoints.Colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
     }
 }
 
 void Mesh::UpdateExcitableVertices() {
-    ExcitableVertexPoints.InstanceModels.clear();
-    ExcitableVertexPoints.InstanceColors.clear();
+    ExcitableVertexPoints.Transforms.clear();
+    ExcitableVertexPoints.Colors.clear();
     ExcitableVertexIndices.clear();
     if (TetMesh.Vertices.empty()) return;
 
@@ -129,8 +131,8 @@ void Mesh::UpdateExcitableVertices() {
     }
 
     for (auto vertex_index : ExcitableVertexIndices) {
-        ExcitableVertexPoints.InstanceModels.push_back(glm::translate(Identity, TetMesh.Vertices[vertex_index]));
-        ExcitableVertexPoints.InstanceColors.push_back({1, 1, 1, 1});
+        ExcitableVertexPoints.Transforms.push_back(glm::translate(Identity, TetMesh.Vertices[vertex_index]));
+        ExcitableVertexPoints.Colors.push_back({1, 1, 1, 1});
     }
 }
 
@@ -189,9 +191,7 @@ void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vect
 
     TetMesh.CenterVertices();
     UpdateExcitableVertices();
-
-    ViewMeshType = MeshType_Tetrahedral; // Automatically switch to tetrahedral view.
-    ActiveViewMeshType = MeshType_Triangular; // Force an automatic rebind on the next render (xxx crappy way of doing this).
+    SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
 }
 
 void Mesh::LoadTetMesh(fs::path file_path) {
@@ -299,7 +299,7 @@ void Mesh::UpdateHoveredVertex() {
         }
     }
 
-    HoveredVertexArrow.InstanceModels.clear();
+    HoveredVertexArrow.Transforms.clear();
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.Vertices.size())) {
         // Point the arrow at the hovered vertex.
         const auto &hovered_vertex = geometry.Vertices[HoveredVertexIndex];
@@ -307,28 +307,21 @@ void Mesh::UpdateHoveredVertex() {
 
         mat4 translate = glm::translate(Identity, hovered_vertex);
         mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(hovered_normal)));
-        HoveredVertexArrow.InstanceModels.push_back({translate * rotate});
+        HoveredVertexArrow.Transforms.push_back({translate * rotate});
     }
 }
 
-void Mesh::Render() {
+void Mesh::Update() {
     if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
-        ViewMeshType = MeshType_Triangular;
-    }
-    if (ActiveViewMeshType != ViewMeshType) {
-        ActiveViewMeshType = ViewMeshType;
+        SetViewMeshType(MeshType_Triangular);
     }
 
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
+}
 
+void Mesh::Render() {
     const auto &geometry = GetActiveGeometry();
-    Scene.Draw(geometry);
-    Scene.Draw(ExcitableVertexPoints);
-    Scene.Draw(HoveredVertexArrow);
-    if (RealImpact) Scene.Draw(RealImpactListenerPoints);
-    Scene.Render();
-
     const auto &vertices = geometry.Vertices;
 
     // Handle mouse interactions.
@@ -429,9 +422,10 @@ void Mesh::RenderConfig() {
                     name.c_str(), TetMesh.Vertices.size(), TetMesh.Indices.size()
                 );
                 TextUnformatted("View mesh type");
-                RadioButton("Triangular", &ViewMeshType, MeshType_Triangular);
+                Type view_mesh_type = ViewMeshType;
+                if (RadioButton("Triangular", &view_mesh_type, MeshType_Triangular)) SetViewMeshType(view_mesh_type);
                 SameLine();
-                RadioButton("Tetrahedral", &ViewMeshType, MeshType_Tetrahedral);
+                if (RadioButton("Tetrahedral", &view_mesh_type, MeshType_Tetrahedral)) SetViewMeshType(view_mesh_type);
             } else {
                 TextUnformatted("No tetrahedral mesh loaded");
             }
@@ -501,11 +495,11 @@ void Mesh::RenderConfig() {
             }
             if (RealImpactLoader.Render() && RealImpact) {
                 const size_t num_points = RealImpact->NumListenerPoints();
-                RealImpactListenerPoints.InstanceModels.clear();
-                RealImpactListenerPoints.InstanceColors.clear();
+                RealImpactListenerPoints.Transforms.clear();
+                RealImpactListenerPoints.Colors.clear();
                 for (size_t i = 0; i < num_points; i++) {
-                    RealImpactListenerPoints.InstanceModels.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
-                    RealImpactListenerPoints.InstanceColors.push_back({1, 1, 1, 1});
+                    RealImpactListenerPoints.Transforms.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
+                    RealImpactListenerPoints.Colors.push_back({1, 1, 1, 1});
                 }
             }
             EndTabItem();

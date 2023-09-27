@@ -29,6 +29,8 @@ struct Mesh {
     Mesh(::Scene &scene, fs::path file_path);
     ~Mesh();
 
+    void Update();
+
     void Render();
     void RenderConfig();
     void RenderProfile();
@@ -40,8 +42,7 @@ struct Mesh {
         if (Profile != nullptr) Profile->SaveTesselation(file_path);
     }
 
-    const Geometry &GetActiveGeometry() const;
-    Geometry &GetActiveGeometry();
+    inline const Geometry &GetActiveGeometry() const { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
@@ -58,8 +59,6 @@ struct Mesh {
     void ApplyTransform();
     glm::mat4 GetTransform() const;
 
-    inline static Type ViewMeshType = MeshType_Triangular;
-
     inline static int NumExcitableVertices = 10;
     inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
     inline static bool QualityTetMesh = true;
@@ -68,6 +67,10 @@ struct Mesh {
     fs::path FilePath; // Most recently loaded file path.
 
 private:
+    Type ViewMeshType = MeshType_Triangular;
+
+    void SetViewMeshType(Type type);
+
     void UpdateHoveredVertex();
     void UpdateExcitableVertices();
     void UpdateExcitableVertexColors();
@@ -76,18 +79,21 @@ private:
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
 
+    void LoadRealImpact() {
+        RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path());
+        Scene.AddGeometry(&RealImpactListenerPoints);
+    }
+
     // Non-empty if the mesh was generated from a 2D profile:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 
     Geometry TriangularMesh, TetMesh;
-    Type ActiveViewMeshType = MeshType_Triangular;
 
     ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
 
     Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
-    Worker RealImpactLoader{
-        "Load RealImpact", "Loading RealImpact data...", [&] { RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path()); }};
+    Worker RealImpactLoader{"Load RealImpact", "Loading RealImpact data...", [&] { LoadRealImpact(); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
     Arrow HoveredVertexArrow{0.005, 0.001, 0.002, 0.003};

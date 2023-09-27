@@ -24,6 +24,7 @@ struct Geometry {
 
     void Load(fs::path file_path);
 
+    void EnableVertexAttributes(bool full_transforms = true) const;
     void BindData() const;
 
     void Clear();
@@ -42,8 +43,11 @@ struct Geometry {
     VertexBuffer Vertices;
     NormalBuffer Normals;
     IndexBuffer Indices;
-    InstanceModelsBuffer InstanceModels;
-    InstanceColorsBuffer InstanceColors;
+    ColorBuffer Colors;
+
+    // Only one of the following two transform buffer types are used at a time.
+    TransformBuffer Transforms;
+    TranslateScaleBuffer TranslateScales;
 
     uint VertexArray;
 };

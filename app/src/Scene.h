@@ -15,13 +15,13 @@ struct Scene {
     Scene();
     ~Scene();
 
-    void SetCameraDistance(float distance);
+    void SetCameraDistance(float);
     void UpdateCameraProjection(const ImVec2 &size);
 
-    void Draw(const Geometry &);
+    void AddGeometry(const Geometry *);
+    void RemoveGeometry(const Geometry *);
 
-    void SetupRender();
-    void Render();
+    void Draw();
     void RenderConfig();
     void RenderGizmoDebug();
 
@@ -56,4 +56,12 @@ struct Scene {
     inline static RenderType RenderMode = RenderType_Smooth;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram;
+    std::unique_ptr<ShaderProgram> SimpleShaderProgram;
+
+    std::vector<const Geometry *> Geometries;
+
+private:
+    void SetupRender();
+    void Render();
+    void Draw(const Geometry *) const;
 };

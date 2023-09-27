@@ -11,36 +11,46 @@ using std::string;
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
     : Vertices(num_vertices), Normals(num_normals), Indices(num_indices) {
     glGenVertexArrays(1, &VertexArray);
-    glBindVertexArray(VertexArray);
-
-    Vertices.Bind();
-    glEnableVertexAttribArray(0); // `layout (location = 0)` in the vertex shader
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-
-    Normals.Bind();
-    glEnableVertexAttribArray(1); // `layout (location = 1)` in the vertex shader
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
-
-    InstanceModels.Bind();
-    // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
-    for (int i = 0; i < 4; i++) {
-        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(vec4), (GLvoid *)(i * sizeof(vec4)));
-        glEnableVertexAttribArray(2 + i);
-        glVertexAttribDivisor(2 + i, 1); // Attribute is updated once per instance.
-    }
-
-    InstanceColors.Bind();
-    glEnableVertexAttribArray(6); // `layout (location = 6)` in the vertex shader
-    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glVertexAttribDivisor(6, 1); // Attribute is updated once per instance.
-
-    glBindVertexArray(0);
+    EnableVertexAttributes();
 }
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
 
 Geometry::~Geometry() {
     glDeleteVertexArrays(1, &VertexArray);
+}
+
+void Geometry::EnableVertexAttributes(bool full_transforms) const {
+    glBindVertexArray(VertexArray);
+
+    Vertices.Bind();
+    Vertices.EnableVertexAttribute(0);
+
+    Normals.Bind();
+    Normals.EnableVertexAttribute(1);
+
+    Colors.Bind();
+    Colors.EnableVertexAttribute(2);
+
+    if (full_transforms) {
+        Transforms.Bind();
+        Transforms.EnableVertexAttribute(3);
+    } else {
+        TranslateScales.Bind();
+        TranslateScales.EnableVertexAttribute(3);
+    }
+    glBindVertexArray(0);
+}
+
+void Geometry::BindData() const {
+    glBindVertexArray(VertexArray);
+    Vertices.BindData();
+    Normals.BindData();
+    Indices.BindData();
+    Transforms.BindData();
+    TranslateScales.BindData();
+    Colors.BindData();
+    glBindVertexArray(0);
 }
 
 void Geometry::Load(fs::path file_path) {
@@ -101,16 +111,6 @@ void Geometry::CenterVertices() {
     Vertices -= (min + max) / 2.0f;
 }
 
-void Geometry::BindData() const {
-    glBindVertexArray(VertexArray);
-    Vertices.BindData();
-    Normals.BindData();
-    Indices.BindData();
-    InstanceModels.BindData();
-    InstanceColors.BindData();
-    glBindVertexArray(0);
-}
-
 void Geometry::Clear() {
     Vertices.clear();
     Normals.clear();
@@ -138,11 +138,11 @@ void Geometry::Save(fs::path file_path) const {
 }
 
 void Geometry::SetTransform(const mat4 &transform) {
-    for (auto &instance_model : InstanceModels) instance_model = transform;
+    for (auto &instance_model : Transforms) instance_model = transform;
 }
 void Geometry::SetColor(const vec4 &color) {
-    InstanceColors.clear();
-    InstanceColors.resize(InstanceModels.size(), color);
+    Colors.clear();
+    Colors.resize(Transforms.size(), color);
 }
 
 void Geometry::ComputeNormals() {

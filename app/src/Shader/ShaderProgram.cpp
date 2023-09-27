@@ -27,8 +27,6 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
         throw std::runtime_error("Shader program linking failed");
     }
 
-    Use();
-
     std::unordered_set<std::string> uniforms;
     for (const auto *shader : Shaders) {
         uniforms.insert(shader->UniformNames.begin(), shader->UniformNames.end());

@@ -59,14 +59,31 @@ Scene::Scene() {
     namespace un = UniformName;
     static const fs::path ShaderDir = fs::path("res") / "shaders";
     static const Shader
-        VertexShader{GL_VERTEX_SHADER, ShaderDir / "vertex.glsl", {un::Projection, un::CameraView}},
-        GeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "geometry.glsl", {un::LineWidth, un::DrawLines}},
+        TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
+        TranslateScaleVertexShader{GL_VERTEX_SHADER, ShaderDir / "translate_scale_vertex.glsl", {un::Projection, un::CameraView}},
+        LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth, un::DrawLines}},
         FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
 
-    MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&VertexShader, &GeometryShader, &FragmentShader});
+    MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &LinesGeometryShader, &FragmentShader});
+    SimpleShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TranslateScaleVertexShader, &FragmentShader});
+
+    MainShaderProgram->Use();
 }
 
 Scene::~Scene() {}
+
+void Scene::AddGeometry(const Geometry *geometry) {
+    if (!geometry) return;
+    if (std::find(Geometries.begin(), Geometries.end(), geometry) != Geometries.end()) return;
+
+    Geometries.push_back(geometry);
+}
+
+void Scene::RemoveGeometry(const Geometry *geometry) {
+    if (!geometry) return;
+
+    Geometries.erase(std::remove(Geometries.begin(), Geometries.end(), geometry), Geometries.end());
+}
 
 void Scene::SetupRender() {
     const auto &io = ImGui::GetIO();
@@ -95,31 +112,38 @@ void Scene::SetupRender() {
     glUniform1f(MainShaderProgram->GetUniform(un::LineWidth), LineWidth);
 }
 
-void Scene::Draw(const Geometry &geometry) {
-    if (geometry.InstanceModels.empty()) return;
+void Scene::Draw() {
+    SetupRender();
+    for (const auto &geometry : Geometries) Draw(geometry);
+    Render();
+}
 
-    geometry.BindData(); // Only rebinds the data if it has changed.
+void Scene::Draw(const Geometry *geometry) const {
+    if (!geometry || geometry->Transforms.empty()) return;
 
-    const int num_indices = geometry.Indices.size();
-    glBindVertexArray(geometry.VertexArray);
+    geometry->BindData(); // Only rebinds the data if it has changed.
+
+    const int num_indices = geometry->Indices.size();
+    glBindVertexArray(geometry->VertexArray);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    if (geometry.InstanceModels.size() <= 1) {
+    if (geometry->Transforms.size() <= 1) {
         glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
     } else {
-        glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry.InstanceModels.size());
+        glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry->Transforms.size());
     }
 }
 
 void Scene::Render() {
-    // Render the mesh to an OpenGl texture and display it, without changing the cursor position.
+    // Render the scene to an OpenGl texture and display it (without changing the cursor position).
     const auto &content_region = GetContentRegionAvail();
     const auto &cursor = GetCursorPos();
     unsigned int texture_id = Canvas.Render();
     Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
     SetCursorPos(cursor);
 
+    // Render ImGuizmo.
     const auto &window_pos = GetWindowPos();
     if (ShowGizmo || ShowCameraGizmo || ShowGrid) {
         ImGuizmo::BeginFrame();

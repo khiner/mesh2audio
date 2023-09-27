@@ -22,6 +22,7 @@ struct GLBuffer {
     void Bind() const {
         glBindBuffer(Type, BufferId);
     }
+
     void BindData() const {
         if (Dirty) {
             Bind();
@@ -95,13 +96,29 @@ struct GLBuffer {
     std::vector<DataType> Data;
 };
 
+struct IndexBuffer : GLBuffer<uint> {
+    IndexBuffer(size_t size = 0) : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, size) {}
+};
+
 #include <glm/gtx/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
-struct PointBuffer : GLBuffer<glm::vec3> {
-    PointBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {}
+template<typename DataType>
+struct PointBuffer : GLBuffer<DataType> {
+    using GLBuffer<DataType>::Dirty;
+    using GLBuffer<DataType>::Data;
+    using GLBuffer<DataType>::Bind;
+
+    PointBuffer(size_t size = 0) : GLBuffer<DataType>(GL_ARRAY_BUFFER, size) {}
+
+    // `layout (location = slot)` in the vertex shader.
+    void EnableVertexAttribute(GLuint slot) const {
+        Bind();
+        glEnableVertexAttribArray(slot);
+        DoEnableVertexAttribute(slot);
+    }
 
     const PointBuffer &operator*=(const glm::vec3 &value) {
         for (auto &elem : Data) elem *= value;
@@ -132,28 +149,61 @@ struct PointBuffer : GLBuffer<glm::vec3> {
         Dirty = true;
         return *this;
     }
+
+protected:
+    virtual void DoEnableVertexAttribute(GLuint slot) const = 0;
 };
 
-struct VertexBuffer : PointBuffer {
+struct VertexBuffer : PointBuffer<glm::vec3> {
     VertexBuffer(size_t size = 0) : PointBuffer(size) {}
-};
 
-struct NormalBuffer : PointBuffer {
-    NormalBuffer(size_t size = 0) : PointBuffer(size) {}
-};
-
-struct IndexBuffer : GLBuffer<uint> {
-    IndexBuffer(size_t size = 0) : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, size) {}
-};
-
-struct InstanceModelsBuffer : GLBuffer<glm::mat4> {
-    InstanceModelsBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
-        push_back(glm::mat4{1});
+    void DoEnableVertexAttribute(GLuint slot) const override {
+        glVertexAttribPointer(slot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
     }
 };
 
-struct InstanceColorsBuffer : GLBuffer<glm::vec4> {
-    InstanceColorsBuffer(size_t size = 0) : GLBuffer(GL_ARRAY_BUFFER, size) {
+struct NormalBuffer : PointBuffer<glm::vec3> {
+    NormalBuffer(size_t size = 0) : PointBuffer(size) {}
+
+    void DoEnableVertexAttribute(GLuint slot) const override {
+        glVertexAttribPointer(slot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+    }
+};
+
+// {x, y, z, scale}
+struct TranslateScaleBuffer : PointBuffer<glm::vec4> {
+    TranslateScaleBuffer(size_t size = 0) : PointBuffer(size) {
+        push_back(glm::vec4{1});
+    }
+
+    void DoEnableVertexAttribute(GLuint slot) const override {
+        glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), 0);
+        glVertexAttribDivisor(slot, 1); // Attribute is updated once per instance.
+    }
+};
+
+struct TransformBuffer : PointBuffer<glm::mat4> {
+    TransformBuffer(size_t size = 0) : PointBuffer(size) {
+        push_back(glm::mat4{1});
+    }
+
+    void DoEnableVertexAttribute(GLuint slot) const override {
+        // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
+        for (int i = 0; i < 4; i++) {
+            glEnableVertexAttribArray(slot + i);
+            glVertexAttribPointer(slot + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (GLvoid *)(i * sizeof(glm::vec4)));
+            glVertexAttribDivisor(slot + i, 1); // Attribute is updated once per instance.
+        }
+    }
+};
+
+struct ColorBuffer : PointBuffer<glm::vec4> {
+    ColorBuffer(size_t size = 0) : PointBuffer(size) {
         push_back({1, 1, 1, 1});
+    }
+
+    void DoEnableVertexAttribute(GLuint slot) const override {
+        glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), 0);
+        glVertexAttribDivisor(slot, 1); // Attribute is updated once per instance.
     }
 };

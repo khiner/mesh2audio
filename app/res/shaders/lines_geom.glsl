@@ -1,5 +1,7 @@
 #version 330 core
 
+// Emits quad lines around every triangle.
+
 uniform float line_width;
 uniform int draw_lines;
 
@@ -8,16 +10,16 @@ layout (triangle_strip, max_vertices = 12) out;
 
 in vec3 vertex_normal[];
 in vec4 vertex_position[];
-in vec4 instance_color[];
+in vec4 vertex_color[];
 
-out vec3 geom_vertex_normal;
-out vec4 geom_vertex_position;
-out vec4 geom_instance_color;
+out vec3 frag_in_normal;
+out vec4 frag_in_position;
+out vec4 frag_in_color;
 
 void EmitVertexWithAttributes(int i, vec4 offset) {
-    geom_vertex_normal = vertex_normal[i];
-    geom_vertex_position = vertex_position[i] + offset;
-    geom_instance_color = instance_color[i];
+    frag_in_normal = vertex_normal[i];
+    frag_in_position = vertex_position[i] + offset;
+    frag_in_color = vertex_color[i];
     gl_Position = gl_in[i].gl_Position + offset;
     EmitVertex();
 }
