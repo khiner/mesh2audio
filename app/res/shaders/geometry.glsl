@@ -1,11 +1,10 @@
 #version 330 core
 
-// Inputs from vertex shader
-layout (triangles) in;
-layout (triangle_strip, max_vertices = 12) out;
-
 uniform float line_width;
 uniform int draw_lines;
+
+layout (triangles) in;
+layout (triangle_strip, max_vertices = 12) out;
 
 in vec3 vertex_normal[];
 in vec4 vertex_position[];

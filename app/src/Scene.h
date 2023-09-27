@@ -12,6 +12,19 @@ struct ImVec2;
 struct ShaderProgram;
 
 struct Scene {
+    Scene();
+    ~Scene();
+
+    void SetCameraDistance(float distance);
+    void UpdateCameraProjection(const ImVec2 &size);
+
+    void Draw(const Geometry &);
+
+    void SetupRender();
+    void Render();
+    void RenderConfig();
+    void RenderGizmoDebug();
+
     enum RenderType_ {
         RenderType_Smooth,
         RenderType_Lines,
@@ -43,17 +56,4 @@ struct Scene {
     inline static RenderType RenderMode = RenderType_Smooth;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram;
-
-    Scene();
-    ~Scene();
-
-    void SetCameraDistance(float distance);
-    void UpdateCameraProjection(const ImVec2 &size);
-
-    void Draw(const Geometry &);
-
-    void SetupRender();
-    void Render();
-    void RenderConfig();
-    void RenderGizmoDebug();
 };

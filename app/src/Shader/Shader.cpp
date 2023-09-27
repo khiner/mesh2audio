@@ -2,14 +2,13 @@
 
 #include <fstream>
 #include <iostream>
-#include <string>
 
 // From https://stackoverflow.com/a/40903508/780425
 static std::string ReadFile(const fs::path path) {
     std::ifstream f(path, std::ios::in | std::ios::binary);
-    const auto sz = fs::file_size(path);
-    std::string result(sz, '\0');
-    f.read(result.data(), sz);
+    const auto size = fs::file_size(path);
+    std::string result(size, '\0');
+    f.read(result.data(), size);
     return result;
 }
 
@@ -24,7 +23,8 @@ static void HandleErrors(const GLint shader) {
               << log.data() << "\n";
 }
 
-Shader::Shader(GLenum type, const fs::path path) {
+Shader::Shader(GLenum type, const fs::path path, std::unordered_set<std::string> uniform_names)
+    : UniformNames(uniform_names) {
     std::string str = ReadFile(path);
     const char *cstr = str.c_str();
 

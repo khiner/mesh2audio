@@ -56,14 +56,14 @@ Scene::Scene() {
     static const vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
     CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
-    const GLuint vertex_shader = Shader{GL_VERTEX_SHADER, fs::path("res") / "shaders" / "vertex.glsl"}.Id;
-    const GLuint geometry_shader = Shader{GL_GEOMETRY_SHADER, fs::path("res") / "shaders" / "geometry.glsl"}.Id;
-    const GLuint fragment_shader = Shader{GL_FRAGMENT_SHADER, fs::path("res") / "shaders" / "fragment.glsl"}.Id;
     namespace un = UniformName;
-    MainShaderProgram = std::make_unique<ShaderProgram>(
-        std::vector<GLuint>{vertex_shader, geometry_shader, fragment_shader},
-        std::vector<string>{un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::Projection, un::CameraView, un::FlatShading, un::DrawLines, un::LineWidth}
-    );
+    static const fs::path ShaderDir = fs::path("res") / "shaders";
+    static const Shader
+        VertexShader{GL_VERTEX_SHADER, ShaderDir / "vertex.glsl", {un::Projection, un::CameraView}},
+        GeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "geometry.glsl", {un::LineWidth, un::DrawLines}},
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
+
+    MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&VertexShader, &GeometryShader, &FragmentShader});
 }
 
 Scene::~Scene() {}

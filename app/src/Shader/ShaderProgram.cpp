@@ -13,9 +13,10 @@ static void HandleErrors(const GLint program) {
               << log.data() << "\n";
 }
 
-ShaderProgram::ShaderProgram(const std::vector<GLuint> &shader_ids, const std::vector<std::string> &uniforms) {
+ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
+    : Shaders(std::move(shaders)) {
     Id = glCreateProgram();
-    for (GLuint shader_id : shader_ids) glAttachShader(Id, shader_id);
+    for (const auto *shader : Shaders) glAttachShader(Id, shader->Id);
 
     glLinkProgram(Id);
 
@@ -27,6 +28,11 @@ ShaderProgram::ShaderProgram(const std::vector<GLuint> &shader_ids, const std::v
     }
 
     Use();
+
+    std::unordered_set<std::string> uniforms;
+    for (const auto *shader : Shaders) {
+        uniforms.insert(shader->UniformNames.begin(), shader->UniformNames.end());
+    }
 
     // Initialize uniform locations
     for (const auto &uniform : uniforms) {

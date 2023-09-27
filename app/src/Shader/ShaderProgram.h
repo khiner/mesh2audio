@@ -6,7 +6,7 @@
 #include "Shader.h"
 
 struct ShaderProgram {
-    ShaderProgram(const std::vector<GLuint> &shader_ids, const std::vector<std::string> &uniforms = {});
+    ShaderProgram(std::vector<const Shader *> &&);
     ~ShaderProgram() = default;
 
     void Use();
@@ -14,5 +14,6 @@ struct ShaderProgram {
     inline GLuint GetUniform(const std::string &name) const { return Uniforms.at(name); }
 
     GLuint Id;
+    std::vector<const Shader *> Shaders;
     std::unordered_map<std::string, GLuint> Uniforms;
 };

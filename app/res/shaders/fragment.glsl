@@ -1,26 +1,18 @@
 #version 330 core
 
-// Inputs passed in from the vertex shader.
+const int num_lights = 5;
+
+uniform mat4 camera_view;
+uniform vec4 light_position[num_lights], light_color[num_lights];
+uniform vec4 ambient_color, diffuse_color, specular_color;
+uniform float shininess_factor;
+uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
+
 in vec3 geom_vertex_normal;
 in vec4 geom_vertex_position;
 in vec4 geom_instance_color;
 
-// Output of the fragment shader.
 out vec4 frag_color;
-
-// Max number of light sources.
-const int num_lights = 5;
-
-uniform mat4 camera_view;
-
-// Uniform variables related to lighting.
-uniform vec4 light_position[num_lights], light_color[num_lights];
-
-// Uniform variables for object properties.
-uniform vec4 ambient_color, diffuse_color, specular_color;
-uniform float shininess_factor;
-
-uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
 
 vec4 compute_lighting(vec3 direction, vec4 light_color, vec3 normal, vec3 half_vector, vec4 object_diffuse, vec4 object_specular, float object_shininess) {
     float n_dot_l = dot(normal, direction);
@@ -33,7 +25,6 @@ void main (void) {
     vec3 eye_position = vec3(0,0,0);
     vec3 fragment_position = geom_vertex_position.xyz / geom_vertex_position.w;
     vec3 eye_direction = normalize(eye_position - fragment_position);
-
     vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : geom_vertex_normal);
 
     vec4 final_color = ambient_color;
