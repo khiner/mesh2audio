@@ -16,6 +16,13 @@ namespace fs = std::filesystem;
 using uint = unsigned int;
 using std::vector;
 
+enum RenderType_ {
+    RenderType_Smooth,
+    RenderType_Lines,
+    RenderType_Points,
+};
+using RenderType = int;
+
 struct Geometry {
     Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
     Geometry(fs::path file_path);
@@ -25,7 +32,9 @@ struct Geometry {
     void Load(fs::path file_path);
 
     void EnableVertexAttributes(bool full_transforms = true) const;
-    void BindData() const;
+
+    void SetupRender(RenderType render_type = RenderType_Smooth);
+    void BindData(RenderType render_type = RenderType_Smooth) const;
 
     void Clear();
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
@@ -38,11 +47,13 @@ struct Geometry {
     void SetColor(const glm::vec4 &);
 
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
+    void ComputeLineIndices();
+
     void ExtrudeProfile(const vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
     VertexBuffer Vertices;
     NormalBuffer Normals;
-    IndexBuffer Indices;
+    IndexBuffer TriangleIndices, LineIndices;
     ColorBuffer Colors;
 
     // Only one of the following two transform buffer types are used at a time.

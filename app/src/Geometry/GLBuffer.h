@@ -24,8 +24,8 @@ struct GLBuffer {
     }
 
     void BindData() const {
+        Bind();
         if (Dirty) {
-            Bind();
             glBufferData(Type, sizeof(DataType) * Data.size(), Data.data(), GL_STATIC_DRAW);
             Dirty = false;
         }

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 
 #include <glm/gtx/string_cast.hpp>
 
@@ -9,7 +10,7 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
-    : Vertices(num_vertices), Normals(num_normals), Indices(num_indices) {
+    : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {
     glGenVertexArrays(1, &VertexArray);
     EnableVertexAttributes();
 }
@@ -42,13 +43,19 @@ void Geometry::EnableVertexAttributes(bool full_transforms) const {
     glBindVertexArray(0);
 }
 
-void Geometry::BindData() const {
+void Geometry::SetupRender(RenderType render_type) {
+    if (render_type == RenderType_Lines && LineIndices.empty()) ComputeLineIndices();
+    else if (render_type != RenderType_Lines && !LineIndices.empty()) LineIndices.clear(); // Save memory.
+}
+
+void Geometry::BindData(RenderType render_type) const {
     glBindVertexArray(VertexArray);
     Vertices.BindData();
     Normals.BindData();
-    Indices.BindData();
+    const auto &indices = render_type == RenderType_Lines ? LineIndices : TriangleIndices;
+    indices.BindData();
     Transforms.BindData();
-    TranslateScales.BindData();
+    // TranslateScales.BindData();
     Colors.BindData();
     glBindVertexArray(0);
 }
@@ -86,9 +93,9 @@ void Geometry::Load(fs::path file_path) {
                 ungetc(second_char, fp);
                 fscanf(fp, "%d %d/%d %d/%d", &ignore, &fy, &ignore, &fz, &ignore);
             }
-            Indices.push_back(fx - 1);
-            Indices.push_back(fy - 1);
-            Indices.push_back(fz - 1);
+            TriangleIndices.push_back(fx - 1);
+            TriangleIndices.push_back(fy - 1);
+            TriangleIndices.push_back(fz - 1);
         }
     }
     fclose(fp);
@@ -98,8 +105,8 @@ void Geometry::Load(fs::path file_path) {
 }
 
 void Geometry::CenterVertices() {
-    vec3 min = vec3(INFINITY, INFINITY, INFINITY);
-    vec3 max = vec3(-INFINITY, -INFINITY, -INFINITY);
+    vec3 min{INFINITY, INFINITY, INFINITY};
+    vec3 max{-INFINITY, -INFINITY, -INFINITY};
     for (const vec3 &v : Vertices) {
         if (v.x < min.x) min.x = v.x;
         if (v.y < min.y) min.y = v.y;
@@ -114,7 +121,8 @@ void Geometry::CenterVertices() {
 void Geometry::Clear() {
     Vertices.clear();
     Normals.clear();
-    Indices.clear();
+    TriangleIndices.clear();
+    LineIndices.clear();
 }
 
 void Geometry::Save(fs::path file_path) const {
@@ -128,10 +136,10 @@ void Geometry::Save(fs::path file_path) const {
     for (const vec3 &n : Normals) {
         out << "vn " << n.x << " " << n.y << " " << n.z << "\n";
     }
-    for (size_t i = 0; i < Indices.size(); i += 3) {
-        out << "f " << Indices[i] + 1 << "//" << Indices[i] + 1 << " "
-            << Indices[i + 1] + 1 << "//" << Indices[i + 1] + 1 << " "
-            << Indices[i + 2] + 1 << "//" << Indices[i + 2] + 1 << "\n";
+    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
+        out << "f " << TriangleIndices[i] + 1 << "//" << TriangleIndices[i] + 1 << " "
+            << TriangleIndices[i + 1] + 1 << "//" << TriangleIndices[i + 1] + 1 << " "
+            << TriangleIndices[i + 2] + 1 << "//" << TriangleIndices[i + 2] + 1 << "\n";
     }
 
     out.close();
@@ -151,12 +159,42 @@ void Geometry::ComputeNormals() {
     Normals.resize(Vertices.size());
 
     // Compute normals for each triangle.
-    for (size_t i = 0; i < Indices.size(); i += 3) {
-        const vec3 &v0 = Vertices[Indices[i]];
-        const vec3 &v1 = Vertices[Indices[i + 1]];
-        const vec3 &v2 = Vertices[Indices[i + 2]];
+    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
+        const vec3 &v0 = Vertices[TriangleIndices[i]];
+        const vec3 &v1 = Vertices[TriangleIndices[i + 1]];
+        const vec3 &v2 = Vertices[TriangleIndices[i + 2]];
         const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-        for (int j = 0; j < 3; j++) Normals[Indices[i + j]] = normal;
+        for (int j = 0; j < 3; j++) Normals[TriangleIndices[i + j]] = normal;
+    }
+}
+
+struct Line {
+    Line(uint a, uint b) : v1(std::min(a, b)), v2(std::max(a, b)) {}
+
+    struct Hash {
+        std::size_t operator()(const Line &line) const {
+            return std::hash<uint>()(line.v1) ^ (std::hash<uint>()(line.v2) << 1);
+        }
+    };
+
+    inline bool operator==(const Line &other) const { return v1 == other.v1 && v2 == other.v2; }
+
+    uint v1, v2;
+};
+
+void Geometry::ComputeLineIndices() {
+    std::unordered_set<Line, Line::Hash> lines;
+    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
+        lines.insert({TriangleIndices[i], TriangleIndices[i + 1]});
+        lines.insert({TriangleIndices[i + 1], TriangleIndices[i + 2]});
+        lines.insert({TriangleIndices[i + 2], TriangleIndices[i]});
+    }
+
+    LineIndices.resize(lines.size() * 2);
+    auto it = LineIndices.begin();
+    for (const auto &line : lines) {
+        (*it++) = line.v1;
+        (*it++) = line.v2;
     }
 }
 
@@ -176,7 +214,7 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
     const int num_indices = slices * (profile_size_no_connect + (closed ? -1 : 0)) * 6;
     Vertices.reserve(num_vertices);
     Normals.reserve(num_vertices);
-    Indices.reserve(num_indices);
+    TriangleIndices.reserve(num_indices);
 
     for (uint slice = 0; slice < slices; slice++) {
         const float ratio = 2 * float(slice) / slices;
@@ -201,7 +239,7 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const uint base_index = slice * profile_size_no_connect + i;
             const uint next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
-            Indices.append({
+            TriangleIndices.append({
                 // First triangle
                 base_index,
                 next_base_index + 1,
@@ -217,7 +255,7 @@ void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices,
     // Connect the top and bottom.
     if (!closed) {
         for (uint slice = 0; slice < slices; slice++) {
-            Indices.append({
+            TriangleIndices.append({
                 // Top
                 uint(Vertices.size() - 2),
                 slice * profile_size_no_connect,

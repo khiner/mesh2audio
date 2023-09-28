@@ -43,6 +43,7 @@ struct Mesh {
     }
 
     inline const Geometry &GetActiveGeometry() const { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
+    inline Geometry &GetActiveGeometry() { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();

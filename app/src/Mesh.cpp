@@ -160,7 +160,7 @@ void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vect
     TetMesh.Clear();
     TetMesh.Vertices.reserve(tet_vecs.size());
     TetMesh.Normals.reserve(tet_vecs.size());
-    TetMesh.Indices.reserve(tet_polys.size() * 12);
+    TetMesh.TriangleIndices.reserve(tet_polys.size() * 12);
 
     // Bind vertices, normals, and indices to the tetrahedral mesh.
     for (size_t i = 0; i < tet_vecs.size(); i++) {
@@ -176,7 +176,7 @@ void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vect
         // Turn tetrahedron into 4 triangles with element-relative indices:
         // 0, 1, 2; 3, 0, 1; 2, 3, 0; 1, 2, 3;
         for (int j = 0; j < 12; j++) {
-            TetMesh.Indices.push_back(p[j % 4]);
+            TetMesh.TriangleIndices.push_back(p[j % 4]);
         }
     }
     // Creating a `cinolib::Tetmesh` resolves redundant faces, which creates much fewer indices.
@@ -247,7 +247,7 @@ string Mesh::GenerateDsp() const {
     // Convert the tetrahedral mesh into a VegaFEM tetmesh.
     // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
     ::TetMesh volumetric_mesh{
-        int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.Indices.size() / 4), (int *)TetMesh.Indices.data(),
+        int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.TriangleIndices.size() / 4), (int *)TetMesh.TriangleIndices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
     m2f::CommonArguments args{
@@ -419,13 +419,14 @@ void Mesh::RenderConfig() {
                 const string name = GetTetMeshName(TetMeshPath);
                 Text(
                     "Current tetrahedral mesh:\n\tGenerated: %s\n\tVertices: %lu\n\tIndices: %lu",
-                    name.c_str(), TetMesh.Vertices.size(), TetMesh.Indices.size()
+                    name.c_str(), TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
                 );
                 TextUnformatted("View mesh type");
-                Type view_mesh_type = ViewMeshType;
-                if (RadioButton("Triangular", &view_mesh_type, MeshType_Triangular)) SetViewMeshType(view_mesh_type);
+                Type mesh_type = ViewMeshType;
+                bool mesh_type_changed = RadioButton("Triangular", &mesh_type, MeshType_Triangular);
                 SameLine();
-                if (RadioButton("Tetrahedral", &view_mesh_type, MeshType_Tetrahedral)) SetViewMeshType(view_mesh_type);
+                mesh_type_changed |= RadioButton("Tetrahedral", &mesh_type, MeshType_Tetrahedral);
+                if (mesh_type_changed) SetViewMeshType(mesh_type);
             } else {
                 TextUnformatted("No tetrahedral mesh loaded");
             }

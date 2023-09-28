@@ -18,19 +18,12 @@ struct Scene {
     void SetCameraDistance(float);
     void UpdateCameraProjection(const ImVec2 &size);
 
-    void AddGeometry(const Geometry *);
+    void AddGeometry(Geometry *);
     void RemoveGeometry(const Geometry *);
 
     void Draw();
     void RenderConfig();
     void RenderGizmoDebug();
-
-    enum RenderType_ {
-        RenderType_Smooth,
-        RenderType_Lines,
-        RenderType_Points,
-    };
-    using RenderType = int;
 
     inline static const int NumLights = 5;
     float LightPositions[NumLights * 4] = {0.0f};
@@ -56,9 +49,12 @@ struct Scene {
     inline static RenderType RenderMode = RenderType_Smooth;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram;
+    std::unique_ptr<ShaderProgram> LinesShaderProgram;
     std::unique_ptr<ShaderProgram> SimpleShaderProgram;
 
-    std::vector<const Geometry *> Geometries;
+    ShaderProgram *CurrShaderProgram = nullptr;
+
+    std::vector<Geometry *> Geometries;
 
 private:
     void SetupRender();
