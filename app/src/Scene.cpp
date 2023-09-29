@@ -61,13 +61,11 @@ Scene::Scene() {
     static const Shader
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
-        TranslateScaleVertexShader{GL_VERTEX_SHADER, ShaderDir / "translate_scale_vertex.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
         FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
-    SimpleShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TranslateScaleVertexShader, &FragmentShader});
 
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
@@ -110,7 +108,7 @@ void Scene::SetupRender() {
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, DiffusionColor);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, SpecularColor);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
-    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && (RenderMode == RenderType_Smooth) ? 1 : 0);
+    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && RenderMode == RenderType_Smooth ? 1 : 0);
 
     if (RenderMode == RenderType_Lines) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
@@ -122,35 +120,10 @@ void Scene::SetupRender() {
 void Scene::Draw() {
     SetupRender();
     // auto start_time = std::chrono::high_resolution_clock::now();
-    for (const auto *geometry : Geometries) Draw(geometry);
+    if (RenderMode == RenderType_Points) glPointSize(PointRadius);
+    for (const auto *geometry : Geometries) geometry->Render(RenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
     Render();
-}
-
-void Scene::Draw(const Geometry *geometry) const {
-    if (!geometry || geometry->Transforms.empty()) return;
-
-    geometry->BindData(RenderMode); // Only rebinds the data if it has changed.
-
-    glBindVertexArray(geometry->VertexArray);
-
-    if (RenderMode == RenderType_Lines) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINES);
-        const int num_indices = geometry->LineIndices.size();
-        if (geometry->Transforms.size() <= 1) {
-            glDrawElements(GL_LINES, num_indices, GL_UNSIGNED_INT, 0);
-        } else {
-            glDrawElementsInstanced(GL_LINES, num_indices, GL_UNSIGNED_INT, 0, geometry->Transforms.size());
-        }
-    } else {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        const int num_indices = geometry->TriangleIndices.size();
-        if (geometry->Transforms.size() <= 1) {
-            glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-        } else {
-            glDrawElementsInstanced(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0, geometry->Transforms.size());
-        }
-    }
 }
 
 void Scene::Render() {
@@ -223,16 +196,17 @@ void Scene::RenderConfig() {
             SameLine();
             render_mode_changed |= RadioButton("Point cloud", &RenderMode, RenderType_Points);
             if (render_mode_changed) {
-                switch (RenderMode) {
-                    case RenderType_Smooth: CurrShaderProgram = MainShaderProgram.get(); break;
-                    case RenderType_Lines: CurrShaderProgram = LinesShaderProgram.get(); break;
-                    case RenderType_Points: CurrShaderProgram = SimpleShaderProgram.get(); break;
-                }
+                CurrShaderProgram = RenderMode == RenderType_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
                 CurrShaderProgram->Use();
             }
-            if (RenderMode == RenderType_Smooth) Checkbox("Flat shading", &UseFlatShading);
+            if (RenderMode == RenderType_Smooth) {
+                Checkbox("Flat shading", &UseFlatShading);
+            }
             if (RenderMode == RenderType_Lines) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);
+            }
+            if (RenderMode == RenderType_Points) {
+                SliderFloat("Point radius", &PointRadius, 0.1, 10, "%.2f", ImGuiSliderFlags_Logarithmic);
             }
             EndTabItem();
         }

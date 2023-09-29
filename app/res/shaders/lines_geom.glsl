@@ -30,8 +30,8 @@ void main() {
 
     EmitWithAttributes(0, offset);
     EmitWithAttributes(1, offset);
-    EmitWithAttributes(1, -offset);
     EmitWithAttributes(0, -offset);
-    
+    EmitWithAttributes(1, -offset);
+
     EndPrimitive();
 }

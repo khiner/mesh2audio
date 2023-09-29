@@ -32,7 +32,7 @@ struct Scene {
     float DiffusionColor[4] = {0.2, 0.2, 0.2, 1};
     float SpecularColor[4] = {0.5, 0.5, 0.5, 1};
     float Shininess = 10;
-    float LineWidth = 0.005;
+    float LineWidth = 0.005, PointRadius = 1;
     bool CustomColors = false, UseFlatShading = true;
 
     bool ShowCameraGizmo = true, ShowGrid = false, ShowGizmo = false, ShowBounds = false;
@@ -48,9 +48,7 @@ struct Scene {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderType RenderMode = RenderType_Smooth;
 
-    std::unique_ptr<ShaderProgram> MainShaderProgram;
-    std::unique_ptr<ShaderProgram> LinesShaderProgram;
-    std::unique_ptr<ShaderProgram> SimpleShaderProgram;
+    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram;
 
     ShaderProgram *CurrShaderProgram = nullptr;
 
@@ -59,5 +57,4 @@ struct Scene {
 private:
     void SetupRender();
     void Render();
-    void Draw(const Geometry *) const;
 };

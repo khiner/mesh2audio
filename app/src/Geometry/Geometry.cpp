@@ -21,7 +21,7 @@ Geometry::~Geometry() {
     glDeleteVertexArrays(1, &VertexArray);
 }
 
-void Geometry::EnableVertexAttributes(bool full_transforms) const {
+void Geometry::EnableVertexAttributes() const {
     glBindVertexArray(VertexArray);
 
     Vertices.Bind();
@@ -33,13 +33,8 @@ void Geometry::EnableVertexAttributes(bool full_transforms) const {
     Colors.Bind();
     Colors.EnableVertexAttribute(2);
 
-    if (full_transforms) {
-        Transforms.Bind();
-        Transforms.EnableVertexAttribute(3);
-    } else {
-        TranslateScales.Bind();
-        TranslateScales.EnableVertexAttribute(3);
-    }
+    Transforms.Bind();
+    Transforms.EnableVertexAttribute(3);
     glBindVertexArray(0);
 }
 
@@ -55,9 +50,26 @@ void Geometry::BindData(RenderType render_type) const {
     const auto &indices = render_type == RenderType_Lines ? LineIndices : TriangleIndices;
     indices.BindData();
     Transforms.BindData();
-    // TranslateScales.BindData();
     Colors.BindData();
     glBindVertexArray(0);
+}
+
+void Geometry::Render(RenderType render_type) const {
+    if (Transforms.empty()) return;
+
+    BindData(render_type); // Only rebinds the data if it has changed.
+
+    glBindVertexArray(VertexArray);
+
+    GLenum polygon_mode = render_type == RenderType_Points ? GL_POINT : GL_FILL;
+    GLenum primitive_type = render_type == RenderType_Lines ? GL_LINES : GL_TRIANGLES;
+    uint num_indices = render_type == RenderType_Lines ? LineIndices.size() : TriangleIndices.size();
+    glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
+    if (Transforms.size() == 1) {
+        glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
+    } else {
+        glDrawElementsInstanced(primitive_type, num_indices, GL_UNSIGNED_INT, 0, Transforms.size());
+    }
 }
 
 void Geometry::Load(fs::path file_path) {
