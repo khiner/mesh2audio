@@ -38,3 +38,7 @@ target_compile_definitions(dynamiclib PUBLIC LLVM_BUILD_UNIVERSAL=1)
 #=================== CDT ===================
 
 add_subdirectory(CDT/CDT)
+
+#=================== tetgen ===================
+
+add_subdirectory(tetgen)

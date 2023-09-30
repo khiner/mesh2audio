@@ -47,10 +47,6 @@ set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
 set(Mesh2FaustDir ${CMAKE_CURRENT_SOURCE_DIR}/lib/faust/tools/physicalModeling/mesh2faust)
 add_subdirectory(${Mesh2FaustDir})
 
-set(CINOLIB_USES_TETGEN ON)
-set(cinolib_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/cinolib)
-find_package(cinolib REQUIRED)
-
 include_directories(
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
@@ -66,6 +62,7 @@ include_directories(
     lib/CDT/CDT/include
     lib/date/include/date
     lib/libnpy/include
+    lib/tetgen
     ${Mesh2FaustDir}/src
 )
 
@@ -79,7 +76,8 @@ else()
 endif()
 
 # `dynamiclib` is faust.
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL GLEW::GLEW SDL3::SDL3 nfd dynamiclib mesh2faust cinolib)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL GLEW::GLEW SDL3::SDL3 nfd dynamiclib mesh2faust tetgen)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)
+add_definitions(-DTETLIBRARY)

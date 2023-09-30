@@ -2,8 +2,6 @@
 
 #include "tetMesh.h" // Vega
 
-#include <cinolib/geometry/vec_mat.h>
-
 #include "Material.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
@@ -47,9 +45,7 @@ struct Mesh {
 
     // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
-    void LoadTetMesh(fs::path file_path);
-    void LoadTetMesh(const vector<cinolib::vec3d> &vecs, const vector<vector<uint>> &polys);
-    bool HasTetMesh() const { return !TetMeshPath.empty(); }
+    bool HasTetMesh() const { return !TetMesh.Empty(); }
     static std::string GetTetMeshName(fs::path file_path);
 
     std::string GenerateDsp() const;

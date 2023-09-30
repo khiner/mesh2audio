@@ -19,6 +19,8 @@ struct GLBuffer {
         glDeleteBuffers(1, &BufferId);
     }
 
+    operator const std::vector<DataType> &() const { return Data; }
+
     void Bind() const {
         glBindBuffer(Type, BufferId);
     }

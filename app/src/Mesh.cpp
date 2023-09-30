@@ -2,21 +2,13 @@
 
 #include <format>
 
-// mesh2faust/vega
-#include "mesh2faust.h"
-#include "tetMesher.h"
-
 #include "date.h"
+#include "tetgen.h"
 
-#include <cinolib/meshes/meshes.h>
-#include <cinolib/tetgen_wrap.h>
+#include "mesh2faust.h"
+#include "tetMesher.h" // Vega
 
 #include "Audio.h"
-
-// auto start = std::chrono::high_resolution_clock::now();
-// auto end = std::chrono::high_resolution_clock::now();
-// auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-// std::cout << std::format("{}", duration) << std::endl;
 
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
@@ -155,80 +147,62 @@ static vector<seconds_t> GetSavedTetMeshTimes() {
     return saved_tet_mesh_times;
 }
 
-void Mesh::LoadTetMesh(const vector<cinolib::vec3d> &tet_vecs, const vector<vector<uint>> &tet_polys) {
-    HoveredVertexIndex = CameraTargetVertexIndex = -1;
-    TetMesh.Clear();
-    TetMesh.Vertices.reserve(tet_vecs.size());
-    TetMesh.Normals.reserve(tet_vecs.size());
-    TetMesh.TriangleIndices.reserve(tet_polys.size() * 12);
+GeometryData ConvertTriMeshToTetMesh(const GeometryData &tri_mesh) {
+    tetgenio in;
+    in.firstnumber = 0;
+    in.numberofpoints = tri_mesh.Vertices.size();
+    in.pointlist = new REAL[in.numberofpoints * 3];
 
-    // Bind vertices, normals, and indices to the tetrahedral mesh.
-    for (size_t i = 0; i < tet_vecs.size(); i++) {
-        const auto &v = tet_vecs[i];
-        const float x = v[0], y = v[1], z = v[2];
-        const float angle = atan2(z, x);
-        TetMesh.Vertices.push_back({x, y, z});
-        TetMesh.Normals.push_back({cos(angle), 0, sin(angle)});
-        // const auto &normal = tet_mesh.face_data(fid).normal;
-        // Normals.push_back({normal.x(), normal.y(), normal.z()});
+    for (uint i = 0; i < tri_mesh.Vertices.size(); ++i) {
+        in.pointlist[i * 3] = tri_mesh.Vertices[i].x;
+        in.pointlist[i * 3 + 1] = tri_mesh.Vertices[i].y;
+        in.pointlist[i * 3 + 2] = tri_mesh.Vertices[i].z;
     }
-    for (const auto &p : tet_polys) {
-        // Turn tetrahedron into 4 triangles with element-relative indices:
-        // 0, 1, 2; 3, 0, 1; 2, 3, 0; 1, 2, 3;
-        for (int j = 0; j < 12; j++) {
-            TetMesh.TriangleIndices.push_back(p[j % 4]);
-        }
+
+    in.numberoffacets = tri_mesh.TriangleIndices.size() / 3;
+    in.facetlist = new tetgenio::facet[in.numberoffacets];
+
+    for (uint i = 0; i < uint(in.numberoffacets); ++i) {
+        tetgenio::facet &f = in.facetlist[i];
+        f.numberofpolygons = 1;
+        f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
+        f.polygonlist[0].numberofvertices = 3;
+        f.polygonlist[0].vertexlist = new int[f.polygonlist[0].numberofvertices];
+
+        f.polygonlist[0].vertexlist[0] = tri_mesh.TriangleIndices[i * 3];
+        f.polygonlist[0].vertexlist[1] = tri_mesh.TriangleIndices[i * 3 + 1];
+        f.polygonlist[0].vertexlist[2] = tri_mesh.TriangleIndices[i * 3 + 2];
     }
-    // Creating a `cinolib::Tetmesh` resolves redundant faces, which creates much fewer indices.
-    // However, it's very slow.
-    // const cinolib::Tetmesh tet_mesh{tet_vecs, tet_polys};
-    // for (uint fid = 0; fid < tet_mesh.num_faces(); ++fid) {
-    //     const auto &tes = tet_mesh.face_tessellation(fid);
-    //     for (uint i = 0; i < tes.size(); ++i) {
-    //         TetMesh.Indices.push_back(tes.at(i));
-    //     }
-    // }
 
-    TetMesh.CenterVertices();
-    UpdateExcitableVertices();
-    SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
-}
+    char tetgen_options[] = "pq"; // 'pq': Quality mesh generation
+    tetgenio out;
+    tetrahedralize(tetgen_options, &in, &out);
 
-void Mesh::LoadTetMesh(fs::path file_path) {
-    vector<cinolib::vec3d> tet_vecs;
-    vector<vector<uint>> tet_polys;
-    read_MESH(file_path.c_str(), tet_vecs, tet_polys);
-    LoadTetMesh(tet_vecs, tet_polys);
-    TetMeshPath = file_path;
+    GeometryData tet_mesh;
+    for (uint i = 0; i < uint(out.numberofpoints); ++i) {
+        tet_mesh.Vertices.emplace_back(out.pointlist[i * 3], out.pointlist[i * 3 + 1], out.pointlist[i * 3 + 2]);
+    }
+
+    // Turn each tetrahedron into 4 triangles.
+    for (uint i = 0; i < uint(out.numberoftetrahedra); ++i) {
+        auto &tet_indices = out.tetrahedronlist;
+        uint a = tet_indices[i * 4], b = tet_indices[i * 4 + 1], c = tet_indices[i * 4 + 2], d = tet_indices[i * 4 + 3];
+        tet_mesh.TriangleIndices.insert(tet_mesh.TriangleIndices.end(), {a, b, c, d, a, b, c, d, a, b, c, d});
+    }
+
+    for (const auto &v : tet_mesh.Vertices) {
+        const float angle = atan2(v.z, v.x);
+        tet_mesh.Normals.push_back({cos(angle), 0, sin(angle)});
+    }
+    return tet_mesh;
 }
 
 void Mesh::GenerateTetMesh() {
-    static vector<cinolib::vec3d> tet_vecs;
-    static vector<uint> tet_indices;
-
-    // Write to an obj file and read back into a cinolib tetmesh.
-    fs::create_directory(TempDir); // Create the temp dir if it doesn't exist.
-    const fs::path tmp_obj_path = TempDir / "tmp.obj";
-    TriangularMesh.Save(tmp_obj_path);
-    cinolib::Polygonmesh<> poly_mesh(tmp_obj_path.c_str());
-    vector<uint> edges_in; // Not used.
-    tetgen_wrap(poly_mesh.vector_verts(), poly_mesh.vector_polys(), edges_in, QualityTetMesh ? "q" : "", tet_vecs, tet_indices);
-    fs::remove(tmp_obj_path); // Delete the temporary file.
-
-    // Write the tet mesh to disk, deleting the oldest tet mesh(es) if this puts us past the max save limit.
-    fs::create_directory(TetSaveDir);
-    const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
-    for (int delete_i = saved_tet_mesh_times.size() - 1; delete_i >= MaxSavedTetMeshes - 1; delete_i--) {
-        const seconds_t oldest_time = saved_tet_mesh_times.at(delete_i);
-        fs::remove(TetSaveDir / (to_string(oldest_time.time_since_epoch().count()) + ".mesh"));
-    }
-    const int epoch_seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    const fs::path file_path = TetSaveDir / (to_string(epoch_seconds) + ".mesh");
-    const auto &tet_polys = cinolib::polys_from_serialized_vids(tet_indices, 4);
-    write_MESH(file_path.c_str(), tet_vecs, tet_polys);
-
-    LoadTetMesh(tet_vecs, tet_polys);
-    TetMeshPath = file_path;
+    TetMesh.SetData(ConvertTriMeshToTetMesh(TriangularMesh.GetData()));
+    HoveredVertexIndex = CameraTargetVertexIndex = -1;
+    // TetMesh.CenterVertices(); // todo delete?
+    UpdateExcitableVertices();
+    SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
 }
 
 string Mesh::GenerateDsp() const {
@@ -312,10 +286,7 @@ void Mesh::UpdateHoveredVertex() {
 }
 
 void Mesh::Update() {
-    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) {
-        SetViewMeshType(MeshType_Triangular);
-    }
-
+    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) SetViewMeshType(MeshType_Triangular);
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
 }
@@ -402,7 +373,7 @@ void Mesh::RenderConfig() {
                 for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
                     const string formatted_time = FormatTime(tet_mesh_time);
                     if (Selectable(formatted_time.c_str(), false)) {
-                        LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
+                        // LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
                     }
                 }
                 EndCombo();
@@ -416,10 +387,14 @@ void Mesh::RenderConfig() {
                     UpdateExcitableVertices();
                 }
 
-                const string name = GetTetMeshName(TetMeshPath);
+                // const string name = GetTetMeshName(TetMeshPath);
+                // Text(
+                //     "Current tetrahedral mesh:\n\tGenerated: %s\n\tVertices: %lu\n\tIndices: %lu",
+                //     name.c_str(), TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
+                // );
                 Text(
-                    "Current tetrahedral mesh:\n\tGenerated: %s\n\tVertices: %lu\n\tIndices: %lu",
-                    name.c_str(), TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
+                    "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
+                    TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
                 );
                 TextUnformatted("View mesh type");
                 Type mesh_type = ViewMeshType;

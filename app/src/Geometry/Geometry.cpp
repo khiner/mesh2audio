@@ -9,6 +9,9 @@
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
+GeometryData::GeometryData(uint num_vertices, uint num_normals, uint num_indices)
+    : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {}
+
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
     : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {
     glGenVertexArrays(1, &VertexArray);

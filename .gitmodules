@@ -30,9 +30,6 @@
 [submodule "app/lib/imspinner"]
 	path = app/lib/imspinner
 	url = git@github.com:dalerank/imspinner.git
-[submodule "app/lib/cinolib"]
-	path = app/lib/cinolib
-	url = git@github.com:mlivesu/cinolib.git
 [submodule "app/lib/earcut"]
 	path = app/lib/earcut
 	url = git@github.com:mapbox/earcut.hpp.git
@@ -48,3 +45,6 @@
 [submodule "app/app/lib/libnpy"]
 	path = app/app/lib/libnpy
 	url = git@github.com:llohse/libnpy.git
+[submodule "app/lib/tetgen"]
+	path = app/lib/tetgen
+	url = git@github.com:libigl/tetgen.git

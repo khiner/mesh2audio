@@ -23,11 +23,27 @@ enum RenderType_ {
 };
 using RenderType = int;
 
+struct GeometryData {
+    GeometryData(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
+    GeometryData(std::vector<glm::vec3> vertices, std::vector<glm::vec3> normals, std::vector<uint> indices)
+        : Vertices(std::move(vertices)), Normals(std::move(normals)), TriangleIndices(std::move(indices)) {}
+
+    std::vector<glm::vec3> Vertices;
+    std::vector<glm::vec3> Normals;
+    std::vector<uint> TriangleIndices;
+};
+
 struct Geometry {
     Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
     Geometry(fs::path file_path);
-
     ~Geometry();
+
+    inline void SetData(const GeometryData &data) {
+        Vertices.assign(data.Vertices.begin(), data.Vertices.end());
+        Normals.assign(data.Normals.begin(), data.Normals.end());
+        TriangleIndices.assign(data.TriangleIndices.begin(), data.TriangleIndices.end());
+    }
+    inline const GeometryData GetData() const { return {Vertices, Normals, TriangleIndices}; }
 
     void Load(fs::path file_path);
 
