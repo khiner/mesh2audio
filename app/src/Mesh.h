@@ -1,7 +1,5 @@
 #pragma once
 
-#include "tetMesh.h" // Vega
-
 #include "Material.h"
 #include "MeshProfile.h"
 #include "RealImpact.h"
@@ -12,6 +10,7 @@
 #include "Geometry/Primitive/Sphere.h"
 
 struct ImVec2;
+struct tetgenio;
 
 struct Mesh {
     Scene &Scene;
@@ -43,7 +42,6 @@ struct Mesh {
     inline const Geometry &GetActiveGeometry() const { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
     inline Geometry &GetActiveGeometry() { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
 
-    void GenerateTetMesh();
     bool HasTetMesh() const { return !TetMesh.Empty(); }
 
     std::string GenerateDsp() const;
@@ -70,6 +68,8 @@ private:
     void UpdateExcitableVertices();
     void UpdateExcitableVertexColors();
 
+    void GenerateTetMesh(); // Populates `TetGenResult`.
+
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
@@ -79,7 +79,9 @@ private:
         Scene.AddGeometry(&RealImpactListenerPoints);
     }
 
-    // Non-empty if the mesh was generated from a 2D profile:
+    void UpdateTetMesh(); // Update the `TetMesh` geometry from `TetGenResult`.
+
+    std::unique_ptr<tetgenio> TetGenResult;
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 

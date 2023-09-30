@@ -11,18 +11,18 @@ using std::string;
 
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
     : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {
-    glGenVertexArrays(1, &VertexArray);
+    glGenVertexArrays(1, &VertexArrayId);
     EnableVertexAttributes();
 }
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
 
 Geometry::~Geometry() {
-    glDeleteVertexArrays(1, &VertexArray);
+    glDeleteVertexArrays(1, &VertexArrayId);
 }
 
 void Geometry::EnableVertexAttributes() const {
-    glBindVertexArray(VertexArray);
+    glBindVertexArray(VertexArrayId);
 
     Vertices.Bind();
     Vertices.EnableVertexAttribute(0);
@@ -44,7 +44,7 @@ void Geometry::SetupRender(RenderType render_type) {
 }
 
 void Geometry::BindData(RenderType render_type) const {
-    glBindVertexArray(VertexArray);
+    glBindVertexArray(VertexArrayId);
     Vertices.BindData();
     Normals.BindData();
     const auto &indices = render_type == RenderType_Lines ? LineIndices : TriangleIndices;
@@ -59,7 +59,7 @@ void Geometry::Render(RenderType render_type) const {
 
     BindData(render_type); // Only rebinds the data if it has changed.
 
-    glBindVertexArray(VertexArray);
+    glBindVertexArray(VertexArrayId);
 
     GLenum polygon_mode = render_type == RenderType_Points ? GL_POINT : GL_FILL;
     GLenum primitive_type = render_type == RenderType_Lines ? GL_LINES : GL_TRIANGLES;
@@ -210,7 +210,7 @@ void Geometry::ComputeLineIndices() {
     }
 }
 
-void Geometry::ExtrudeProfile(const vector<vec2> &profile_vertices, uint slices, bool closed) {
+void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint slices, bool closed) {
     Clear();
     if (profile_vertices.size() < 3) return;
 

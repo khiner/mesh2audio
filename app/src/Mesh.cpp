@@ -125,19 +125,38 @@ void Mesh::UpdateExcitableVertices() {
     }
 }
 
-void ConvertTriGeomToTetGeom(const Geometry &tri_geom, Geometry &tet_geom) {
-    tetgenio in;
-    in.firstnumber = 0;
-    in.numberofpoints = tri_geom.Vertices.size();
-    in.pointlist = new REAL[in.numberofpoints * 3];
+void Mesh::UpdateTetMesh() {
+    if (ViewMeshType == MeshType_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
 
-    for (uint i = 0; i < tri_geom.Vertices.size(); ++i) {
-        in.pointlist[i * 3] = tri_geom.Vertices[i].x;
-        in.pointlist[i * 3 + 1] = tri_geom.Vertices[i].y;
-        in.pointlist[i * 3 + 2] = tri_geom.Vertices[i].z;
+    TetMesh.Clear();
+    for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
+        TetMesh.Vertices.push_back({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
     }
 
-    in.numberoffacets = tri_geom.TriangleIndices.size() / 3;
+    for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
+        auto &tri_indices = TetGenResult->trifacelist;
+        uint tri_i = i * 3;
+        uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
+        TetMesh.TriangleIndices.append({a, b, c});
+    }
+    TetMesh.ComputeNormals(); // todo better surface normals
+
+    UpdateExcitableVertices();
+}
+
+void Mesh::GenerateTetMesh() {
+    tetgenio in;
+    in.firstnumber = 0;
+    in.numberofpoints = TriangularMesh.Vertices.size();
+    in.pointlist = new REAL[in.numberofpoints * 3];
+
+    for (uint i = 0; i < TriangularMesh.Vertices.size(); ++i) {
+        in.pointlist[i * 3] = TriangularMesh.Vertices[i].x;
+        in.pointlist[i * 3 + 1] = TriangularMesh.Vertices[i].y;
+        in.pointlist[i * 3 + 2] = TriangularMesh.Vertices[i].z;
+    }
+
+    in.numberoffacets = TriangularMesh.TriangleIndices.size() / 3;
     in.facetlist = new tetgenio::facet[in.numberoffacets];
 
     for (uint i = 0; i < uint(in.numberoffacets); ++i) {
@@ -146,60 +165,32 @@ void ConvertTriGeomToTetGeom(const Geometry &tri_geom, Geometry &tet_geom) {
         f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
         f.polygonlist[0].numberofvertices = 3;
         f.polygonlist[0].vertexlist = new int[f.polygonlist[0].numberofvertices];
-        f.polygonlist[0].vertexlist[0] = tri_geom.TriangleIndices[i * 3];
-        f.polygonlist[0].vertexlist[1] = tri_geom.TriangleIndices[i * 3 + 1];
-        f.polygonlist[0].vertexlist[2] = tri_geom.TriangleIndices[i * 3 + 2];
+        f.polygonlist[0].vertexlist[0] = TriangularMesh.TriangleIndices[i * 3];
+        f.polygonlist[0].vertexlist[1] = TriangularMesh.TriangleIndices[i * 3 + 1];
+        f.polygonlist[0].vertexlist[2] = TriangularMesh.TriangleIndices[i * 3 + 2];
     }
 
-    char tetgen_options[] = "pq"; // 'pq': Quality mesh generation
-    tetgenio out;
-    tetrahedralize(tetgen_options, &in, &out);
-
-    for (uint i = 0; i < uint(out.numberofpoints); ++i) {
-        tet_geom.Vertices.push_back({out.pointlist[i * 3], out.pointlist[i * 3 + 1], out.pointlist[i * 3 + 2]});
-    }
-    // Turn each tetrahedron into 4 triangles.
-    for (uint i = 0; i < uint(out.numberoftetrahedra); ++i) {
-        auto &tet_indices = out.tetrahedronlist;
-        uint tri_i = i * 4;
-        uint a = tet_indices[tri_i], b = tet_indices[tri_i + 1], c = tet_indices[tri_i + 2], d = tet_indices[tri_i + 3];
-        tet_geom.TriangleIndices.append({a, b, c, d, a, b, c, d, a, b, c, d});
-    }
-    // todo the above triangle structure is needed for downstream FEM. Below is better for rendering.
-    // for (uint i = 0; i < uint(out.numberoftrifaces); ++i) {
-    //     auto &tri_indices = out.trifacelist;
-    //     uint tri_i = i * 3;
-    //     uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
-    //     tet_geom.TriangleIndices.append({a, b, c});
-    // }
-    tet_geom.ComputeNormals(); // todo better surface normals
-}
-
-void Mesh::GenerateTetMesh() {
-    ConvertTriGeomToTetGeom(TriangularMesh, TetMesh);
-    HoveredVertexIndex = CameraTargetVertexIndex = -1;
-    // TetMesh.CenterVertices(); // todo delete?
-    UpdateExcitableVertices();
-    SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
+    const string options = QualityTetMesh ? "pq" : "p";
+    TetGenResult = std::make_unique<tetgenio>();
+    std::vector<char> options_mutable(options.begin(), options.end());
+    tetrahedralize(options_mutable.data(), &in, TetGenResult.get());
 }
 
 string Mesh::GenerateDsp() const {
-    if (!HasTetMesh()) return ""; // Tet mesh must be generated first.
+    if (!TetGenResult) return "";
 
-    // This is a copy of `tet_vecs`, but using raw doubles, since there is no matching `tetgen_wrap` method.
-    static vector<double> tet_vertices;
-    const auto &tet_vecs = TetMesh.Vertices;
-    tet_vertices.resize(tet_vecs.size() * 3);
-    for (size_t i = 0; i < tet_vecs.size(); i++) {
-        tet_vertices[i * 3 + 0] = tet_vecs[i].x;
-        tet_vertices[i * 3 + 1] = tet_vecs[i].y;
-        tet_vertices[i * 3 + 2] = tet_vecs[i].z;
+    vector<int> tet_indices;
+    tet_indices.reserve(TetGenResult->numberoftetrahedra * 4 * 3); // 4 triangles per tetrahedron, 3 indices per triangle.
+    // Turn each tetrahedron into 4 triangles.
+    for (uint i = 0; i < uint(TetGenResult->numberoftetrahedra); ++i) {
+        auto &result_indices = TetGenResult->tetrahedronlist;
+        uint tri_i = i * 4;
+        int a = result_indices[tri_i], b = result_indices[tri_i + 1], c = result_indices[tri_i + 2], d = result_indices[tri_i + 3];
+        tet_indices.insert(tet_indices.end(), {a, b, c, d, a, b, c, d, a, b, c, d});
     }
-
     // Convert the tetrahedral mesh into a VegaFEM tetmesh.
-    // We do this as a one-off every time, so that this is the only method that needs to be aware of VegaFEM types.
     ::TetMesh volumetric_mesh{
-        int(tet_vecs.size()), tet_vertices.data(), int(TetMesh.TriangleIndices.size() / 4), (int *)TetMesh.TriangleIndices.data(),
+        TetGenResult->numberofpoints, TetGenResult->pointlist, TetGenResult->numberoftetrahedra * 3, tet_indices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
     m2f::CommonArguments args{
@@ -332,6 +323,8 @@ void Mesh::RenderConfig() {
             SetNextWindowSize(GetMainViewport()->Size / 4);
             if (TetGenerator.Render()) {
                 // Tet generation completed.
+                UpdateTetMesh();
+                SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
             }
             SeparatorText("Create");
 

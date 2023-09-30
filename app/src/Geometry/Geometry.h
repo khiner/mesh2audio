@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include <filesystem>
 
 #include <glm/vec2.hpp>
@@ -12,9 +10,6 @@ inline static const glm::mat4 Identity(1.f);
 inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
-
-using uint = unsigned int;
-using std::vector;
 
 enum RenderType_ {
     RenderType_Smooth,
@@ -48,17 +43,15 @@ struct Geometry {
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void ComputeLineIndices();
 
-    void ExtrudeProfile(const vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
+    void ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
     VertexBuffer Vertices;
     NormalBuffer Normals;
     IndexBuffer TriangleIndices, LineIndices;
     ColorBuffer Colors;
-
-    // Only one of the following two transform buffer types are used at a time.
     TransformBuffer Transforms;
 
-    uint VertexArray;
+    uint VertexArrayId;
 
 private:
     void BindData(RenderType render_type = RenderType_Smooth) const;
