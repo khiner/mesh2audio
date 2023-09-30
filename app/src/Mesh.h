@@ -57,6 +57,7 @@ struct Mesh {
     int NumExcitableVertices = 10;
     bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
     bool QualityTetMesh = true;
+    bool AutomaticTetGeneration = true;
 
     fs::path FilePath; // Most recently loaded file path.
 

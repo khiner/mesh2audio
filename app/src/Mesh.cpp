@@ -125,19 +125,19 @@ void Mesh::UpdateExcitableVertices() {
     }
 }
 
-GeometryData ConvertTriMeshToTetMesh(const GeometryData &tri_mesh) {
+void ConvertTriGeomToTetGeom(const Geometry &tri_geom, Geometry &tet_geom) {
     tetgenio in;
     in.firstnumber = 0;
-    in.numberofpoints = tri_mesh.Vertices.size();
+    in.numberofpoints = tri_geom.Vertices.size();
     in.pointlist = new REAL[in.numberofpoints * 3];
 
-    for (uint i = 0; i < tri_mesh.Vertices.size(); ++i) {
-        in.pointlist[i * 3] = tri_mesh.Vertices[i].x;
-        in.pointlist[i * 3 + 1] = tri_mesh.Vertices[i].y;
-        in.pointlist[i * 3 + 2] = tri_mesh.Vertices[i].z;
+    for (uint i = 0; i < tri_geom.Vertices.size(); ++i) {
+        in.pointlist[i * 3] = tri_geom.Vertices[i].x;
+        in.pointlist[i * 3 + 1] = tri_geom.Vertices[i].y;
+        in.pointlist[i * 3 + 2] = tri_geom.Vertices[i].z;
     }
 
-    in.numberoffacets = tri_mesh.TriangleIndices.size() / 3;
+    in.numberoffacets = tri_geom.TriangleIndices.size() / 3;
     in.facetlist = new tetgenio::facet[in.numberoffacets];
 
     for (uint i = 0; i < uint(in.numberoffacets); ++i) {
@@ -146,37 +146,37 @@ GeometryData ConvertTriMeshToTetMesh(const GeometryData &tri_mesh) {
         f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
         f.polygonlist[0].numberofvertices = 3;
         f.polygonlist[0].vertexlist = new int[f.polygonlist[0].numberofvertices];
-
-        f.polygonlist[0].vertexlist[0] = tri_mesh.TriangleIndices[i * 3];
-        f.polygonlist[0].vertexlist[1] = tri_mesh.TriangleIndices[i * 3 + 1];
-        f.polygonlist[0].vertexlist[2] = tri_mesh.TriangleIndices[i * 3 + 2];
+        f.polygonlist[0].vertexlist[0] = tri_geom.TriangleIndices[i * 3];
+        f.polygonlist[0].vertexlist[1] = tri_geom.TriangleIndices[i * 3 + 1];
+        f.polygonlist[0].vertexlist[2] = tri_geom.TriangleIndices[i * 3 + 2];
     }
 
     char tetgen_options[] = "pq"; // 'pq': Quality mesh generation
     tetgenio out;
     tetrahedralize(tetgen_options, &in, &out);
 
-    GeometryData tet_mesh;
     for (uint i = 0; i < uint(out.numberofpoints); ++i) {
-        tet_mesh.Vertices.emplace_back(out.pointlist[i * 3], out.pointlist[i * 3 + 1], out.pointlist[i * 3 + 2]);
+        tet_geom.Vertices.push_back({out.pointlist[i * 3], out.pointlist[i * 3 + 1], out.pointlist[i * 3 + 2]});
     }
-
     // Turn each tetrahedron into 4 triangles.
     for (uint i = 0; i < uint(out.numberoftetrahedra); ++i) {
         auto &tet_indices = out.tetrahedronlist;
-        uint a = tet_indices[i * 4], b = tet_indices[i * 4 + 1], c = tet_indices[i * 4 + 2], d = tet_indices[i * 4 + 3];
-        tet_mesh.TriangleIndices.insert(tet_mesh.TriangleIndices.end(), {a, b, c, d, a, b, c, d, a, b, c, d});
+        uint tri_i = i * 4;
+        uint a = tet_indices[tri_i], b = tet_indices[tri_i + 1], c = tet_indices[tri_i + 2], d = tet_indices[tri_i + 3];
+        tet_geom.TriangleIndices.append({a, b, c, d, a, b, c, d, a, b, c, d});
     }
-
-    for (const auto &v : tet_mesh.Vertices) {
-        const float angle = atan2(v.z, v.x);
-        tet_mesh.Normals.push_back({cos(angle), 0, sin(angle)});
-    }
-    return tet_mesh;
+    // todo the above triangle structure is needed for downstream FEM. Below is better for rendering.
+    // for (uint i = 0; i < uint(out.numberoftrifaces); ++i) {
+    //     auto &tri_indices = out.trifacelist;
+    //     uint tri_i = i * 3;
+    //     uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
+    //     tet_geom.TriangleIndices.append({a, b, c});
+    // }
+    tet_geom.ComputeNormals(); // todo better surface normals
 }
 
 void Mesh::GenerateTetMesh() {
-    TetMesh.SetData(ConvertTriMeshToTetMesh(TriangularMesh.GetData()));
+    ConvertTriGeomToTetGeom(TriangularMesh, TetMesh);
     HoveredVertexIndex = CameraTargetVertexIndex = -1;
     // TetMesh.CenterVertices(); // todo delete?
     UpdateExcitableVertices();
