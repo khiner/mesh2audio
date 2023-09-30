@@ -1,7 +1,5 @@
 #include "Mesh.h"
 
-#include <format>
-
 #include "date.h"
 #include "tetgen.h"
 
@@ -72,7 +70,6 @@ void Mesh::ExtrudeProfile() {
 
     HoveredVertexIndex = CameraTargetVertexIndex = -1;
     TetMesh.Clear();
-    TetMeshPath.clear();
     UpdateExcitableVertices();
     TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     SetViewMeshType(MeshType_Triangular);
@@ -126,25 +123,6 @@ void Mesh::UpdateExcitableVertices() {
         ExcitableVertexPoints.Transforms.push_back(glm::translate(Identity, TetMesh.Vertices[vertex_index]));
         ExcitableVertexPoints.Colors.push_back({1, 1, 1, 1});
     }
-}
-
-static string FormatTime(seconds_t seconds) { return date::format("{:%m-%d %H:%M:%S %Z}", seconds); }
-static seconds_t GetTimeFromPath(const fs::path &file_path) { return seconds_t{std::chrono::seconds(std::stoi(file_path.stem()))}; }
-
-string Mesh::GetTetMeshName(fs::path file_path) { return FormatTime(GetTimeFromPath(file_path)); }
-
-static const fs::path TempDir = "tmp";
-static const fs::path TetSaveDir = "saved_tet_meshes";
-static const int MaxSavedTetMeshes = 8;
-
-static vector<seconds_t> GetSavedTetMeshTimes() {
-    vector<seconds_t> saved_tet_mesh_times;
-    for (const auto &entry : fs::directory_iterator(TetSaveDir)) {
-        saved_tet_mesh_times.push_back(GetTimeFromPath(entry.path()));
-    }
-    // Sort by most recent first.
-    std::sort(saved_tet_mesh_times.begin(), saved_tet_mesh_times.end(), std::greater<>());
-    return saved_tet_mesh_times;
 }
 
 GeometryData ConvertTriMeshToTetMesh(const GeometryData &tri_mesh) {
@@ -366,19 +344,6 @@ void Mesh::RenderConfig() {
             TetGenerator.RenderLauncher(HasTetMesh() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
             if (!can_generate_tet_mesh) EndDisabled();
 
-            // Dropdown to select from saved tet meshes and load.
-            if (BeginCombo("Saved tet meshes", nullptr)) {
-                const auto &saved_tet_mesh_times = GetSavedTetMeshTimes();
-                if (saved_tet_mesh_times.empty()) TextUnformatted("No saved tet meshes");
-                for (const seconds_t tet_mesh_time : saved_tet_mesh_times) {
-                    const string formatted_time = FormatTime(tet_mesh_time);
-                    if (Selectable(formatted_time.c_str(), false)) {
-                        // LoadTetMesh(TetSaveDir / (to_string(tet_mesh_time.time_since_epoch().count()) + ".mesh"));
-                    }
-                }
-                EndCombo();
-            }
-
             SeparatorText("Current mesh");
             Text("File: %s", FilePath.c_str());
             if (HasTetMesh()) {
@@ -387,11 +352,6 @@ void Mesh::RenderConfig() {
                     UpdateExcitableVertices();
                 }
 
-                // const string name = GetTetMeshName(TetMeshPath);
-                // Text(
-                //     "Current tetrahedral mesh:\n\tGenerated: %s\n\tVertices: %lu\n\tIndices: %lu",
-                //     name.c_str(), TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
-                // );
                 Text(
                     "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
                     TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()

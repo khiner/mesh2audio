@@ -43,10 +43,8 @@ struct Mesh {
     inline const Geometry &GetActiveGeometry() const { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
     inline Geometry &GetActiveGeometry() { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
 
-    // Every time a tet mesh is generated, it is automatically saved to disk.
     void GenerateTetMesh();
     bool HasTetMesh() const { return !TetMesh.Empty(); }
-    static std::string GetTetMeshName(fs::path file_path);
 
     std::string GenerateDsp() const;
     std::string GenerateDspAxisymmetric() const { return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : ""; }
@@ -56,11 +54,10 @@ struct Mesh {
     void ApplyTransform();
     glm::mat4 GetTransform() const;
 
-    inline static int NumExcitableVertices = 10;
-    inline static bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
-    inline static bool QualityTetMesh = true;
+    int NumExcitableVertices = 10;
+    bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
+    bool QualityTetMesh = true;
 
-    fs::path TetMeshPath; // Path to the current loaded tet mesh.
     fs::path FilePath; // Most recently loaded file path.
 
 private:

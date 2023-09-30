@@ -33,7 +33,6 @@ static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<Mesh> mesh;
 
 static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
-static fs::path DspTetMeshPath; // Path to the tet mesh used for the most recent DSP generation.
 static bool IsGeneratedDsp2d = false; // `false` means 3D.
 static string GeneratedDsp; // The most recently generated DSP code.
 
@@ -294,10 +293,6 @@ int main(int, char **) {
         if (Windows.AudioModel.Visible) {
             Begin(Windows.AudioModel.Name, &Windows.AudioModel.Visible);
 
-            if (!DspTetMeshPath.empty()) {
-                const string name = Mesh::GetTetMeshName(DspTetMeshPath);
-                Text("Current DSP generated from tetrahedral mesh\ncreated at %s", name.c_str());
-            }
             if (BeginTabBar("Audio model")) {
                 if (BeginTabItem("Model")) {
                     const bool has_tetrahedral_mesh = mesh->HasTetMesh();
@@ -321,11 +316,8 @@ int main(int, char **) {
                             const int num_excitations = generate_tet_dsp ? mesh->Num3DExcitationVertices() : mesh->Num2DExcitationVertices();
                             const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
                             if (!model_dsp.empty()) {
-                                // Cache the path to the tet mesh that was used to generate the most recent DSP.
-                                DspTetMeshPath = mesh->TetMeshPath;
                                 GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, num_excitations);
                             } else {
-                                DspTetMeshPath = "";
                                 GeneratedDsp = "process = _;";
                             }
                         });
