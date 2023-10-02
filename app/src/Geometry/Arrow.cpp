@@ -8,9 +8,9 @@ using std::vector;
 Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length, uint segments) : Geometry() {
     // Cylinder base.
     for (uint i = 0; i <= segments; ++i) {
-        const float ratio = 2 * float(i) / segments;
-        const float x = __cospif(ratio) * base_radius;
-        const float z = __sinpif(ratio) * base_radius;
+        const float __angle = 2 * float(i) / segments;
+        const float x = __cospif(__angle) * base_radius;
+        const float z = __sinpif(__angle) * base_radius;
 
         Vertices.push_back({x, tip_length, z});
         Normals.push_back({x, 0.0f, z});
@@ -34,9 +34,9 @@ Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length
 
     // Cone tip.
     for (uint i = 0; i <= segments; ++i) {
-        const float ratio = 2 * float(i) / segments;
-        const float x = __cospif(ratio) * tip_radius;
-        const float z = __sinpif(ratio) * tip_radius;
+        const float __angle = 2 * float(i) / segments;
+        const float x = __cospif(__angle) * tip_radius;
+        const float z = __sinpif(__angle) * tip_radius;
 
         Vertices.push_back({x, tip_length, z});
         Normals.push_back({x, tip_length, z});

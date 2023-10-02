@@ -1,6 +1,7 @@
 #include "Scene.h"
 
 #include "GLCanvas.h"
+#include "Geometry/Primitive/Sphere.h"
 #include "Shader/ShaderProgram.h"
 
 #include <algorithm>
@@ -31,16 +32,11 @@ inline static const string
 } // namespace UniformName
 
 Scene::Scene() {
-    // Initialize all colors to white, and initialize the light positions to be in a circle on the xz plane.
-    std::fill_n(LightColors, NumLights * 4, 1.0f);
+    // Initialize the lights to lie in a circle on the xz plane.
     for (uint i = 0; i < NumLights; i++) {
-        const float ratio = 2 * float(i) / NumLights;
-        const float dist = 15.0f;
-        LightPositions[i * 4 + 0] = dist * __cospif(ratio);
-        LightPositions[i * 4 + 1] = 0;
-        LightPositions[i * 4 + 2] = dist * __sinpif(ratio);
-        LightPositions[4 * i + 3] = 1.0f;
-        LightColors[4 * i + 3] = 1.0f;
+        const float __angle = 2 * float(i) / NumLights;
+        const float dist = 2.0f;
+        LightPositions[i] = {dist * __cospif(__angle), 0, dist * __sinpif(__angle), 1};
     }
 
     /**
@@ -102,11 +98,11 @@ void Scene::SetupRender() {
     namespace un = UniformName;
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::LightPosition), NumLights, LightPositions);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::LightColor), NumLights, LightColors);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, AmbientColor);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, DiffusionColor);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, SpecularColor);
+    glUniform4fv(CurrShaderProgram->GetUniform(un::LightPosition), NumLights, &LightPositions[0][0]);
+    glUniform4fv(CurrShaderProgram->GetUniform(un::LightColor), NumLights, &LightColors[0][0]);
+    glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
+    glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
+    glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
     glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && RenderMode == RenderType_Smooth ? 1 : 0);
 
@@ -229,9 +225,8 @@ void Scene::RenderConfig() {
                 ColorEdit3("Ambient", &AmbientColor[0]);
                 ColorEdit3("Diffusion", &DiffusionColor[0]);
                 ColorEdit3("Specular", &SpecularColor[0]);
-                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
             } else {
-                for (int i = 1; i < 3; i++) {
+                for (uint i = 1; i < 3; i++) {
                     AmbientColor[i] = AmbientColor[0];
                     DiffusionColor[i] = DiffusionColor[0];
                     SpecularColor[i] = SpecularColor[0];
@@ -239,16 +234,32 @@ void Scene::RenderConfig() {
                 SliderFloat("Ambient", &AmbientColor[0], 0.0f, 1.0f);
                 SliderFloat("Diffusion", &DiffusionColor[0], 0.0f, 1.0f);
                 SliderFloat("Specular", &SpecularColor[0], 0.0f, 1.0f);
-                SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
             }
+            SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
 
             SeparatorText("Lights");
             for (int i = 0; i < NumLights; i++) {
                 Separator();
                 PushID(i);
                 Text("Light %d", i + 1);
-                SliderFloat3("Positions", &LightPositions[4 * i], -25.0f, 25.0f);
-                ColorEdit3("Color", &LightColors[4 * i]);
+                bool show_lights = bool(LightPoints[i]);
+                if (Checkbox("Show", &show_lights)) {
+                    if (show_lights) {
+                        LightPoints[i] = std::make_unique<Sphere>(0.1);
+                        LightPoints[i]->SetColor(LightColors[i]);
+                        LightPoints[i]->SetPosition(LightPositions[i]);
+                        AddGeometry(LightPoints[i].get());
+                    } else {
+                        RemoveGeometry(LightPoints[i].get());
+                        LightPoints[i].reset();
+                    }
+                }
+                if (SliderFloat3("Position", &LightPositions[i][0], -8, 8)) {
+                    if (LightPoints[i]) LightPoints[i]->SetPosition(LightPositions[i]);
+                }
+                if (ColorEdit3("Color", &LightColors[i][0]) && LightPoints[i]) {
+                    LightPoints[i]->SetColor(LightColors[i]);
+                }
                 PopID();
             }
             EndTabItem();

@@ -157,8 +157,15 @@ void Geometry::Save(fs::path file_path) const {
     out.close();
 }
 
+void Geometry::SetPosition(const vec3 &position) {
+    for (auto &transform : Transforms) {
+        transform[3][0] = position.x;
+        transform[3][1] = position.y;
+        transform[3][2] = position.z;
+    }
+}
 void Geometry::SetTransform(const mat4 &transform) {
-    for (auto &instance_model : Transforms) instance_model = transform;
+    for (auto &transform : Transforms) transform = transform;
 }
 void Geometry::SetColor(const vec4 &color) {
     Colors.clear();
@@ -229,9 +236,9 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
     TriangleIndices.reserve(num_indices);
 
     for (uint slice = 0; slice < slices; slice++) {
-        const float ratio = 2 * float(slice) / slices;
-        const float c = __cospif(ratio);
-        const float s = __sinpif(ratio);
+        const float __angle = 2 * float(slice) / slices;
+        const float c = __cospif(__angle);
+        const float s = __sinpif(__angle);
         // Exclude the top/bottom vertices, which will be connected later.
         for (int i = start_index; i < end_index; i++) {
             const auto &p = profile_vertices[i];

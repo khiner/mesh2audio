@@ -37,6 +37,7 @@ struct Geometry {
 
     void CenterVertices();
 
+    void SetPosition(const glm::vec3 &);
     void SetTransform(const glm::mat4 &);
     void SetColor(const glm::vec4 &);
 
