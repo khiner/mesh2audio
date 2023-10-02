@@ -25,9 +25,7 @@ struct Scene {
     void RenderConfig();
     void RenderGizmoDebug();
 
-    inline static const int NumLights = 5;
-    glm::vec4 LightPositions[NumLights] = {glm::vec4{0.0f}};
-    glm::vec4 LightColors[NumLights] = {glm::vec4{1.0f}, glm::vec4{1.0f}, glm::vec4{1.0f}, glm::vec4{1.0f}, glm::vec4{1.0f}};
+    LightBuffer Lights{5};
     glm::vec4 AmbientColor = {0.05, 0.05, 0.05, 1};
     glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};
     glm::vec4 SpecularColor = {0.5, 0.5, 0.5, 1};
@@ -53,7 +51,7 @@ struct Scene {
     ShaderProgram *CurrShaderProgram = nullptr;
 
     std::vector<Geometry *> Geometries;
-    std::unique_ptr<Geometry> LightPoints[NumLights]; // View viewing light positions.
+    std::unique_ptr<Geometry> LightPoints[5]; // For visualizing light positions.
 
 private:
     void SetupRender();

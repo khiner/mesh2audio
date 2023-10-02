@@ -19,8 +19,6 @@ static GLCanvas Canvas;
 
 namespace UniformName {
 inline static const string
-    LightPosition = "light_position",
-    LightColor = "light_color",
     AmbientColor = "ambient_color",
     DiffuseColor = "diffuse_color",
     SpecularColor = "specular_color",
@@ -33,10 +31,10 @@ inline static const string
 
 Scene::Scene() {
     // Initialize the lights to lie in a circle on the xz plane.
-    for (uint i = 0; i < NumLights; i++) {
-        const float __angle = 2 * float(i) / NumLights;
+    for (uint i = 0; i < Lights.size(); i++) {
+        const float __angle = 2 * float(i) / Lights.size();
         const float dist = 2.0f;
-        LightPositions[i] = {dist * __cospif(__angle), 0, dist * __sinpif(__angle), 1};
+        Lights[i].Position = {dist * __cospif(__angle), 0, dist * __sinpif(__angle), 1};
     }
 
     /**
@@ -58,13 +56,17 @@ Scene::Scene() {
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
-        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::LightPosition, un::LightColor, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
 
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
+
+    Lights.BindData();
+    GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
+    glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, Lights.BufferId);
 }
 
 Scene::~Scene() {}
@@ -98,8 +100,6 @@ void Scene::SetupRender() {
     namespace un = UniformName;
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::LightPosition), NumLights, &LightPositions[0][0]);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::LightColor), NumLights, &LightColors[0][0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
@@ -123,6 +123,7 @@ void Scene::Draw() {
 }
 
 void Scene::Render() {
+    Lights.BindData();
     // Render the scene to an OpenGl texture and display it (without changing the cursor position).
     const auto &content_region = GetContentRegionAvail();
     const auto &cursor = GetCursorPos();
@@ -238,27 +239,27 @@ void Scene::RenderConfig() {
             SliderFloat("Shininess", &Shininess, 0.0f, 150.0f);
 
             SeparatorText("Lights");
-            for (int i = 0; i < NumLights; i++) {
+            for (size_t i = 0; i < Lights.size(); i++) {
                 Separator();
                 PushID(i);
-                Text("Light %d", i + 1);
+                Text("Light %d", int(i + 1));
                 bool show_lights = bool(LightPoints[i]);
                 if (Checkbox("Show", &show_lights)) {
                     if (show_lights) {
                         LightPoints[i] = std::make_unique<Sphere>(0.1);
-                        LightPoints[i]->SetColor(LightColors[i]);
-                        LightPoints[i]->SetPosition(LightPositions[i]);
+                        LightPoints[i]->SetColor(Lights[i].Color);
+                        LightPoints[i]->SetPosition(Lights[i].Position);
                         AddGeometry(LightPoints[i].get());
                     } else {
                         RemoveGeometry(LightPoints[i].get());
                         LightPoints[i].reset();
                     }
                 }
-                if (SliderFloat3("Position", &LightPositions[i][0], -8, 8)) {
-                    if (LightPoints[i]) LightPoints[i]->SetPosition(LightPositions[i]);
+                if (SliderFloat3("Position", &Lights[i].Position[0], -8, 8)) {
+                    if (LightPoints[i]) LightPoints[i]->SetPosition(Lights[i].Position);
                 }
-                if (ColorEdit3("Color", &LightColors[i][0]) && LightPoints[i]) {
-                    LightPoints[i]->SetColor(LightColors[i]);
+                if (ColorEdit3("Color", &Lights[i].Color[0]) && LightPoints[i]) {
+                    LightPoints[i]->SetColor(Lights[i].Color);
                 }
                 PopID();
             }

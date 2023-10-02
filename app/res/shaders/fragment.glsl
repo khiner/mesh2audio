@@ -1,9 +1,16 @@
 #version 330 core
 
+struct Light {
+    vec4 position;
+    vec4 color;
+};
+
 const int num_lights = 5;
+layout (std140) uniform LightBlock {
+    Light lights[num_lights];
+};
 
 uniform mat4 camera_view;
-uniform vec4 light_position[num_lights], light_color[num_lights];
 uniform vec4 ambient_color, diffuse_color, specular_color;
 uniform float shininess_factor;
 uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
@@ -27,11 +34,11 @@ void main (void) {
     mat4 inv_camera_view = inverse(camera_view);
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
-        vec4 light_pos = inv_camera_view * light_position[i];
+        vec4 light_pos = inv_camera_view * lights[i].position;
         vec3 pos = light_pos.xyz / light_pos.w;
         vec3 dir = normalize(pos - fragment_position);
         vec3 half_vector = normalize(dir + eye_direction);
-        final_color += compute_lighting(dir, light_color[i], normal, half_vector);
+        final_color += compute_lighting(dir, lights[i].color, normal, half_vector);
     }
 
     frag_color = final_color * frag_in_color;

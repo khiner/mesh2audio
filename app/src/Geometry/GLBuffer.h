@@ -209,3 +209,15 @@ struct ColorBuffer : PointBuffer<glm::vec4> {
         glVertexAttribDivisor(slot, 1); // Attribute is updated once per instance.
     }
 };
+
+struct Light {
+    glm::vec4 Position{0.0f};
+    glm::vec4 Color{1.0f};
+};
+
+struct LightBuffer : GLBuffer<Light> {
+    LightBuffer(size_t size = 0) : GLBuffer(GL_UNIFORM_BUFFER, size) {
+        Data.resize(size);
+        Dirty = true;
+    }
+};

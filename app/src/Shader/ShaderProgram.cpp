@@ -1,17 +1,8 @@
 #include "ShaderProgram.h"
+
+#include <format>
 #include <iostream>
 #include <vector>
-
-static void HandleErrors(const GLint program) {
-    GLint length;
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-
-    std::vector<GLchar> log(length + 1);
-    glGetProgramInfoLog(program, length, &length, log.data());
-
-    std::cout << "Compile Error:\n"
-              << log.data() << "\n";
-}
 
 ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
     : Shaders(std::move(shaders)) {
@@ -23,7 +14,14 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
     GLint linked;
     glGetProgramiv(Id, GL_LINK_STATUS, &linked);
     if (!linked) {
-        HandleErrors(Id);
+        GLint length;
+        glGetProgramiv(Id, GL_INFO_LOG_LENGTH, &length);
+
+        std::vector<GLchar> log(length + 1);
+        glGetProgramInfoLog(Id, length, &length, log.data());
+
+        std::cout << "Compile Error:\n"
+                  << log.data() << "\n";
         throw std::runtime_error("Shader program linking failed");
     }
 
@@ -35,6 +33,7 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
     // Initialize uniform locations
     for (const auto &uniform : uniforms) {
         Uniforms[uniform] = glGetUniformLocation(Id, uniform.c_str());
+        if (Uniforms[uniform] == -1) throw std::runtime_error(std::format("Uniform {} not found", uniform));
     }
 }
 
