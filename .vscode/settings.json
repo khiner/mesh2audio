@@ -94,6 +94,7 @@
     "valarray": "cpp",
     "ranges": "cpp",
     "*.inc": "cpp",
-    "codecvt": "cpp"
+    "codecvt": "cpp",
+    "future": "cpp"
   }
 }

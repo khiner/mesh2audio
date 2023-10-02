@@ -30,8 +30,10 @@ inline static const string
 } // namespace UniformName
 
 Scene::Scene() {
+    static const uint NumLights = 5;
     // Initialize the lights to lie in a circle on the xz plane.
-    for (uint i = 0; i < Lights.size(); i++) {
+    for (uint i = 0; i < NumLights; i++) {
+        Lights.push_back({});
         const float __angle = 2 * float(i) / Lights.size();
         const float dist = 2.0f;
         Lights[i].Position = {dist * __cospif(__angle), 0, dist * __sinpif(__angle), 1};
@@ -243,7 +245,7 @@ void Scene::RenderConfig() {
                 Separator();
                 PushID(i);
                 Text("Light %d", int(i + 1));
-                bool show_lights = bool(LightPoints[i]);
+                bool show_lights = LightPoints.contains(i);
                 if (Checkbox("Show", &show_lights)) {
                     if (show_lights) {
                         LightPoints[i] = std::make_unique<Sphere>(0.1);
@@ -252,13 +254,13 @@ void Scene::RenderConfig() {
                         AddGeometry(LightPoints[i].get());
                     } else {
                         RemoveGeometry(LightPoints[i].get());
-                        LightPoints[i].reset();
+                        LightPoints.erase(i);
                     }
                 }
                 if (SliderFloat3("Position", &Lights[i].Position[0], -8, 8)) {
-                    if (LightPoints[i]) LightPoints[i]->SetPosition(Lights[i].Position);
+                    if (LightPoints.contains(i)) LightPoints[i]->SetPosition(Lights[i].Position);
                 }
-                if (ColorEdit3("Color", &Lights[i].Color[0]) && LightPoints[i]) {
+                if (ColorEdit3("Color", &Lights[i].Color[0]) && LightPoints.contains(i)) {
                     LightPoints[i]->SetColor(Lights[i].Color);
                 }
                 PopID();

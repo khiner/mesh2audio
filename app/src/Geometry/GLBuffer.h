@@ -216,8 +216,5 @@ struct Light {
 };
 
 struct LightBuffer : GLBuffer<Light> {
-    LightBuffer(size_t size = 0) : GLBuffer(GL_UNIFORM_BUFFER, size) {
-        Data.resize(size);
-        Dirty = true;
-    }
+    LightBuffer(size_t size = 0) : GLBuffer(GL_UNIFORM_BUFFER, size) {}
 };

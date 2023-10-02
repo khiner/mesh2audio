@@ -25,7 +25,7 @@ struct Scene {
     void RenderConfig();
     void RenderGizmoDebug();
 
-    LightBuffer Lights{5};
+    LightBuffer Lights;
     glm::vec4 AmbientColor = {0.05, 0.05, 0.05, 1};
     glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};
     glm::vec4 SpecularColor = {0.5, 0.5, 0.5, 1};
@@ -51,7 +51,7 @@ struct Scene {
     ShaderProgram *CurrShaderProgram = nullptr;
 
     std::vector<Geometry *> Geometries;
-    std::unique_ptr<Geometry> LightPoints[5]; // For visualizing light positions.
+    std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
 private:
     void SetupRender();
