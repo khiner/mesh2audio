@@ -5,15 +5,15 @@ struct Light {
     vec4 color;
 };
 
-const int num_lights = 5;
-layout (std140) uniform LightBlock {
-    Light lights[num_lights];
-};
-
-uniform mat4 camera_view;
+uniform int num_lights;
 uniform vec4 ambient_color, diffuse_color, specular_color;
 uniform float shininess_factor;
 uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
+
+const int max_num_lights = 5; // Must be a constant. (Can't be a uniform.)
+layout (std140) uniform LightBlock {
+    Light lights[max_num_lights];
+};
 
 in vec4 frag_in_position;
 in vec3 frag_in_normal;
@@ -31,10 +31,9 @@ void main (void) {
     vec3 fragment_position = frag_in_position.xyz / frag_in_position.w;
     vec3 eye_direction = normalize(-fragment_position);
     vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : frag_in_normal);
-    mat4 inv_camera_view = inverse(camera_view);
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
-        vec4 light_pos = inv_camera_view * lights[i].position;
+        vec4 light_pos = lights[i].position;
         vec3 pos = light_pos.xyz / light_pos.w;
         vec3 dir = normalize(pos - fragment_position);
         vec3 half_vector = normalize(dir + eye_direction);

@@ -19,6 +19,7 @@ static GLCanvas Canvas;
 
 namespace UniformName {
 inline static const string
+    NumLights = "num_lights",
     AmbientColor = "ambient_color",
     DiffuseColor = "diffuse_color",
     SpecularColor = "specular_color",
@@ -30,14 +31,23 @@ inline static const string
 } // namespace UniformName
 
 Scene::Scene() {
-    static const uint NumLights = 5;
-    // Initialize the lights to lie in a circle on the xz plane.
-    for (uint i = 0; i < NumLights; i++) {
-        Lights.push_back({});
-        const float __angle = 2 * float(i) / Lights.size();
-        const float dist = 2.0f;
-        Lights[i].Position = {dist * __cospif(__angle), 0, dist * __sinpif(__angle), 1};
-    }
+    /**
+      Initialize light positions using a three-point lighting system:
+        1) Key light: The main light, positioned at a 45-degree angle from the subject.
+        2) Fill light: Positioned opposite the key light to fill the shadows. It's less intense than the key light.
+        3) Back light: Positioned behind and above the subject to create a rim of light around the subject, separating it from the background.
+      We consider the "subject" to be the origin.
+    */
+    for (int _ = 0; _ < 3; _++) Lights.push_back({});
+    static const float dist_factor = 2.0f;
+
+    // Key light.
+    float key_light__angle = 1.f / 4.f; // Multiplied by pi.
+    Lights[0].Position = {dist_factor * __cospif(key_light__angle), 0, dist_factor * __sinpif(key_light__angle), 1};
+    // Fill light, twice as far away to make it less intense.
+    Lights[1].Position = {-dist_factor * __cospif(key_light__angle) * 2, 0, -dist_factor * __sinpif(key_light__angle) * 2, 1};
+    // Back light.
+    Lights[2].Position = {0, dist_factor * 1.5, -dist_factor, 1};
 
     /**
       Initialize a right-handed coordinate system, with:
@@ -58,7 +68,7 @@ Scene::Scene() {
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
-        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::CameraView, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
@@ -102,6 +112,7 @@ void Scene::SetupRender() {
     namespace un = UniformName;
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
+    glUniform1i(CurrShaderProgram->GetUniform(un::NumLights), Lights.size());
     glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
