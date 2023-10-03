@@ -19,7 +19,7 @@ Shader::Shader(GLenum type, const fs::path path, std::unordered_set<std::string>
     const char *cstr = str.c_str();
 
     Id = glCreateShader(type);
-    glShaderSource(Id, 1, &cstr, NULL);
+    glShaderSource(Id, 1, &cstr, nullptr);
     glCompileShader(Id);
 
     GLint compiled;
@@ -31,8 +31,6 @@ Shader::Shader(GLenum type, const fs::path path, std::unordered_set<std::string>
         std::vector<GLchar> log(length + 1);
         glGetShaderInfoLog(Id, length, &length, log.data());
 
-        std::cout << "Compile Error:\n"
-                  << log.data() << "\n";
-        throw std::runtime_error(std::format("Shader {} compilation failed", path.string()));
+        throw std::runtime_error(std::format("Shader {} compilation failed:\n{}", path.string(), log.data()));
     }
 }

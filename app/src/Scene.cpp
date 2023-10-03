@@ -19,6 +19,7 @@ static GLCanvas Canvas;
 
 namespace UniformName {
 inline static const string
+    ShadowMap = "shadow_map",
     NumLights = "num_lights",
     AmbientColor = "ambient_color",
     DiffuseColor = "diffuse_color",
@@ -31,6 +32,8 @@ inline static const string
 } // namespace UniformName
 
 Scene::Scene() {
+    SetupShadowMap();
+
     /**
       Initialize light positions using a three-point lighting system:
         1) Key light: The main light, positioned at a 45-degree angle from the subject.
@@ -43,11 +46,14 @@ Scene::Scene() {
 
     // Key light.
     float key_light__angle = 1.f / 4.f; // Multiplied by pi.
-    Lights[0].Position = {dist_factor * __cospif(key_light__angle), 0, dist_factor * __sinpif(key_light__angle), 1};
+    Lights[0].SetPosition({dist_factor * __cospif(key_light__angle), 0, dist_factor * __sinpif(key_light__angle)});
     // Fill light, twice as far away to make it less intense.
-    Lights[1].Position = {-dist_factor * __cospif(key_light__angle) * 2, 0, -dist_factor * __sinpif(key_light__angle) * 2, 1};
+    Lights[1].SetPosition({-dist_factor * __cospif(key_light__angle) * 2, 0, -dist_factor * __sinpif(key_light__angle) * 2});
     // Back light.
-    Lights[2].Position = {0, dist_factor * 1.5, -dist_factor, 1};
+    Lights[2].SetPosition({0, dist_factor * 1.5, -dist_factor});
+
+    // Point all lights at the origin.
+    for (auto &light : Lights) light.SetDirection(-glm::vec3(light.Position));
 
     /**
       Initialize a right-handed coordinate system, with:
@@ -68,20 +74,56 @@ Scene::Scene() {
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
-        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::ShadowMap, un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}},
+        ShadowVertexShader{GL_VERTEX_SHADER, ShaderDir / "shadow_vertex.glsl", {}},
+        ShadowFragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "shadow_fragment.glsl", {}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
+    ShadowShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&ShadowVertexShader, &ShadowFragmentShader});
+
+    ShadowShaderProgram->Use();
+    Lights.BindData();
+    glBindBufferBase(GL_UNIFORM_BUFFER, glGetUniformBlockIndex(ShadowShaderProgram->Id, "LightBlock"), Lights.BufferId);
+
+    MainShaderProgram->Use();
+    Lights.BindData();
+    glBindBufferBase(GL_UNIFORM_BUFFER, glGetUniformBlockIndex(MainShaderProgram->Id, "LightBlock"), Lights.BufferId);
 
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
-
-    Lights.BindData();
-    GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
-    glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, Lights.BufferId);
 }
 
 Scene::~Scene() {}
+
+void Scene::SetupShadowMap() {
+    glGenFramebuffers(1, &ShadowFramebufferId);
+    glGenTextures(1, &DepthTextureId);
+    glBindTexture(GL_TEXTURE_2D, DepthTextureId);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    // For shadow mapping, set the border color to white since we are using depth values in the range [0, 1].
+    // This way, any lookup outside the texture range will return a depth that will not produce a shadow.
+    GLfloat border_color[] = {1.0, 1.0, 1.0, 1.0};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+
+    // Allocate and attach the depth texture as the framebuffer's depth buffer.
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, ShadowMapSize.x, ShadowMapSize.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glBindFramebuffer(GL_FRAMEBUFFER, ShadowFramebufferId);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, DepthTextureId, 0);
+
+    // We are not rendering color.
+    // The shadow mapping framebuffer is used only to capture depth information from the light's point of view.
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) throw std::runtime_error("Framebuffer not complete");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 void Scene::AddGeometry(Geometry *geometry) {
     if (!geometry) return;
@@ -96,22 +138,43 @@ void Scene::RemoveGeometry(const Geometry *geometry) {
     Geometries.erase(std::remove(Geometries.begin(), Geometries.end(), geometry), Geometries.end());
 }
 
-void Scene::SetupRender() {
+void Scene::Draw() {
     const auto &io = ImGui::GetIO();
     const bool window_hovered = IsWindowHovered();
     if (window_hovered && io.MouseWheel != 0) {
         SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
-    UpdateCameraProjection(content_region);
+    CameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
+    Lights.BindData();
+    for (auto *geometry : Geometries) {
+        if (RenderMode == RenderType_Lines && geometry->LineIndices.empty()) geometry->ComputeLineIndices();
+        else if (RenderMode != RenderType_Lines && !geometry->LineIndices.empty()) geometry->LineIndices.clear(); // Save memory.
+    }
+
+    if (RenderMode == RenderType_Smooth) {
+        // Shadow mapping (which is only meaningful when rendering closed geometries - not points or lines).
+        glBindFramebuffer(GL_FRAMEBUFFER, ShadowFramebufferId);
+        glViewport(0, 0, ShadowMapSize.x, ShadowMapSize.y);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        ShadowShaderProgram->Use();
+        for (const auto *geometry : Geometries) geometry->Render(RenderMode);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    CurrShaderProgram->Use();
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
     Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+
+    glActiveTexture(GL_TEXTURE0); // Bind the shadow map
+    glBindTexture(GL_TEXTURE_2D, DepthTextureId);
 
     namespace un = UniformName;
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
+    glUniform1i(CurrShaderProgram->GetUniform(un::ShadowMap), 0);
     glUniform1i(CurrShaderProgram->GetUniform(un::NumLights), Lights.size());
     glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
@@ -123,22 +186,12 @@ void Scene::SetupRender() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    for (auto *geometry : Geometries) geometry->SetupRender(RenderMode);
-}
-
-void Scene::Draw() {
-    SetupRender();
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (RenderMode == RenderType_Points) glPointSize(PointRadius);
     for (const auto *geometry : Geometries) geometry->Render(RenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
-    Render();
-}
 
-void Scene::Render() {
-    Lights.BindData();
     // Render the scene to an OpenGl texture and display it (without changing the cursor position).
-    const auto &content_region = GetContentRegionAvail();
     const auto &cursor = GetCursorPos();
     unsigned int texture_id = Canvas.Render();
     Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
@@ -207,7 +260,6 @@ void Scene::RenderConfig() {
             render_mode_changed |= RadioButton("Point cloud", &RenderMode, RenderType_Points);
             if (render_mode_changed) {
                 CurrShaderProgram = RenderMode == RenderType_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
-                CurrShaderProgram->Use();
             }
             if (RenderMode == RenderType_Smooth) {
                 Checkbox("Flat shading", &UseFlatShading);
@@ -232,7 +284,7 @@ void Scene::RenderConfig() {
             }
             EndTabItem();
         }
-        if (BeginTabItem("Lighing")) {
+        if (BeginTabItem("Lighting")) {
             SeparatorText("Colors");
             Checkbox("Custom colors", &CustomColors);
             if (CustomColors) {
@@ -269,7 +321,11 @@ void Scene::RenderConfig() {
                     }
                 }
                 if (SliderFloat3("Position", &Lights[i].Position[0], -8, 8)) {
+                    Lights[i].UpdateViewProjection();
                     if (LightPoints.contains(i)) LightPoints[i]->SetPosition(Lights[i].Position);
+                }
+                if (SliderFloat3("Direction", &Lights[i].Direction[0], -1, 1)) {
+                    Lights[i].UpdateViewProjection();
                 }
                 if (ColorEdit3("Color", &Lights[i].Color[0]) && LightPoints.contains(i)) {
                     LightPoints[i]->SetColor(Lights[i].Color);
@@ -287,8 +343,4 @@ void Scene::SetCameraDistance(float distance) {
     const vec3 eye = glm::inverse(CameraView)[3];
     CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
     CameraDistance = distance;
-}
-
-void Scene::UpdateCameraProjection(const ImVec2 &size) {
-    CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
 }

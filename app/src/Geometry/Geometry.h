@@ -6,9 +6,6 @@
 
 #include "GLBuffer.h"
 
-inline static const glm::mat4 Identity(1.f);
-inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
-
 namespace fs = std::filesystem;
 
 enum RenderType_ {
@@ -27,7 +24,6 @@ struct Geometry {
 
     void EnableVertexAttributes() const;
 
-    void SetupRender(RenderType render_type = RenderType_Smooth);
     void Render(RenderType render_type = RenderType_Smooth) const;
 
     void Clear();

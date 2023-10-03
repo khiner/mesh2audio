@@ -16,7 +16,6 @@ struct Scene {
     ~Scene();
 
     void SetCameraDistance(float);
-    void UpdateCameraProjection(const ImVec2 &size);
 
     void AddGeometry(Geometry *);
     void RemoveGeometry(const Geometry *);
@@ -48,14 +47,20 @@ struct Scene {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderType RenderMode = RenderType_Smooth;
 
-    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram;
+    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, ShadowShaderProgram;
 
     ShaderProgram *CurrShaderProgram = nullptr;
 
     std::vector<Geometry *> Geometries;
-    std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
+    // For visualizing light positions. Key is `Lights` index.
+    // todo change shape now that lights have a direction.
+    std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints;
 
 private:
-    void SetupRender();
-    void Render();
+    void SetupShadowMap(); // Only called once during construction.
+
+    // Shaddow mapping.
+    GLuint ShadowFramebufferId;
+    GLuint DepthTextureId;
+    glm::vec2 ShadowMapSize{1024, 1024}; // Higher resolution == more detailed shadows, more computationally expensive.
 };

@@ -38,11 +38,6 @@ void Geometry::EnableVertexAttributes() const {
     glBindVertexArray(0);
 }
 
-void Geometry::SetupRender(RenderType render_type) {
-    if (render_type == RenderType_Lines && LineIndices.empty()) ComputeLineIndices();
-    else if (render_type != RenderType_Lines && !LineIndices.empty()) LineIndices.clear(); // Save memory.
-}
-
 void Geometry::BindData(RenderType render_type) const {
     glBindVertexArray(VertexArrayId);
     Vertices.BindData();
@@ -164,8 +159,8 @@ void Geometry::SetPosition(const vec3 &position) {
         transform[3][2] = position.z;
     }
 }
-void Geometry::SetTransform(const mat4 &transform) {
-    for (auto &transform : Transforms) transform = transform;
+void Geometry::SetTransform(const mat4 &new_transform) {
+    for (auto &transform : Transforms) transform = new_transform;
 }
 void Geometry::SetColor(const vec4 &color) {
     Colors.clear();

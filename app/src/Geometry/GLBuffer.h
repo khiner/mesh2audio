@@ -2,11 +2,19 @@
 
 #include <vector>
 
+#include <glm/gtx/quaternion.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+
 #include <GL/glew.h>
 
 using uint = unsigned int;
 using GLuint = uint;
 using GLenum = uint;
+
+inline static const glm::mat4 Identity(1.f);
+inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 template<typename DataType>
 struct GLBuffer {
@@ -101,11 +109,6 @@ struct GLBuffer {
 struct IndexBuffer : GLBuffer<uint> {
     IndexBuffer(size_t size = 0) : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, size) {}
 };
-
-#include <glm/gtx/quaternion.hpp>
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
 
 template<typename DataType>
 struct PointBuffer : GLBuffer<DataType> {
@@ -212,7 +215,25 @@ struct ColorBuffer : PointBuffer<glm::vec4> {
 
 struct Light {
     glm::vec4 Position{0.0f};
+    glm::vec4 Direction{0.0f};
     glm::vec4 Color{1.0f};
+    glm::mat4 ViewProjection{1.0f};
+
+    void SetPosition(const glm::vec3 &position) {
+        Position = glm::vec4(position, 1.0f);
+        UpdateViewProjection();
+    }
+    void SetDirection(const glm::vec3 &direction) {
+        Direction = glm::vec4(direction, 0.0f);
+        UpdateViewProjection();
+    }
+
+    void UpdateViewProjection() {
+        static const float near_plane = 1.0f, far_plane = 100.0f;
+        static const glm::mat4 projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+        glm::mat4 view = glm::lookAt(glm::vec3(Position), glm::vec3(Position) + glm::vec3(Direction), Up);
+        ViewProjection = projection * view;
+    }
 };
 
 struct LightBuffer : GLBuffer<Light> {

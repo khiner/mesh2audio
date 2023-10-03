@@ -32,8 +32,10 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
 
     // Initialize uniform locations
     for (const auto &uniform : uniforms) {
-        Uniforms[uniform] = glGetUniformLocation(Id, uniform.c_str());
-        if (Uniforms[uniform] == -1) throw std::runtime_error(std::format("Uniform {} not found", uniform));
+        int location = glGetUniformLocation(Id, uniform.c_str());
+        if (location == -1) throw std::runtime_error(std::format("Uniform {} not found", uniform));
+
+        Uniforms[uniform] = location;
     }
 }
 
