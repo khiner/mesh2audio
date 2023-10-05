@@ -46,7 +46,7 @@ void Geometry::SetupRender(RenderType render_type) {
 void Geometry::BindData(RenderType render_type) const {
     glBindVertexArray(VertexArrayId);
     Vertices.BindData();
-    Normals.BindData();
+    if (!Normals.empty()) Normals.BindData();
     const auto &indices = render_type == RenderType_Lines ? LineIndices : TriangleIndices;
     indices.BindData();
     Transforms.BindData();

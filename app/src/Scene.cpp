@@ -1,6 +1,7 @@
 #include "Scene.h"
 
 #include "GLCanvas.h"
+#include "Geometry/GridLines.h"
 #include "Geometry/Primitive/Sphere.h"
 #include "Shader/ShaderProgram.h"
 
@@ -27,7 +28,8 @@ inline static const string
     Projection = "projection",
     CameraView = "camera_view",
     FlatShading = "flat_shading",
-    LineWidth = "line_width";
+    LineWidth = "line_width",
+    GridLinesColor = "grid_lines_color";
 } // namespace UniformName
 
 Scene::Scene() {
@@ -68,10 +70,13 @@ Scene::Scene() {
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
-        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}};
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}},
+        GridLinesVertexShader{GL_VERTEX_SHADER, ShaderDir / "grid_lines_vertex.glsl", {un::Projection, un::CameraView}},
+        GridLinesFragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "grid_lines_fragment.glsl", {}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
+    GridLinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&GridLinesVertexShader, &GridLinesFragmentShader});
 
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
@@ -103,11 +108,16 @@ void Scene::Render() {
         SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
-    CameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
+    CameraProjection = glm::perspective(glm::radians(fov), content_region.x / content_region.y, 0.1f, 100.f);
+    
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
     Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+
+    Lights.BindData();
+
+    CurrShaderProgram->Use();
 
     namespace un = UniformName;
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
@@ -123,13 +133,26 @@ void Scene::Render() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    Lights.BindData();
     for (auto *geometry : Geometries) geometry->SetupRender(RenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (RenderMode == RenderType_Points) glPointSize(PointRadius);
     for (const auto *geometry : Geometries) geometry->Render(RenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
+
+    if (Grid) {
+        GridLinesShaderProgram->Use();
+        namespace un = UniformName;
+        glUniformMatrix4fv(GridLinesShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
+        glUniformMatrix4fv(GridLinesShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
+        // glUniform4fv(GridLinesShaderProgram->GetUniform(un::GridLinesColor), 1, &GridLinesColor[0]);
+
+        glEnable(GL_BLEND);
+        Grid->SetupRender(RenderType_Smooth);
+        Grid->Render(RenderType_Smooth);
+        glDisable(GL_BLEND);
+    }
+
     // Render the scene to an OpenGl texture and display it (without changing the cursor position).
     const auto &cursor = GetCursorPos();
     unsigned int texture_id = Canvas.Render();
@@ -138,14 +161,11 @@ void Scene::Render() {
 
     // Render ImGuizmo.
     const auto &window_pos = GetWindowPos();
-    if (ShowGizmo || ShowCameraGizmo || ShowGrid) {
+    if (ShowGizmo || ShowCameraGizmo) {
         ImGuizmo::BeginFrame();
         ImGuizmo::SetDrawlist();
         ImGuizmo::SetOrthographic(false);
         ImGuizmo::SetRect(window_pos.x, window_pos.y + GetTextLineHeightWithSpacing(), content_region.x, content_region.y);
-    }
-    if (ShowGrid) {
-        ImGuizmo::DrawGrid(&CameraView[0][0], &CameraProjection[0][0], &Identity[0][0], 100.f);
     }
     if (GizmoCallback) {
         if (ImGuizmo::Manipulate(
@@ -191,6 +211,16 @@ void Scene::RenderGizmoDebug() {
 void Scene::RenderConfig() {
     if (BeginTabBar("SceneConfig")) {
         if (BeginTabItem("Geometries")) {
+            bool show_grid = bool(Grid);
+            if (Checkbox("Show grid", &show_grid)) {
+                if (show_grid) {
+                    Grid = std::make_unique<GridLines>();
+                    // AddGeometry(Grid.get());
+                } else {
+                    // RemoveGeometry(Grid.get());
+                    Grid.reset();
+                }
+            }
             SeparatorText("Render mode");
             bool render_mode_changed = RadioButton("Smooth", &RenderMode, RenderType_Smooth);
             SameLine();
@@ -199,7 +229,6 @@ void Scene::RenderConfig() {
             render_mode_changed |= RadioButton("Point cloud", &RenderMode, RenderType_Points);
             if (render_mode_changed) {
                 CurrShaderProgram = RenderMode == RenderType_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
-                CurrShaderProgram->Use();
             }
             if (RenderMode == RenderType_Smooth) {
                 Checkbox("Flat shading", &UseFlatShading);
@@ -215,7 +244,6 @@ void Scene::RenderConfig() {
         if (BeginTabItem("Camera")) {
             Checkbox("Show gizmo", &ShowCameraGizmo);
             SameLine();
-            Checkbox("Grid", &ShowGrid);
             SliderFloat("FOV", &fov, 20.f, 110.f);
 
             float camera_distance = CameraDistance;

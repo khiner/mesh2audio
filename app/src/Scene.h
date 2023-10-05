@@ -10,6 +10,7 @@
 struct ImVec2;
 
 struct ShaderProgram;
+struct GridLines;
 
 struct Scene {
     Scene();
@@ -29,11 +30,12 @@ struct Scene {
     // todo Diffusion and specular colors are object properties, not scene properties.
     glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};
     glm::vec4 SpecularColor = {0.5, 0.5, 0.5, 1};
+    // glm::vec4 GridLinesColor = {1, 1, 1, 1};
     float Shininess = 10;
     float LineWidth = 0.005, PointRadius = 1;
     bool CustomColors = false, UseFlatShading = true;
 
-    bool ShowCameraGizmo = true, ShowGrid = false, ShowGizmo = false, ShowBounds = false;
+    bool ShowCameraGizmo = true, ShowGizmo = false, ShowBounds = false;
 
     glm::mat4 GizmoTransform{1};
     std::function<void(const glm::mat4 &)> GizmoCallback;
@@ -41,16 +43,18 @@ struct Scene {
     ImGuizmo::OPERATION GizmoOp{ImGuizmo::TRANSLATE};
 
     glm::mat4 CameraView, CameraProjection;
-    float CameraDistance = 4, fov = 27;
+    float CameraDistance = 4, fov = 50;
 
     inline static uint MaxNumLights = 5;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderType RenderMode = RenderType_Smooth;
 
-    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram;
+    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
 
     ShaderProgram *CurrShaderProgram = nullptr;
 
     std::vector<Geometry *> Geometries;
     std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
+
+    std::unique_ptr<GridLines> Grid;
 };
