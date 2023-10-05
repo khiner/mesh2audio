@@ -96,14 +96,14 @@ void Scene::RemoveGeometry(const Geometry *geometry) {
     Geometries.erase(std::remove(Geometries.begin(), Geometries.end(), geometry), Geometries.end());
 }
 
-void Scene::SetupRender() {
+void Scene::Render() {
     const auto &io = ImGui::GetIO();
     const bool window_hovered = IsWindowHovered();
     if (window_hovered && io.MouseWheel != 0) {
         SetCameraDistance(CameraDistance * (1.f - io.MouseWheel / 16.f));
     }
     const auto content_region = GetContentRegionAvail();
-    UpdateCameraProjection(content_region);
+    CameraProjection = glm::perspective(glm::radians(fov * 2), content_region.x / content_region.y, 0.1f, 100.f);
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
@@ -123,22 +123,14 @@ void Scene::SetupRender() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
+    Lights.BindData();
     for (auto *geometry : Geometries) geometry->SetupRender(RenderMode);
-}
 
-void Scene::Draw() {
-    SetupRender();
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (RenderMode == RenderType_Points) glPointSize(PointRadius);
     for (const auto *geometry : Geometries) geometry->Render(RenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
-    Render();
-}
-
-void Scene::Render() {
-    Lights.BindData();
     // Render the scene to an OpenGl texture and display it (without changing the cursor position).
-    const auto &content_region = GetContentRegionAvail();
     const auto &cursor = GetCursorPos();
     unsigned int texture_id = Canvas.Render();
     Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
@@ -232,7 +224,7 @@ void Scene::RenderConfig() {
             }
             EndTabItem();
         }
-        if (BeginTabItem("Lighing")) {
+        if (BeginTabItem("Lighting")) {
             SeparatorText("Colors");
             Checkbox("Custom colors", &CustomColors);
             if (CustomColors) {
@@ -287,8 +279,4 @@ void Scene::SetCameraDistance(float distance) {
     const vec3 eye = glm::inverse(CameraView)[3];
     CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
     CameraDistance = distance;
-}
-
-void Scene::UpdateCameraProjection(const ImVec2 &size) {
-    CameraProjection = glm::perspective(glm::radians(fov * 2), size.x / size.y, 0.1f, 100.f);
 }

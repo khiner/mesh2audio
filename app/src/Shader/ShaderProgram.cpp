@@ -19,10 +19,7 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
 
         std::vector<GLchar> log(length + 1);
         glGetProgramInfoLog(Id, length, &length, log.data());
-
-        std::cout << "Compile Error:\n"
-                  << log.data() << "\n";
-        throw std::runtime_error("Shader program linking failed");
+        throw std::runtime_error(std::format("Shader program linking failed. Log:\n{}", log.data()));
     }
 
     std::unordered_set<std::string> uniforms;
@@ -32,8 +29,10 @@ ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
 
     // Initialize uniform locations
     for (const auto &uniform : uniforms) {
-        Uniforms[uniform] = glGetUniformLocation(Id, uniform.c_str());
-        if (Uniforms[uniform] == -1) throw std::runtime_error(std::format("Uniform {} not found", uniform));
+        int location = glGetUniformLocation(Id, uniform.c_str());
+        if (location == -1) throw std::runtime_error(std::format("Uniform {} not found", uniform));
+
+        Uniforms[uniform] = location;
     }
 }
 

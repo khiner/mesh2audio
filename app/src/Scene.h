@@ -16,12 +16,11 @@ struct Scene {
     ~Scene();
 
     void SetCameraDistance(float);
-    void UpdateCameraProjection(const ImVec2 &size);
 
     void AddGeometry(Geometry *);
     void RemoveGeometry(const Geometry *);
 
-    void Draw();
+    void Render();
     void RenderConfig();
     void RenderGizmoDebug();
 
@@ -54,8 +53,4 @@ struct Scene {
 
     std::vector<Geometry *> Geometries;
     std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
-
-private:
-    void SetupRender();
-    void Render();
 };

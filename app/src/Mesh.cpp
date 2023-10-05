@@ -367,7 +367,7 @@ void Mesh::RenderConfig() {
                         TriangularMesh.SetTransform(transform);
                         TetMesh.SetTransform(transform);
                         Translation = glm::vec3{transform[3]};
-                        Scale = glm::vec3{glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
+                        Scale = {glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
                         RotationAngles = glm::eulerAngles(glm::quat_cast(transform));
                     };
                 } else {

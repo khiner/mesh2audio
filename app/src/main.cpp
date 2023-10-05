@@ -269,7 +269,7 @@ int main(int, char **) {
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
             if (mesh != nullptr) mesh->Update();
-            MainScene->Draw();
+            MainScene->Render();
             if (mesh != nullptr) mesh->Render();
             End();
             PopStyleVar();
