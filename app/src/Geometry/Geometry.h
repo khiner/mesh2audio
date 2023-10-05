@@ -35,11 +35,12 @@ struct Geometry {
 
     bool Empty() const { return Vertices.empty(); }
 
-    void CenterVertices();
+    std::pair<glm::vec3, glm::vec3> ComputeBounds(); // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
 
     void SetPosition(const glm::vec3 &);
     void SetTransform(const glm::mat4 &);
     void SetColor(const glm::vec4 &);
+    void CenterVertices();
 
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void ComputeLineIndices();

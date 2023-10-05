@@ -2,14 +2,13 @@
 
 #include "Material.h"
 #include "MeshProfile.h"
-#include "RealImpact.h"
 #include "Scene.h"
 #include "Worker.h"
 
 #include "Geometry/Arrow.h"
 #include "Geometry/Primitive/Sphere.h"
 
-struct ImVec2;
+struct RealImpact;
 struct tetgenio;
 
 struct Mesh {
@@ -69,17 +68,12 @@ private:
     void UpdateExcitableVertexColors();
 
     void GenerateTetMesh(); // Populates `TetGenResult`.
+    void UpdateTetMesh(); // Update the `TetMesh` geometry from `TetGenResult`.
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
-
-    void LoadRealImpact() {
-        RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path());
-        Scene.AddGeometry(&RealImpactListenerPoints);
-    }
-
-    void UpdateTetMesh(); // Update the `TetMesh` geometry from `TetGenResult`.
+    void LoadRealImpact(); // Load [RealImpact](https://github.com/khiner/RealImpact) in the same directory as the loaded .obj file.
 
     std::unique_ptr<tetgenio> TetGenResult;
     std::unique_ptr<MeshProfile> Profile;
@@ -87,16 +81,18 @@ private:
 
     Geometry TriangularMesh, TetMesh;
 
-    ImRect BoundsRect; // Bounds of original loaded mesh, before any transformations.
+    // Bounds of original loaded mesh, before any transformations.
+    // Used to determine initial camera distance and scale of auto-generated geometries.
+    std::pair<glm::vec3, glm::vec3> InitialBounds; // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
 
     Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
     Worker RealImpactLoader{"Load RealImpact", "Loading RealImpact data...", [&] { LoadRealImpact(); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-    Arrow HoveredVertexArrow{0.005, 0.001, 0.002, 0.003};
+    Arrow HoveredVertexArrow{0.5, 0.1, 0.2, 0.3};
 
-    vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
-    Sphere ExcitableVertexPoints{0.0025}; // Instanced spheres for each excitable vertex.
+    std::vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
+    Arrow ExcitableVertexArrows{0.25, 0.05, 0.1, 0.15}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
     Sphere RealImpactListenerPoints{0.01}; // Instanced spheres for each listener point.
 
     glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};

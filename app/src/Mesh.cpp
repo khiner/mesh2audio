@@ -1,12 +1,11 @@
 #include "Mesh.h"
 
 #include "date.h"
+#include "mesh2faust.h"
 #include "tetgen.h"
 
-#include "mesh2faust.h"
-#include "tetMesher.h" // Vega
-
 #include "Audio.h"
+#include "RealImpact.h"
 
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
@@ -28,8 +27,11 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     HoveredVertexArrow.SetColor({1, 0, 0, 1});
     UpdateExcitableVertices();
     Scene.AddGeometry(&GetActiveGeometry());
-    Scene.AddGeometry(&ExcitableVertexPoints);
+    Scene.AddGeometry(&ExcitableVertexArrows);
     Scene.AddGeometry(&HoveredVertexArrow);
+
+    InitialBounds = TriangularMesh.ComputeBounds();
+    Scene.SetCameraDistance(glm::distance(InitialBounds.first, InitialBounds.second) * 2);
 }
 
 Mesh::~Mesh() {}
@@ -101,14 +103,14 @@ void Mesh::UpdateExcitableVertexColors() {
             } else {
                 SetColor(ExcitableVertexColor, vertex_color);
             }
-            ExcitableVertexPoints.Colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
+            ExcitableVertexArrows.Colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
     }
 }
 
 void Mesh::UpdateExcitableVertices() {
-    ExcitableVertexPoints.Transforms.clear();
-    ExcitableVertexPoints.Colors.clear();
+    ExcitableVertexArrows.Transforms.clear();
+    ExcitableVertexArrows.Colors.clear();
     ExcitableVertexIndices.clear();
     if (TetMesh.Vertices.empty()) return;
 
@@ -119,10 +121,20 @@ void Mesh::UpdateExcitableVertices() {
         ExcitableVertexIndices[i] = int(t * (TetMesh.Vertices.size() - 1));
     }
 
+    // Point arrows at each excitable vertex.
+    float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
+    mat4 scale = glm::scale(Identity, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
-        ExcitableVertexPoints.Transforms.push_back(glm::translate(Identity, TetMesh.Vertices[vertex_index]));
-        ExcitableVertexPoints.Colors.push_back({1, 1, 1, 1});
+        mat4 translate = glm::translate(Identity, TetMesh.Vertices[vertex_index]);
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(TetMesh.Normals[vertex_index])));
+        ExcitableVertexArrows.Transforms.push_back({translate * rotate * scale});
+        ExcitableVertexArrows.Colors.push_back({1, 1, 1, 1});
     }
+}
+
+void Mesh::LoadRealImpact() {
+    RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path());
+    Scene.AddGeometry(&RealImpactListenerPoints);
 }
 
 void Mesh::UpdateTetMesh() {
@@ -134,9 +146,10 @@ void Mesh::UpdateTetMesh() {
     }
 
     for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
-        auto &tri_indices = TetGenResult->trifacelist;
-        uint tri_i = i * 3;
-        uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
+        const auto &tri_indices = TetGenResult->trifacelist;
+        const uint tri_i = i * 3;
+        // Order of triangle indices important for normal calculation.
+        const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 2], c = tri_indices[tri_i + 1];
         TetMesh.TriangleIndices.append({a, b, c});
     }
     TetMesh.ComputeNormals(); // todo better surface normals
@@ -245,12 +258,11 @@ void Mesh::UpdateHoveredVertex() {
     HoveredVertexArrow.Transforms.clear();
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.Vertices.size())) {
         // Point the arrow at the hovered vertex.
-        const auto &hovered_vertex = geometry.Vertices[HoveredVertexIndex];
-        const auto &hovered_normal = geometry.Normals[HoveredVertexIndex];
-
-        mat4 translate = glm::translate(Identity, hovered_vertex);
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(hovered_normal)));
-        HoveredVertexArrow.Transforms.push_back({translate * rotate});
+        float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
+        mat4 scale = glm::scale(Identity, vec3{scale_factor});
+        mat4 translate = glm::translate(Identity, geometry.Vertices[HoveredVertexIndex]);
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(geometry.Normals[HoveredVertexIndex])));
+        HoveredVertexArrow.Transforms.push_back({translate * rotate * scale});
     }
 }
 

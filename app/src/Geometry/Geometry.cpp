@@ -116,7 +116,7 @@ void Geometry::Load(fs::path file_path) {
     ComputeNormals();
 }
 
-void Geometry::CenterVertices() {
+std::pair<vec3, vec3> Geometry::ComputeBounds() {
     vec3 min{INFINITY, INFINITY, INFINITY};
     vec3 max{-INFINITY, -INFINITY, -INFINITY};
     for (const vec3 &v : Vertices) {
@@ -127,6 +127,11 @@ void Geometry::CenterVertices() {
         if (v.y > max.y) max.y = v.y;
         if (v.z > max.z) max.z = v.z;
     }
+    return {min, max};
+}
+
+void Geometry::CenterVertices() {
+    const auto [min, max] = ComputeBounds();
     Vertices -= (min + max) / 2.0f;
 }
 
