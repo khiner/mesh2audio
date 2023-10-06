@@ -47,6 +47,10 @@ set(INCLUDE_EXECUTABLE OFF CACHE STRING "Build the mesh2faust executable" FORCE)
 set(Mesh2FaustDir ${CMAKE_CURRENT_SOURCE_DIR}/lib/faust/tools/physicalModeling/mesh2faust)
 add_subdirectory(${Mesh2FaustDir})
 
+find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
+find_package(Bullet REQUIRED)
+
 include_directories(
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
@@ -64,10 +68,8 @@ include_directories(
     lib/libnpy/include
     lib/tetgen
     ${Mesh2FaustDir}/src
+    ${BULLET_INCLUDE_DIRS}
 )
-
-find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
 
 if(APPLE)
   target_include_directories(${PROJECT_NAME} PRIVATE /opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3)
@@ -76,7 +78,7 @@ else()
 endif()
 
 # `dynamiclib` is faust.
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL GLEW::GLEW SDL3::SDL3 nfd dynamiclib mesh2faust tetgen)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL GLEW::GLEW SDL3::SDL3 nfd dynamiclib mesh2faust tetgen ${BULLET_LIBRARIES})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wno-elaborated-enum-base -DIMGUI_IMPL_OPENGL_LOADER_GLEW)

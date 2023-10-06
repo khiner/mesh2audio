@@ -6,12 +6,11 @@ Supports fast DSP generation of physical audio models that sound decently realis
 
 The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer, or by using an audio input device (such as a microphone) to excite the vertices.
 
-* Project video: https://youtu.be/RwxgOHVBDvc
-* Example audio output is in the [sound_samples](sound_samples/) directory.
+- Project video: https://youtu.be/RwxgOHVBDvc
+- Example audio output is in the [sound_samples](sound_samples/) directory.
 
 This project started as the final project for Karl Hiner and Ben Wilfong for GA Tech CSE-6730 Modeling & Simulation, Spring 2023.
 _The code as it was at the end of the school project repo is [here](https://github.com/GATech-CSE-6730-Spring-2023-Project/mesh2audio)._
-
 
 Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
 (Ben implemented everything under the `fem` directory.)
@@ -25,7 +24,7 @@ The rest of the code is basically a GUI wrapper around Ben's axysimmetric FEM, a
 #### Mac
 
 ```shell
-$ brew install glew llvm eigen
+$ brew install glew llvm eigen bullet
 ```
 
 #### Linux
