@@ -1,17 +1,17 @@
 #include "Scene.h"
 
-#include "GLCanvas.h"
-#include "Geometry/Primitive/Rect.h"
-#include "Geometry/Primitive/Sphere.h"
-#include "Shader/ShaderProgram.h"
-
 #include <algorithm>
 #include <format>
 #include <iostream>
 #include <string>
 
-using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
+#include "GLCanvas.h"
+#include "Geometry/Primitive/Rect.h"
+#include "Geometry/Primitive/Sphere.h"
+#include "Physics.h"
+#include "Shader/ShaderProgram.h"
 
+using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
 using namespace ImGui;
@@ -102,6 +102,8 @@ void Scene::RemoveGeometry(const Geometry *geometry) {
 }
 
 void Scene::Render() {
+    if (Physics) Physics->Tick();
+
     const auto &io = ImGui::GetIO();
     const bool window_hovered = IsWindowHovered();
     if (window_hovered && io.MouseWheel != 0) {
@@ -228,7 +230,7 @@ void Scene::RenderConfig() {
             if (Checkbox("Show floor", &show_floor)) {
                 if (show_floor) {
                     float y = -1;
-                    Floor = std::make_unique<Rect>(vec3{1, y, 1}, vec3{-1, y, -1}, vec3{-1, y, 1},  vec3{1, y, -1}, vec3{0, 1, 0});
+                    Floor = std::make_unique<Rect>(vec3{1, y, 1}, vec3{-1, y, -1}, vec3{-1, y, 1}, vec3{1, y, -1}, vec3{0, 1, 0});
                     Floor->SetTransform(glm::scale(Identity, vec3{50, 1, 50}));
                     AddGeometry(Floor.get());
                 } else {
@@ -311,6 +313,20 @@ void Scene::RenderConfig() {
                 }
                 PopID();
             }
+            EndTabItem();
+        }
+        if (BeginTabItem("Physics")) {
+            bool enable_physics = bool(Physics);
+            if (Checkbox("Enable physics", &enable_physics)) {
+                if (enable_physics) {
+                    Physics = std::make_unique<::Physics>();
+                    Physics->AddRigidBody({0, 1, 0}, {0, -1, 0}); // Floor.
+                    Physics->AddRigidBody(Geometries[0]);
+                } else {
+                    Physics.reset();
+                }
+            }
+            if (Physics) Physics->RenderConfig();
             EndTabItem();
         }
         EndTabBar();

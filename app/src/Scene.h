@@ -10,10 +10,9 @@
 
 #include "Geometry/Geometry.h"
 
-struct ImVec2;
-
 struct ShaderProgram;
 struct Rect;
+struct Physics;
 
 struct Scene {
     Scene();
@@ -59,4 +58,5 @@ struct Scene {
     std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
     std::unique_ptr<Rect> Grid, Floor;
+    std::unique_ptr<Physics> Physics;
 };
