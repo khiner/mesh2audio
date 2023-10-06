@@ -95,6 +95,16 @@
     "ranges": "cpp",
     "*.inc": "cpp",
     "codecvt": "cpp",
-    "future": "cpp"
+    "future": "cpp",
+    "__std_stream": "cpp",
+    "any": "cpp",
+    "cfenv": "cpp",
+    "condition_variable": "cpp",
+    "csignal": "cpp",
+    "forward_list": "cpp",
+    "shared_mutex": "cpp",
+    "source_location": "cpp",
+    "strstream": "cpp",
+    "typeindex": "cpp"
   }
 }

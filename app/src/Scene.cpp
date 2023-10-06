@@ -1,7 +1,7 @@
 #include "Scene.h"
 
 #include "GLCanvas.h"
-#include "Geometry/GridLines.h"
+#include "Geometry/Primitive/Rect.h"
 #include "Geometry/Primitive/Sphere.h"
 #include "Shader/ShaderProgram.h"
 
@@ -109,7 +109,7 @@ void Scene::Render() {
     }
     const auto content_region = GetContentRegionAvail();
     CameraProjection = glm::perspective(glm::radians(fov), content_region.x / content_region.y, 0.1f, 100.f);
-    
+
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
@@ -214,10 +214,11 @@ void Scene::RenderConfig() {
             bool show_grid = bool(Grid);
             if (Checkbox("Show grid", &show_grid)) {
                 if (show_grid) {
-                    Grid = std::make_unique<GridLines>();
-                    // AddGeometry(Grid.get());
+                    // Rendering of grid lines derives from a plane at z = 0.
+                    // See `grid_lines_vertex.glsl` and `grid_lines_fragment.glsl` for details.
+                    // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
+                    Grid = std::make_unique<Rect>(vec3{1, 1, 0}, vec3{-1, -1, 0}, vec3{-1, 1, 0}, vec3{1, -1, 0});
                 } else {
-                    // RemoveGeometry(Grid.get());
                     Grid.reset();
                 }
             }

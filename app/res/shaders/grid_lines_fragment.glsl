@@ -1,6 +1,6 @@
 #version 330 core
 
-// Following this guide: https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid/
+// Following this guide: https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid
 
 in vec3 nearPoint;
 in vec3 farPoint;

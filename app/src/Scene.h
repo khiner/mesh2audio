@@ -13,7 +13,7 @@
 struct ImVec2;
 
 struct ShaderProgram;
-struct GridLines;
+struct Rect;
 
 struct Scene {
     Scene();
@@ -33,7 +33,6 @@ struct Scene {
     // todo Diffusion and specular colors are object properties, not scene properties.
     glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};
     glm::vec4 SpecularColor = {0.5, 0.5, 0.5, 1};
-    // glm::vec4 GridLinesColor = {1, 1, 1, 1};
     float Shininess = 10;
     float LineWidth = 0.005, PointRadius = 1;
     bool CustomColors = false, UseFlatShading = true;
@@ -59,5 +58,5 @@ struct Scene {
     std::vector<Geometry *> Geometries;
     std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
-    std::unique_ptr<GridLines> Grid;
+    std::unique_ptr<Rect> Grid;
 };
