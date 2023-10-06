@@ -1,137 +1,84 @@
 #include "Physics.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
-
-#include <btBulletDynamicsCommon.h>
-
 #include <iostream>
 
-static btVector3 Glm2Bt(const glm::vec3 &vec) { return {vec.x, vec.y, vec.z}; }
+rp3d::PhysicsCommon PhysicsCommon;
+rp3d::PhysicsWorld *World;
 
-static glm::mat4 Bt2Glm(const btTransform &in) {
-    glm::mat4 out;
-    // Convert rotation quaternion to a 3x3 matrix.
-    btMatrix3x3 btBasis = in.getBasis();
-    for (size_t r = 0; r < 3; r++) {
-        for (size_t c = 0; c < 3; c++) {
-            out[c][r] = btBasis[r][c]; // Transposed
-        }
-    }
+static rp3d::Vector3 Glm2Rp3d(const glm::vec3 &vec) { return {vec.x, vec.y, vec.z}; }
 
-    btVector3 origin = in.getOrigin();
-    out[3][0] = origin.x();
-    out[3][1] = origin.y();
-    out[3][2] = origin.z();
-
-    out[0][3] = 0.0f;
-    out[1][3] = 0.0f;
-    out[2][3] = 0.0f;
-    out[3][3] = 1.0f;
-
-    return out;
-}
-static btTransform Glm2Bt(const glm::mat4 &in) {
-    btMatrix3x3 basis(
-        in[0][0], in[1][0], in[2][0],
-        in[0][1], in[1][1], in[2][1],
-        in[0][2], in[1][2], in[2][2]
-    );
-
-    btVector3 origin(in[3][0], in[3][1], in[3][2]);
-
-    return btTransform(basis, origin);
+static glm::mat4 Rp3d2Glm(const rp3d::Transform &transform) {
+    glm::mat4 result;
+    transform.getOpenGLMatrix(&result[0][0]);
+    return result;
 }
 
-RigidBody::RigidBody(Geometry *geom)
-    : geometry_(geom), mesh_(std::make_unique<btTriangleMesh>()) {
-    glm::mat4 transform = geom->Transforms[0];
-    // const auto &indices = geom->TriangleIndices;
-    // for (size_t i = 0; i < indices.size(); i += 3) {
-    //     mesh_->addTriangle(
-    //         Glm2Bt(geom->Vertices[indices[i]]),
-    //         Glm2Bt(geom->Vertices[indices[i + 1]]),
-    //         Glm2Bt(geom->Vertices[indices[i + 2]])
-    //     );
-    // }
-    // shape_ = std::make_unique<btBvhTriangleMeshShape>(mesh_.get(), true);
-    // motionState_ = std::make_unique<btDefaultMotionState>(Glm2Bt(transform));
-
-    const auto [geom_min, geom_max] = geom->ComputeBounds();
-    glm::vec3 half_extents = (geom_max - geom_min) * 0.5f;
-    shape_ = std::make_unique<btBoxShape>(Glm2Bt(half_extents));
-    motionState_ = std::make_unique<btDefaultMotionState>(Glm2Bt(transform));
-
-    btScalar mass = 0.1f;
-    btVector3 inertia(0, 0, 0);
-    shape_->calculateLocalInertia(mass, inertia);
-    btRigidBody::btRigidBodyConstructionInfo ci(mass, motionState_.get(), shape_.get(), inertia);
-    body_ = std::make_unique<btRigidBody>(ci);
+static rp3d::Transform Glm2Rp3d(glm::mat4 &transform) {
+    rp3d::Transform result;
+    result.setFromOpenGL(&transform[0][0]);
+    return result;
 }
-
-RigidBody::RigidBody(glm::vec3 plane_normal, const glm::vec3 &initial_pos)
-    : mesh_(std::make_unique<btTriangleMesh>()) {
-    shape_ = std::make_unique<btStaticPlaneShape>(Glm2Bt(plane_normal), 0);
-    motionState_ = std::make_unique<btDefaultMotionState>(btTransform({0, 0, 0, 1}, Glm2Bt(initial_pos)));
-
-    btRigidBody::btRigidBodyConstructionInfo ci(0, motionState_.get(), shape_.get()); // Mass set to 0 for static plane
-    body_ = std::make_unique<btRigidBody>(ci);
-}
-
-RigidBody::~RigidBody() {
-    // Automatic cleanup in reverse order of creation when the RigidBody object is destroyed
-}
-
-void RigidBody::Tick() {
-    btTransform transform;
-    GetBody()->getMotionState()->getWorldTransform(transform);
-    if (geometry_) {
-        std::cout << "Transform: " << transform.getOrigin().getX() << ", " << transform.getOrigin().getY() << ", " << transform.getOrigin().getZ() << std::endl;
-        geometry_->SetTransform(Bt2Glm(transform));
-    } else {
-        std::cout << "PT: " << transform.getOrigin().getX() << ", " << transform.getOrigin().getY() << ", " << transform.getOrigin().getZ() << std::endl;
-    }
-}
-
-btRigidBody *RigidBody::GetBody() const { return body_.get(); }
-
-btDefaultCollisionConfiguration CollisionConfiguration;
-btCollisionDispatcher CollisionDispatcher(&CollisionConfiguration);
-btDbvtBroadphase Broadphase;
-btSequentialImpulseConstraintSolver Solver;
-btDiscreteDynamicsWorld DynamicsWorld(&CollisionDispatcher, &Broadphase, &Solver, &CollisionConfiguration);
 
 Physics::Physics() {
-    DynamicsWorld.setGravity({0, Gravity, 0});
+    rp3d::PhysicsWorld::WorldSettings settings;
+    // settings.defaultVelocitySolverNbIterations = 20;
+    // settings.isSleepingEnabled = false;
+    settings.gravity = {0, Gravity, 0};
+    World = PhysicsCommon.createPhysicsWorld(std::move(settings));
 }
 
 Physics::~Physics() {
-    for (auto &rigid_body : RigidBodies) {
-        DynamicsWorld.removeRigidBody(rigid_body->GetBody());
-    }
+    PhysicsCommon.destroyPhysicsWorld(World);
 }
 
 void Physics::AddRigidBody(Geometry *geometry) {
-    auto rigid_body = std::make_unique<RigidBody>(geometry);
-    DynamicsWorld.addRigidBody(rigid_body->GetBody());
-    RigidBodies.push_back(std::move(rigid_body));
+    // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
+    // rp3d::VertexArray vertex_array(&geometry->Vertices[0], sizeof(glm::vec3), geometry->Vertices.size(), rp3d::VertexArray::DataType::VERTEX_FLOAT_TYPE);
+    // std::vector<rp3d::Message> messages;
+    // rp3d::ConvexMesh *convex_mesh = PhysicsCommon.createConvexMesh(vertex_array, messages);
+    // if (convex_mesh == nullptr) {
+    //     std::cout << "Error while creating a ConvexMesh:" << std::endl;
+    //     for (const auto &message : messages) std::cout << "Error: " << message.text << std::endl;
+    // }
+    // auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
+
+    auto [geom_min, geom_max] = geometry->ComputeBounds();
+    auto *shape = PhysicsCommon.createBoxShape(Glm2Rp3d((geom_max - geom_min) * 0.5f));
+
+    auto *body = World->createRigidBody(Glm2Rp3d(geometry->Transforms[0]));
+    body->setMass(1.f);
+    body->addCollider(shape, {});
+    body->setIsAllowedToSleep(false);
+    RigidBodies.push_back({body, geometry});
 }
-void Physics::AddRigidBody(glm::vec3 plane_normal, const glm::vec3 &initial_pos) {
-    auto rigid_body = std::make_unique<RigidBody>(std::move(plane_normal), initial_pos);
-    DynamicsWorld.addRigidBody(rigid_body->GetBody());
-    RigidBodies.push_back(std::move(rigid_body));
+
+void Physics::AddRigidBody(const glm::vec3 &initial_pos) {
+    auto transform = rp3d::Transform::identity();
+    transform.setPosition(Glm2Rp3d(initial_pos - glm::vec3{0, 1, 0})); // Make room for box representing plane.
+    auto *body = World->createRigidBody(transform);
+    body->setType(rp3d::BodyType::STATIC);
+    rp3d::Vector3 floor_half_extents(100, 1, 100);
+    auto *shape = PhysicsCommon.createBoxShape(floor_half_extents);
+    body->addCollider(shape, {});
+    RigidBodies.push_back({body, nullptr});
 }
 
 void Physics::Tick() {
-    DynamicsWorld.stepSimulation(1.0f / 60.0f, 10);
-
+    World->update(1.0f / 60.0f);
     for (auto &rigid_body : RigidBodies) {
-        rigid_body->Tick();
+        if (rigid_body.Geometry) {
+            rigid_body.Geometry->SetTransform(Rp3d2Glm(rigid_body.Body->getTransform()));
+        }
     }
 }
+
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
 
 using namespace ImGui;
 
 void Physics::RenderConfig() {
-    SliderFloat("Gravity", &Gravity, -20, 20);
+    if (SliderFloat("Gravity", &Gravity, -20, 20)) {
+        World->setGravity({0, Gravity, 0});
+    }
 }

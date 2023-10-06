@@ -42,3 +42,7 @@ add_subdirectory(CDT/CDT)
 #=================== tetgen ===================
 
 add_subdirectory(tetgen)
+
+#=================== reactphysics3d ===================
+
+add_subdirectory(reactphysics3d)

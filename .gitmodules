@@ -48,3 +48,7 @@
 [submodule "app/lib/tetgen"]
 	path = app/lib/tetgen
 	url = git@github.com:libigl/tetgen.git
+[submodule "app/lib/reactphysics3d"]
+	path = app/lib/reactphysics3d
+	url = git@github.com:DanielChappuis/reactphysics3d.git
+	branch = develop

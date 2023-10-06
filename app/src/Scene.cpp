@@ -320,7 +320,7 @@ void Scene::RenderConfig() {
             if (Checkbox("Enable physics", &enable_physics)) {
                 if (enable_physics) {
                     Physics = std::make_unique<::Physics>();
-                    Physics->AddRigidBody({0, 1, 0}, {0, -1, 0}); // Floor.
+                    Physics->AddRigidBody({0, -1, 0}); // Floor.
                     Physics->AddRigidBody(Geometries[0]);
                 } else {
                     Physics.reset();

@@ -24,7 +24,7 @@ The rest of the code is basically a GUI wrapper around Ben's axysimmetric FEM, a
 #### Mac
 
 ```shell
-$ brew install glew llvm eigen bullet
+$ brew install glew llvm eigen
 ```
 
 #### Linux
