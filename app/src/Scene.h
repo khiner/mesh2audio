@@ -58,5 +58,5 @@ struct Scene {
     std::vector<Geometry *> Geometries;
     std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
-    std::unique_ptr<Rect> Grid;
+    std::unique_ptr<Rect> Grid, Floor;
 };

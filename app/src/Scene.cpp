@@ -218,8 +218,22 @@ void Scene::RenderConfig() {
                     // See `grid_lines_vertex.glsl` and `grid_lines_fragment.glsl` for details.
                     // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
                     Grid = std::make_unique<Rect>(vec3{1, 1, 0}, vec3{-1, -1, 0}, vec3{-1, 1, 0}, vec3{1, -1, 0});
+                    Grid->Colors.clear();
+                    Grid->Normals.clear();
                 } else {
                     Grid.reset();
+                }
+            }
+            bool show_floor = bool(Floor);
+            if (Checkbox("Show floor", &show_floor)) {
+                if (show_floor) {
+                    float y = -1;
+                    Floor = std::make_unique<Rect>(vec3{1, y, 1}, vec3{-1, y, -1}, vec3{-1, y, 1},  vec3{1, y, -1}, vec3{0, 1, 0});
+                    Floor->SetTransform(glm::scale(Identity, vec3{50, 1, 50}));
+                    AddGeometry(Floor.get());
+                } else {
+                    RemoveGeometry(Floor.get());
+                    Floor.reset();
                 }
             }
             SeparatorText("Render mode");
