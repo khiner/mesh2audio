@@ -9,9 +9,6 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-using std::string, std::vector;
-using glm::vec2;
-
 namespace fs = std::filesystem;
 
 enum TesselationMode_ {
@@ -37,10 +34,10 @@ struct MeshProfile {
     // creating a continuous connected solid "bridge" between all rotated slices.
     // E.g. for a bell profile, the top-center of the bell would be the first vertex, the bottom-center
     // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
-    vector<vec2> GetVertices() const;
+    std::vector<glm::vec2> GetVertices() const;
 
     void SaveTesselation(fs::path file_path) const; // Export the tesselation to a 2D .obj file.
-    string GenerateDspAxisymmetric() const;
+    std::string GenerateDspAxisymmetric() const;
 
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).
@@ -86,9 +83,9 @@ private:
     fs::path SvgFilePath; // Most recently loaded .svg file path.
     ImRect OriginalBounds; // Bounds as read directly from SVG, before normalizing.
 
-    vector<ImVec2> ControlPoints;
-    vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
+    std::vector<ImVec2> ControlPoints;
+    std::vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
 
-    vector<ImVec2> TesselationVertices;
-    vector<uint> TesselationIndices;
+    std::vector<ImVec2> TesselationVertices;
+    std::vector<uint> TesselationIndices;
 };

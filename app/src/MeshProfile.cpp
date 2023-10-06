@@ -12,6 +12,9 @@
 
 #include "Audio.h"
 
+using std::string, std::vector;
+using glm::vec2;
+
 MeshProfile::MeshProfile(fs::path svg_file_path) {
     if (svg_file_path.extension() != ".svg") throw std::runtime_error("Unsupported file type: " + svg_file_path.string());
 
@@ -278,7 +281,7 @@ bool MeshProfile::Render() {
     }
     if (Audio::FaustState::IsRunning() && Audio::FaustState::Is2DModel) {
         const int tesselation_index_pos = *Audio::FaustState::ExcitePos;
-        if (tesselation_index_pos >= 0 && tesselation_index_pos < TesselationIndices.size()) {
+        if (tesselation_index_pos >= 0 && size_t(tesselation_index_pos) < TesselationIndices.size()) {
             const int tesselation_index = TesselationIndices[tesselation_index_pos];
             const ImVec2 vertex = TesselationVertices[tesselation_index];
             dl->AddCircleFilled(vertex * scale + offset, AnchorPointRadius, GetColorU32(ImGuiCol_ButtonHovered));

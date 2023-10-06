@@ -192,7 +192,7 @@ void Mesh::GenerateTetMesh() {
 string Mesh::GenerateDsp() const {
     if (!TetGenResult) return "";
 
-    vector<int> tet_indices;
+    std::vector<int> tet_indices;
     tet_indices.reserve(TetGenResult->numberoftetrahedra * 4 * 3); // 4 triangles per tetrahedron, 3 indices per triangle.
     // Turn each tetrahedron into 4 triangles.
     for (uint i = 0; i < uint(TetGenResult->numberoftetrahedra); ++i) {
