@@ -1,14 +1,13 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-
 #include "Geometry/Geometry.h"
 
-#include <reactphysics3d/reactphysics3d.h>
+namespace reactphysics3d {
+class RigidBody;
+}
 
 struct RigidBody {
-    rp3d::RigidBody *Body;
+    reactphysics3d::RigidBody *Body;
     Geometry *Geometry;
 };
 

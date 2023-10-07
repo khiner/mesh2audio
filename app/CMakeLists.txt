@@ -39,6 +39,7 @@ add_executable(${PROJECT_NAME}
     ${IMPLOT_DIR}/implot_items.cpp
     ${IMPLOT_DIR}/implot_demo.cpp
     lib/ImGuizmo/ImGuizmo.cpp
+    lib/quickhull/QuickHull.cpp
     ${SOURCES}
 )
 add_dependencies(${PROJECT_NAME} CopyResources)
@@ -66,6 +67,7 @@ include_directories(
     lib/date/include/date
     lib/libnpy/include
     lib/tetgen
+    lib/quickhull
     ${Mesh2FaustDir}/src
 )
 

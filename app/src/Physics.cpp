@@ -1,6 +1,8 @@
 #include "Physics.h"
 
-#include <iostream>
+#include <reactphysics3d/reactphysics3d.h>
+
+#include "Geometry/ConvexHull.h"
 
 rp3d::PhysicsCommon PhysicsCommon;
 rp3d::PhysicsWorld *World;
@@ -31,8 +33,44 @@ Physics::~Physics() {
     PhysicsCommon.destroyPhysicsWorld(World);
 }
 
+static std::unique_ptr<rp3d::PolygonVertexArray> PolygonVertices;
+static std::vector<rp3d::PolygonVertexArray::PolygonFace> PolygonFaces;
+
+rp3d::PolyhedronMesh *GeometryDataToPolyhedronMesh(const GeometryData &data) {
+    using namespace rp3d;
+    const auto &vertices = data.Vertices;
+    const auto &indices = data.Indices;
+
+    PolygonFaces.resize(data.Indices.size() / 3);
+    for (uint f = 0; f < PolygonFaces.size(); f++) {
+        PolygonFaces[f].indexBase = f * 3; // First vertex of the face in the indices array.
+        PolygonFaces[f].nbVertices = 3; // Number of vertices in the face.
+    }
+
+    PolygonVertices = std::make_unique<PolygonVertexArray>(
+        vertices.size(), &vertices[0][0], 3 * sizeof(float), &indices[0], sizeof(int), indices.size(), &PolygonFaces[0],
+        PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE, PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE
+    );
+    /** todo failed assert in `PhysicsCommon.createPolyhedronMesh`.
+       Look for a way to find a minimal polygon meeting the following criteria from https://www.reactphysics3d.com/usermanual.html:
+       - You need to make sure that the mesh you provide is indeed convex.
+         Secondly, you should provide the simplest possible convex mesh.
+         This means that you need to avoid coplanar faces in your convex mesh shape.
+         Coplanar faces have to be merged together.
+         Remember that convex meshes are not limited to triangular faces, you can create faces with more than three vertices.
+       - Also note that meshes with duplicated vertices are not supported.
+         The number of vertices you pass to create the PolygonVertexArray must be exactly the number of vertices in your convex mesh.
+       - When you specify the vertices for each face of your convex mesh, be careful with their order.
+         The vertices of a face must be specified in counter clockwise order as seen from the outside of your convex mesh.
+       - You also need to make sure that the origin of your mesh is inside the convex mesh.
+         A mesh with an origin outside the convex mesh is not currently supported by the library.
+    */
+    return ::PhysicsCommon.createPolyhedronMesh(PolygonVertices.get());
+}
+
 void Physics::AddRigidBody(Geometry *geometry) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
+    // If we switch back to this, remember that it's on the `develop` branch (as of 10/6/23).
     // rp3d::VertexArray vertex_array(&geometry->Vertices[0], sizeof(glm::vec3), geometry->Vertices.size(), rp3d::VertexArray::DataType::VERTEX_FLOAT_TYPE);
     // std::vector<rp3d::Message> messages;
     // rp3d::ConvexMesh *convex_mesh = PhysicsCommon.createConvexMesh(vertex_array, messages);
@@ -42,6 +80,21 @@ void Physics::AddRigidBody(Geometry *geometry) {
     // }
     // auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
+    // GeometryData ch_geom_data = ConvexHull::Generate(geometry->Vertices);
+    // auto *polyhedral_mesh = GeometryDataToPolyhedronMesh(ch_geom_data);
+    // auto *shape = PhysicsCommon.createConvexMeshShape(polyhedral_mesh);
+
+    // Just using a bounding box for now.
+    // Need to add solid mesh debugging capabilities in this app, so I can reason better about meshes.
+    // Need:
+    //   - View the convex hull of any mesh.
+    //   - View the bounding box of any mesh.
+    //   - View normals as arrows.
+    //   - Render normals as colors.
+    //   - View vertex indices.
+    //   - Count triangle faces.
+    //   - Implement true flat shading by duplicating vertices and storing face normals (rather than vertex normals).
+    //   - Store & render as polyhedral faces with arbitrary vertices per face, and mixed face types.
     auto [geom_min, geom_max] = geometry->ComputeBounds();
     auto *shape = PhysicsCommon.createBoxShape(Glm2Rp3d((geom_max - geom_min) * 0.5f));
 
