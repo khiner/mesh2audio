@@ -7,6 +7,8 @@
 #include "Audio.h"
 #include "RealImpact.h"
 
+#include "Geometry/ConvexHull.h"
+
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
@@ -64,6 +66,7 @@ void Mesh::ApplyTransform() {
     const mat4 transform = GetTransform();
     TriangularMesh.SetTransform(transform);
     TetMesh.SetTransform(transform);
+    ConvexHullMesh.SetTransform(transform);
     Scene.GizmoTransform = transform;
 }
 
@@ -349,6 +352,10 @@ void Mesh::RenderConfig() {
             TetGenerator.RenderLauncher(HasTetMesh() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
             if (!can_generate_tet_mesh) EndDisabled();
 
+            if (Button("Generate convex hull")) {
+                ConvexHullMesh.SetGeometryData(ConvexHull::Generate(TriangularMesh.Vertices, ConvexHull::Mode::RP3D));
+                SetViewMeshType(MeshType_ConvexHull);
+            }
             SeparatorText("Current mesh");
             Text("File: %s", FilePath.c_str());
             if (HasTetMesh()) {

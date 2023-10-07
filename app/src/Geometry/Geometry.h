@@ -5,6 +5,7 @@
 #include <glm/vec2.hpp>
 
 #include "GLBuffer.h"
+#include "GeometryData.h"
 
 inline static const glm::mat4 Identity(1.f);
 inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
@@ -37,6 +38,7 @@ struct Geometry {
 
     std::pair<glm::vec3, glm::vec3> ComputeBounds(); // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
 
+    void SetGeometryData(const GeometryData &);
     void SetPosition(const glm::vec3 &);
     void SetTransform(const glm::mat4 &);
     void SetColor(const glm::vec4 &);

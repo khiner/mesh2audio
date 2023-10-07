@@ -19,6 +19,7 @@ struct Mesh {
     enum Type_ {
         MeshType_Triangular,
         MeshType_Tetrahedral,
+        MeshType_ConvexHull,
     };
 
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
@@ -38,8 +39,20 @@ struct Mesh {
         if (Profile != nullptr) Profile->SaveTesselation(file_path);
     }
 
-    inline const Geometry &GetActiveGeometry() const { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
-    inline Geometry &GetActiveGeometry() { return ViewMeshType == MeshType_Triangular ? TriangularMesh : TetMesh; }
+    inline const Geometry &GetActiveGeometry() const {
+        switch (ViewMeshType) {
+            case MeshType_Triangular: return TriangularMesh;
+            case MeshType_Tetrahedral: return TetMesh;
+            case MeshType_ConvexHull: return ConvexHullMesh;
+        }
+    }
+    inline Geometry &GetActiveGeometry() {
+        switch (ViewMeshType) {
+            case MeshType_Triangular: return TriangularMesh;
+            case MeshType_Tetrahedral: return TetMesh;
+            case MeshType_ConvexHull: return ConvexHullMesh;
+        }
+    }
 
     bool HasTetMesh() const { return !TetMesh.Empty(); }
 
@@ -61,7 +74,7 @@ struct Mesh {
 private:
     Type ViewMeshType = MeshType_Triangular;
 
-    void SetViewMeshType(Type type);
+    void SetViewMeshType(Type);
 
     void UpdateHoveredVertex();
     void UpdateExcitableVertices();
@@ -79,7 +92,7 @@ private:
     std::unique_ptr<MeshProfile> Profile;
     std::unique_ptr<::RealImpact> RealImpact;
 
-    Geometry TriangularMesh, TetMesh;
+    Geometry TriangularMesh, TetMesh, ConvexHullMesh; // `ConvexHullMesh` is the convex hull of `TriangularMesh`.
 
     // Bounds of original loaded mesh, before any transformations.
     // Used to determine initial camera distance and scale of auto-generated geometries.

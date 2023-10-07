@@ -51,6 +51,7 @@
 [submodule "app/lib/reactphysics3d"]
 	path = app/lib/reactphysics3d
 	url = git@github.com:DanielChappuis/reactphysics3d.git
+	branch = develop
 [submodule "app/lib/quickhull"]
 	path = app/lib/quickhull
 	url = git@github.com:akuukka/quickhull.git

@@ -162,6 +162,13 @@ void Geometry::Save(fs::path file_path) const {
     out.close();
 }
 
+void Geometry::SetGeometryData(const GeometryData &geom_data) {
+    Clear();
+    Vertices.assign(geom_data.Vertices.begin(), geom_data.Vertices.end());
+    TriangleIndices.assign(geom_data.Indices.begin(), geom_data.Indices.end());
+    ComputeNormals();
+}
+
 void Geometry::SetPosition(const vec3 &position) {
     for (auto &transform : Transforms) {
         transform[3][0] = position.x;
