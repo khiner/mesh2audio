@@ -11,20 +11,18 @@
 struct RealImpact;
 struct tetgenio;
 
-struct Mesh {
+struct InteractiveMesh {
     Scene &Scene;
 
-    using Type = int;
-
-    enum Type_ {
-        MeshType_Triangular,
-        MeshType_Tetrahedral,
-        MeshType_ConvexHull,
+    enum ViewMode {
+        ViewMode_Triangular,
+        ViewMode_Tetrahedral,
+        ViewMode_ConvexHull,
     };
 
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
-    Mesh(::Scene &scene, fs::path file_path);
-    ~Mesh();
+    InteractiveMesh(::Scene &, fs::path file_path);
+    ~InteractiveMesh();
 
     void Update();
 
@@ -40,21 +38,21 @@ struct Mesh {
     }
 
     inline const Geometry &GetActiveGeometry() const {
-        switch (ViewMeshType) {
-            case MeshType_Triangular: return TriangularMesh;
-            case MeshType_Tetrahedral: return TetMesh;
-            case MeshType_ConvexHull: return ConvexHullMesh;
+        switch (ActiveViewMode) {
+            case ViewMode_Triangular: return Triangles;
+            case ViewMode_Tetrahedral: return Tets;
+            case ViewMode_ConvexHull: return ConvexHull;
         }
     }
     inline Geometry &GetActiveGeometry() {
-        switch (ViewMeshType) {
-            case MeshType_Triangular: return TriangularMesh;
-            case MeshType_Tetrahedral: return TetMesh;
-            case MeshType_ConvexHull: return ConvexHullMesh;
+        switch (ActiveViewMode) {
+            case ViewMode_Triangular: return Triangles;
+            case ViewMode_Tetrahedral: return Tets;
+            case ViewMode_ConvexHull: return ConvexHull;
         }
     }
 
-    bool HasTetMesh() const { return !TetMesh.Empty(); }
+    bool HasTets() const { return !Tets.Empty(); }
 
     std::string GenerateDsp() const;
     std::string GenerateDspAxisymmetric() const { return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : ""; }
@@ -66,47 +64,47 @@ struct Mesh {
 
     int NumExcitableVertices = 10;
     bool ShowExcitableVertices = true; // Only shown when viewing tet mesh.
-    bool QualityTetMesh = true;
+    bool QualityTets = true;
     bool AutomaticTetGeneration = true;
 
     fs::path FilePath; // Most recently loaded file path.
 
 private:
-    Type ViewMeshType = MeshType_Triangular;
+    ViewMode ActiveViewMode = ViewMode_Triangular;
 
-    void SetViewMeshType(Type);
+    void SetViewMode(ViewMode);
 
     void UpdateHoveredVertex();
     void UpdateExcitableVertices();
     void UpdateExcitableVertexColors();
 
-    void GenerateTetMesh(); // Populates `TetGenResult`.
-    void UpdateTetMesh(); // Update the `TetMesh` geometry from `TetGenResult`.
+    void GenerateTets(); // Populates `TetGenResult`.
+    void UpdateTets(); // Update the `Tets` geometry from `TetGenResult`.
 
     // Generate an axisymmetric 3D mesh by rotating the current 2D profile about the y-axis.
     // _This will have no effect if `Load(path)` was not called first to load a 2D profile._
     void ExtrudeProfile();
     void LoadRealImpact(); // Load [RealImpact](https://github.com/khiner/RealImpact) in the same directory as the loaded .obj file.
 
-    std::unique_ptr<tetgenio> TetGenResult;
-    std::unique_ptr<MeshProfile> Profile;
-    std::unique_ptr<::RealImpact> RealImpact;
-
-    Geometry TriangularMesh, TetMesh, ConvexHullMesh; // `ConvexHullMesh` is the convex hull of `TriangularMesh`.
+    Geometry Triangles, Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
 
     // Bounds of original loaded mesh, before any transformations.
     // Used to determine initial camera distance and scale of auto-generated geometries.
     std::pair<glm::vec3, glm::vec3> InitialBounds; // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
 
-    Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTetMesh(); }};
+    glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};
+
+    std::unique_ptr<tetgenio> TetGenResult;
+    std::unique_ptr<MeshProfile> Profile;
+    std::unique_ptr<::RealImpact> RealImpact;
+
+    Worker TetGenerator{"Generate tet mesh", "Generating tetrahedral mesh...", [&] { GenerateTets(); }};
     Worker RealImpactLoader{"Load RealImpact", "Loading RealImpact data...", [&] { LoadRealImpact(); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
     Arrow HoveredVertexArrow{0.5, 0.1, 0.2, 0.3};
 
-    std::vector<int> ExcitableVertexIndices; // Indexes into `TetMesh` vertices.
+    std::vector<int> ExcitableVertexIndices; // Indexes into `Tets` vertices.
     Arrow ExcitableVertexArrows{0.25, 0.05, 0.1, 0.15}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
     Sphere RealImpactListenerPoints{0.01}; // Instanced spheres for each listener point.
-
-    glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};
 };

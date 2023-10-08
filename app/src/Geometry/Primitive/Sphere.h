@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Geometry.h"
+#include "Geometry/Geometry.h"
 
 // Icosphere.
 struct Sphere : Geometry {

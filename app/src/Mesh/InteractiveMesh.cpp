@@ -1,4 +1,4 @@
-#include "Mesh.h"
+#include "InteractiveMesh.h"
 
 #include "date.h"
 #include "mesh2faust.h"
@@ -13,7 +13,7 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
-Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
+InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     const bool is_svg = file_path.extension() == ".svg";
     const bool is_obj = file_path.extension() == ".obj";
     if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -21,36 +21,36 @@ Mesh::Mesh(::Scene &scene, fs::path file_path) : Scene(scene) {
     FilePath = file_path; // Store the most recent file path.
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(FilePath);
-        TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
+        Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     } else {
-        TriangularMesh.Load(FilePath);
+        Triangles.Load(FilePath);
     }
 
     HoveredVertexArrow.SetColor({1, 0, 0, 1});
     UpdateExcitableVertices();
+    InitialBounds = Triangles.ComputeBounds();
+
     Scene.AddGeometry(&GetActiveGeometry());
     Scene.AddGeometry(&ExcitableVertexArrows);
     Scene.AddGeometry(&HoveredVertexArrow);
-
-    InitialBounds = TriangularMesh.ComputeBounds();
     Scene.SetCameraDistance(glm::distance(InitialBounds.first, InitialBounds.second) * 2);
 }
 
-Mesh::~Mesh() {}
+InteractiveMesh::~InteractiveMesh() {}
 
-void Mesh::SetViewMeshType(Type type) {
-    if (ViewMeshType == type) return;
+void InteractiveMesh::SetViewMode(ViewMode view_mode) {
+    if (ActiveViewMode == view_mode) return;
 
     Scene.RemoveGeometry(&GetActiveGeometry());
-    ViewMeshType = type;
+    ActiveViewMode = view_mode;
     Scene.AddGeometry(&GetActiveGeometry());
 }
 
-void Mesh::Save(fs::path file_path) const {
+void InteractiveMesh::Save(fs::path file_path) const {
     GetActiveGeometry().Save(file_path);
 }
 
-mat4 Mesh::GetTransform() const {
+mat4 InteractiveMesh::GetTransform() const {
     mat4 transform = Identity;
     transform = glm::translate(transform, Translation);
 
@@ -62,22 +62,22 @@ mat4 Mesh::GetTransform() const {
     return glm::scale(transform, Scale);
 }
 
-void Mesh::ApplyTransform() {
+void InteractiveMesh::ApplyTransform() {
     const mat4 transform = GetTransform();
-    TriangularMesh.SetTransform(transform);
-    TetMesh.SetTransform(transform);
-    ConvexHullMesh.SetTransform(transform);
+    Triangles.SetTransform(transform);
+    Tets.SetTransform(transform);
+    ConvexHull.SetTransform(transform);
     Scene.GizmoTransform = transform;
 }
 
-void Mesh::ExtrudeProfile() {
+void InteractiveMesh::ExtrudeProfile() {
     if (Profile == nullptr) return;
 
     HoveredVertexIndex = CameraTargetVertexIndex = -1;
-    TetMesh.Clear();
+    Tets.Clear();
     UpdateExcitableVertices();
-    TriangularMesh.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
-    SetViewMeshType(MeshType_Triangular);
+    Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
+    SetViewMode(ViewMode_Triangular);
 }
 
 static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
@@ -89,8 +89,8 @@ static void SetColor(const float to[], float result[]) {
     for (int i = 0; i < 4; i++) result[i] = to[i];
 }
 
-void Mesh::UpdateExcitableVertexColors() {
-    if (ViewMeshType == MeshType_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
+void InteractiveMesh::UpdateExcitableVertexColors() {
+    if (ActiveViewMode == ViewMode_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
             // todo update to use vec4 for all colors.
             static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
@@ -111,41 +111,41 @@ void Mesh::UpdateExcitableVertexColors() {
     }
 }
 
-void Mesh::UpdateExcitableVertices() {
+void InteractiveMesh::UpdateExcitableVertices() {
     ExcitableVertexArrows.Transforms.clear();
     ExcitableVertexArrows.Colors.clear();
     ExcitableVertexIndices.clear();
-    if (TetMesh.Vertices.empty()) return;
+    if (Tets.Vertices.empty()) return;
 
     // Linearly sample excitable vertices from all available vertices.
     ExcitableVertexIndices.resize(NumExcitableVertices);
     for (int i = 0; i < NumExcitableVertices; i++) {
         const float t = float(i) / (NumExcitableVertices - 1);
-        ExcitableVertexIndices[i] = int(t * (TetMesh.Vertices.size() - 1));
+        ExcitableVertexIndices[i] = int(t * (Tets.Vertices.size() - 1));
     }
 
     // Point arrows at each excitable vertex.
     float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
     mat4 scale = glm::scale(Identity, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
-        mat4 translate = glm::translate(Identity, TetMesh.Vertices[vertex_index]);
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(TetMesh.Normals[vertex_index])));
+        mat4 translate = glm::translate(Identity, Tets.Vertices[vertex_index]);
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(Tets.Normals[vertex_index])));
         ExcitableVertexArrows.Transforms.push_back({translate * rotate * scale});
         ExcitableVertexArrows.Colors.push_back({1, 1, 1, 1});
     }
 }
 
-void Mesh::LoadRealImpact() {
+void InteractiveMesh::LoadRealImpact() {
     RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path());
     Scene.AddGeometry(&RealImpactListenerPoints);
 }
 
-void Mesh::UpdateTetMesh() {
-    if (ViewMeshType == MeshType_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
+void InteractiveMesh::UpdateTets() {
+    if (ActiveViewMode == ViewMode_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
 
-    TetMesh.Clear();
+    Tets.Clear();
     for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
-        TetMesh.Vertices.push_back({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
+        Tets.Vertices.push_back({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
     }
 
     for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
@@ -153,26 +153,26 @@ void Mesh::UpdateTetMesh() {
         const uint tri_i = i * 3;
         // Order of triangle indices important for normal calculation.
         const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 2], c = tri_indices[tri_i + 1];
-        TetMesh.TriangleIndices.append({a, b, c});
+        Tets.TriangleIndices.append({a, b, c});
     }
-    TetMesh.ComputeNormals(); // todo better surface normals
+    Tets.ComputeNormals(); // todo better surface normals
 
     UpdateExcitableVertices();
 }
 
-void Mesh::GenerateTetMesh() {
+void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
-    in.numberofpoints = TriangularMesh.Vertices.size();
+    in.numberofpoints = Triangles.Vertices.size();
     in.pointlist = new REAL[in.numberofpoints * 3];
 
-    for (uint i = 0; i < TriangularMesh.Vertices.size(); ++i) {
-        in.pointlist[i * 3] = TriangularMesh.Vertices[i].x;
-        in.pointlist[i * 3 + 1] = TriangularMesh.Vertices[i].y;
-        in.pointlist[i * 3 + 2] = TriangularMesh.Vertices[i].z;
+    for (uint i = 0; i < Triangles.Vertices.size(); ++i) {
+        in.pointlist[i * 3] = Triangles.Vertices[i].x;
+        in.pointlist[i * 3 + 1] = Triangles.Vertices[i].y;
+        in.pointlist[i * 3 + 2] = Triangles.Vertices[i].z;
     }
 
-    in.numberoffacets = TriangularMesh.TriangleIndices.size() / 3;
+    in.numberoffacets = Triangles.TriangleIndices.size() / 3;
     in.facetlist = new tetgenio::facet[in.numberoffacets];
 
     for (uint i = 0; i < uint(in.numberoffacets); ++i) {
@@ -181,18 +181,18 @@ void Mesh::GenerateTetMesh() {
         f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
         f.polygonlist[0].numberofvertices = 3;
         f.polygonlist[0].vertexlist = new int[f.polygonlist[0].numberofvertices];
-        f.polygonlist[0].vertexlist[0] = TriangularMesh.TriangleIndices[i * 3];
-        f.polygonlist[0].vertexlist[1] = TriangularMesh.TriangleIndices[i * 3 + 1];
-        f.polygonlist[0].vertexlist[2] = TriangularMesh.TriangleIndices[i * 3 + 2];
+        f.polygonlist[0].vertexlist[0] = Triangles.TriangleIndices[i * 3];
+        f.polygonlist[0].vertexlist[1] = Triangles.TriangleIndices[i * 3 + 1];
+        f.polygonlist[0].vertexlist[2] = Triangles.TriangleIndices[i * 3 + 2];
     }
 
-    const string options = QualityTetMesh ? "pq" : "p";
+    const string options = QualityTets ? "pq" : "p";
     TetGenResult = std::make_unique<tetgenio>();
     std::vector<char> options_mutable(options.begin(), options.end());
     tetrahedralize(options_mutable.data(), &in, TetGenResult.get());
 }
 
-string Mesh::GenerateDsp() const {
+string InteractiveMesh::GenerateDsp() const {
     if (!TetGenResult) return "";
 
     std::vector<int> tet_indices;
@@ -204,8 +204,8 @@ string Mesh::GenerateDsp() const {
         int a = result_indices[tri_i], b = result_indices[tri_i + 1], c = result_indices[tri_i + 2], d = result_indices[tri_i + 3];
         tet_indices.insert(tet_indices.end(), {a, b, c, d, a, b, c, d, a, b, c, d});
     }
-    // Convert the tetrahedral mesh into a VegaFEM tetmesh.
-    ::TetMesh volumetric_mesh{
+    // Convert the tetrahedral mesh into a VegaFEM Tets.
+    TetMesh volumetric_mesh{
         TetGenResult->numberofpoints, TetGenResult->pointlist, TetGenResult->numberoftetrahedra * 3, tet_indices.data(),
         Material.YoungModulus, Material.PoissonRatio, Material.Density};
 
@@ -227,7 +227,7 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 
 using namespace ImGui;
 
-void Mesh::UpdateHoveredVertex() {
+void InteractiveMesh::UpdateHoveredVertex() {
     const auto &geometry = GetActiveGeometry();
 
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
@@ -269,13 +269,13 @@ void Mesh::UpdateHoveredVertex() {
     }
 }
 
-void Mesh::Update() {
-    if (ViewMeshType == MeshType_Tetrahedral && !HasTetMesh()) SetViewMeshType(MeshType_Triangular);
+void InteractiveMesh::Update() {
+    if (ActiveViewMode == ViewMode_Tetrahedral && !HasTets()) SetViewMode(ViewMode_Triangular);
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
 }
 
-void Mesh::Render() {
+void InteractiveMesh::Render() {
     const auto &geometry = GetActiveGeometry();
     const auto &vertices = geometry.Vertices;
 
@@ -330,7 +330,7 @@ void Mesh::Render() {
     }
 }
 
-void Mesh::RenderConfig() {
+void InteractiveMesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
             const auto &center = GetMainViewport()->GetCenter();
@@ -338,8 +338,8 @@ void Mesh::RenderConfig() {
             SetNextWindowSize(GetMainViewport()->Size / 4);
             if (TetGenerator.Render()) {
                 // Tet generation completed.
-                UpdateTetMesh();
-                SetViewMeshType(MeshType_Tetrahedral); // Automatically switch to tetrahedral view.
+                UpdateTets();
+                SetViewMode(ViewMode_Tetrahedral); // Automatically switch to tetrahedral view.
             }
             SeparatorText("Create");
 
@@ -348,32 +348,32 @@ void Mesh::RenderConfig() {
                 BeginDisabled();
                 TextUnformatted("Disable |MeshProfile|->|ClosePath| to generate tet mesh.\n(Meshes with holes can only be used for axisymmetric simulations.)");
             }
-            Checkbox("Quality mode", &QualityTetMesh);
-            TetGenerator.RenderLauncher(HasTetMesh() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
+            Checkbox("Quality mode", &QualityTets);
+            TetGenerator.RenderLauncher(HasTets() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
             if (!can_generate_tet_mesh) EndDisabled();
 
             if (Button("Generate convex hull")) {
-                ConvexHullMesh.SetGeometryData(ConvexHull::Generate(TriangularMesh.Vertices, ConvexHull::Mode::RP3D));
-                SetViewMeshType(MeshType_ConvexHull);
+                ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.Vertices, ConvexHull::Mode::RP3D));
+                SetViewMode(ViewMode_ConvexHull);
             }
             SeparatorText("Current mesh");
             Text("File: %s", FilePath.c_str());
-            if (HasTetMesh()) {
+            if (HasTets()) {
                 Checkbox("Show excitable vertices", &ShowExcitableVertices);
-                if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(TetMesh.Vertices.size())))) {
+                if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.Vertices.size())))) {
                     UpdateExcitableVertices();
                 }
 
                 Text(
                     "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
-                    TetMesh.Vertices.size(), TetMesh.TriangleIndices.size()
+                    Tets.Vertices.size(), Tets.TriangleIndices.size()
                 );
-                TextUnformatted("View mesh type");
-                Type mesh_type = ViewMeshType;
-                bool mesh_type_changed = RadioButton("Triangular", &mesh_type, MeshType_Triangular);
+                TextUnformatted("View mode");
+                int view_mode = int(ActiveViewMode);
+                bool view_mode_chanded = RadioButton("Triangular", &view_mode, ViewMode_Triangular);
                 SameLine();
-                mesh_type_changed |= RadioButton("Tetrahedral", &mesh_type, MeshType_Tetrahedral);
-                if (mesh_type_changed) SetViewMeshType(mesh_type);
+                view_mode_chanded |= RadioButton("Tetrahedral", &view_mode, ViewMode_Tetrahedral);
+                if (view_mode_chanded) SetViewMode(ViewMode(view_mode));
             } else {
                 TextUnformatted("No tetrahedral mesh loaded");
             }
@@ -383,8 +383,8 @@ void Mesh::RenderConfig() {
                 if (Scene.ShowGizmo) {
                     Scene.GizmoTransform = GetTransform();
                     Scene.GizmoCallback = [this](const glm::mat4 &transform) {
-                        TriangularMesh.SetTransform(transform);
-                        TetMesh.SetTransform(transform);
+                        Triangles.SetTransform(transform);
+                        Tets.SetTransform(transform);
                         Translation = glm::vec3{transform[3]};
                         Scale = {glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
                         RotationAngles = glm::eulerAngles(glm::quat_cast(transform));
@@ -456,12 +456,12 @@ void Mesh::RenderConfig() {
     }
 }
 
-void Mesh::RenderProfile() {
+void InteractiveMesh::RenderProfile() {
     if (Profile == nullptr) Text("The current mesh was not loaded from a 2D profile.");
     else if (Profile->Render()) ExtrudeProfile();
 }
 
-void Mesh::RenderProfileConfig() {
+void InteractiveMesh::RenderProfileConfig() {
     if (Profile == nullptr) Text("The current mesh was not loaded from a 2D profile.");
     else if (Profile->RenderConfig()) ExtrudeProfile();
 }

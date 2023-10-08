@@ -48,7 +48,7 @@ struct Scene {
 
     inline static uint MaxNumLights = 5;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-    inline static RenderType RenderMode = RenderType_Smooth;
+    inline static RenderMode ActiveRenderMode = RenderMode_Smooth;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
 

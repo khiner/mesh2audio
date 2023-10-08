@@ -129,17 +129,17 @@ void Scene::Render() {
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
-    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && RenderMode == RenderType_Smooth ? 1 : 0);
+    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && ActiveRenderMode == RenderMode_Smooth ? 1 : 0);
 
-    if (RenderMode == RenderType_Lines) {
+    if (ActiveRenderMode == RenderMode_Lines) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    for (auto *geometry : Geometries) geometry->SetupRender(RenderMode);
+    for (auto *geometry : Geometries) geometry->SetupRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
-    if (RenderMode == RenderType_Points) glPointSize(PointRadius);
-    for (const auto *geometry : Geometries) geometry->Render(RenderMode);
+    if (ActiveRenderMode == RenderMode_Points) glPointSize(PointRadius);
+    for (const auto *geometry : Geometries) geometry->Render(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
     if (Grid) {
@@ -150,8 +150,8 @@ void Scene::Render() {
         // glUniform4fv(GridLinesShaderProgram->GetUniform(un::GridLinesColor), 1, &GridLinesColor[0]);
 
         glEnable(GL_BLEND);
-        Grid->SetupRender(RenderType_Smooth);
-        Grid->Render(RenderType_Smooth);
+        Grid->SetupRender(RenderMode_Smooth);
+        Grid->Render(RenderMode_Smooth);
         glDisable(GL_BLEND);
     }
 
@@ -239,21 +239,23 @@ void Scene::RenderConfig() {
                 }
             }
             SeparatorText("Render mode");
-            bool render_mode_changed = RadioButton("Smooth", &RenderMode, RenderType_Smooth);
+            int render_mode = int(ActiveRenderMode);
+            bool render_mode_changed = RadioButton("Smooth", &render_mode, RenderMode_Smooth);
             SameLine();
-            render_mode_changed |= RadioButton("Lines", &RenderMode, RenderType_Lines);
+            render_mode_changed |= RadioButton("Lines", &render_mode, RenderMode_Lines);
             SameLine();
-            render_mode_changed |= RadioButton("Point cloud", &RenderMode, RenderType_Points);
+            render_mode_changed |= RadioButton("Point cloud", &render_mode, RenderMode_Points);
             if (render_mode_changed) {
-                CurrShaderProgram = RenderMode == RenderType_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
+                ActiveRenderMode = RenderMode(render_mode);
+                CurrShaderProgram = ActiveRenderMode == RenderMode_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
             }
-            if (RenderMode == RenderType_Smooth) {
+            if (ActiveRenderMode == RenderMode_Smooth) {
                 Checkbox("Flat shading", &UseFlatShading);
             }
-            if (RenderMode == RenderType_Lines) {
+            if (ActiveRenderMode == RenderMode_Lines) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);
             }
-            if (RenderMode == RenderType_Points) {
+            if (ActiveRenderMode == RenderMode_Points) {
                 SliderFloat("Point radius", &PointRadius, 0.1, 10, "%.2f", ImGuiSliderFlags_Logarithmic);
             }
             EndTabItem();

@@ -15,22 +15,17 @@
 #include <nfd.h>
 
 #include "Audio.h"
-#include "Mesh.h"
+#include "Mesh/InteractiveMesh.h"
 #include "RealImpact.h"
 #include "Window.h"
 #include "Worker.h"
 
 #include "Scene.h"
 
-// This example can also compile and run with Emscripten! See 'Makefile.emscripten' for details.
-#ifdef __EMSCRIPTEN__
-#include "../libs/emscripten/emscripten_mainloop_stub.h"
-#endif
-
 static WindowsState Windows;
 
 static std::unique_ptr<Scene> MainScene;
-static std::unique_ptr<Mesh> mesh;
+static std::unique_ptr<InteractiveMesh> MainMesh;
 
 static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
 static bool IsGeneratedDsp2d = false; // `false` means 3D.
@@ -139,7 +134,7 @@ int main(int, char **) {
     // IM_ASSERT(font != NULL);
 
     if (!MainScene) MainScene = std::make_unique<Scene>();
-    mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
+    MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
     // Alternatively, we could initialize with a mesh obj file:
     // mesh = std::make_unique<Mesh>(*MainScene, fs::path("res") / "obj" / "bell" / "english.obj");
     // mesh = std::make_unique<Mesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
@@ -149,15 +144,7 @@ int main(int, char **) {
 
     // Main loop
     bool done = false;
-#ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
-    // You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
-    io.IniFilename = NULL;
-    EMSCRIPTEN_MAINLOOP_BEGIN
-#else
-    while (!done)
-#endif
-    {
+    while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
@@ -199,29 +186,29 @@ int main(int, char **) {
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
-                        mesh = std::make_unique<Mesh>(*MainScene, file_path);
+                        MainMesh = std::make_unique<InteractiveMesh>(*MainScene, file_path);
                         NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
-                if (MenuItem("Export mesh as obj", nullptr, false, mesh != nullptr)) {
+                if (MenuItem("Export mesh as obj", nullptr, false, MainMesh != nullptr)) {
                     nfdchar_t *save_path;
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}};
                     nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
                     if (result == NFD_OKAY) {
-                        mesh->Save(save_path);
+                        MainMesh->Save(save_path);
                         NFD_FreePath(save_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
-                if (MenuItem("Export profile as obj", nullptr, false, mesh != nullptr && mesh->HasProfile())) {
+                if (MenuItem("Export profile as obj", nullptr, false, MainMesh != nullptr && MainMesh->HasProfile())) {
                     nfdchar_t *save_path;
                     nfdfilteritem_t filter[] = {{"Mesh profile object", "obj"}};
                     nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
                     if (result == NFD_OKAY) {
-                        mesh->SaveProfile(save_path);
+                        MainMesh->SaveProfile(save_path);
                         NFD_FreePath(save_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
@@ -257,10 +244,10 @@ int main(int, char **) {
         }
         if (Windows.MeshControls.Visible) {
             Begin(Windows.MeshControls.Name, &Windows.MeshControls.Visible);
-            if (mesh == nullptr) {
+            if (MainMesh == nullptr) {
                 Text("No mesh has been loaded.");
             } else {
-                mesh->RenderConfig();
+                MainMesh->RenderConfig();
             }
             End();
         }
@@ -269,9 +256,9 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
 
-            if (mesh != nullptr) mesh->Update();
+            if (MainMesh != nullptr) MainMesh->Update();
             MainScene->Render();
-            if (mesh != nullptr) mesh->Render();
+            if (MainMesh != nullptr) MainMesh->Render();
             End();
             PopStyleVar();
         }
@@ -279,7 +266,7 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.MeshProfile.Name, &Windows.MeshProfile.Visible);
 
-            if (mesh != nullptr) mesh->RenderProfile();
+            if (MainMesh != nullptr) MainMesh->RenderProfile();
             else Text("No mesh has been loaded.");
 
             End();
@@ -296,8 +283,8 @@ int main(int, char **) {
 
             if (BeginTabBar("Audio model")) {
                 if (BeginTabItem("Model")) {
-                    const bool has_tetrahedral_mesh = mesh->HasTetMesh();
-                    const bool has_profile = mesh->HasProfile();
+                    const bool has_tetrahedral_mesh = MainMesh->HasTets();
+                    const bool has_profile = MainMesh->HasProfile();
                     if (!has_tetrahedral_mesh) BeginDisabled();
                     const bool generate_tet_dsp = Button("Generate 3D DSP");
                     if (!has_tetrahedral_mesh) {
@@ -314,8 +301,8 @@ int main(int, char **) {
                     }
                     if (generate_tet_dsp || generate_axisymmetric_dsp) {
                         DspGenerator.Launch([&] {
-                            const int num_excitations = generate_tet_dsp ? mesh->Num3DExcitationVertices() : mesh->Num2DExcitationVertices();
-                            const string model_dsp = generate_tet_dsp ? mesh->GenerateDsp() : mesh->GenerateDspAxisymmetric();
+                            const int num_excitations = generate_tet_dsp ? MainMesh->Num3DExcitationVertices() : MainMesh->Num2DExcitationVertices();
+                            const string model_dsp = generate_tet_dsp ? MainMesh->GenerateDsp() : MainMesh->GenerateDspAxisymmetric();
                             if (!model_dsp.empty()) {
                                 GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, num_excitations);
                             } else {
@@ -402,9 +389,6 @@ int main(int, char **) {
 
         SDL_GL_SwapWindow(window);
     }
-#ifdef __EMSCRIPTEN__
-    EMSCRIPTEN_MAINLOOP_END;
-#endif
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();

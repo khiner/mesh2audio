@@ -69,6 +69,7 @@ include_directories(
     lib/tetgen
     lib/quickhull
     ${Mesh2FaustDir}/src
+    src
 )
 
 if(APPLE)

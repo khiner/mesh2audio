@@ -12,12 +12,11 @@ inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
 
-enum RenderType_ {
-    RenderType_Smooth,
-    RenderType_Lines,
-    RenderType_Points,
+enum RenderMode {
+    RenderMode_Smooth,
+    RenderMode_Lines,
+    RenderMode_Points,
 };
-using RenderType = int;
 
 struct Geometry {
     Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
@@ -28,8 +27,8 @@ struct Geometry {
 
     void EnableVertexAttributes() const;
 
-    void SetupRender(RenderType render_type = RenderType_Smooth);
-    void Render(RenderType render_type = RenderType_Smooth) const;
+    void SetupRender(RenderMode render_mode = RenderMode_Smooth);
+    void Render(RenderMode render_mode = RenderMode_Smooth) const;
 
     void Clear();
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
@@ -42,7 +41,7 @@ struct Geometry {
     void SetPosition(const glm::vec3 &);
     void SetTransform(const glm::mat4 &);
     void SetColor(const glm::vec4 &);
-    void CenterVertices();
+    void Center();
 
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void ComputeLineIndices();
@@ -58,5 +57,5 @@ struct Geometry {
     uint VertexArrayId;
 
 private:
-    void BindData(RenderType render_type = RenderType_Smooth) const;
+    void BindData(RenderMode render_mode = RenderMode_Smooth) const;
 };

@@ -38,32 +38,32 @@ void Geometry::EnableVertexAttributes() const {
     glBindVertexArray(0);
 }
 
-void Geometry::SetupRender(RenderType render_type) {
-    if (render_type == RenderType_Lines && LineIndices.empty()) ComputeLineIndices();
-    else if (render_type != RenderType_Lines && !LineIndices.empty()) LineIndices.clear(); // Save memory.
+void Geometry::SetupRender(RenderMode render_mode) {
+    if (render_mode == RenderMode_Lines && LineIndices.empty()) ComputeLineIndices();
+    else if (render_mode != RenderMode_Lines && !LineIndices.empty()) LineIndices.clear(); // Save memory.
 }
 
-void Geometry::BindData(RenderType render_type) const {
+void Geometry::BindData(RenderMode render_mode) const {
     glBindVertexArray(VertexArrayId);
     Vertices.BindData();
     if (!Normals.empty()) Normals.BindData();
-    const auto &indices = render_type == RenderType_Lines ? LineIndices : TriangleIndices;
+    const auto &indices = render_mode == RenderMode_Lines ? LineIndices : TriangleIndices;
     indices.BindData();
     Transforms.BindData();
     Colors.BindData();
     glBindVertexArray(0);
 }
 
-void Geometry::Render(RenderType render_type) const {
+void Geometry::Render(RenderMode render_mode) const {
     if (Transforms.empty()) return;
 
-    BindData(render_type); // Only rebinds the data if it has changed.
+    BindData(render_mode); // Only rebinds the data if it has changed.
 
     glBindVertexArray(VertexArrayId);
 
-    GLenum polygon_mode = render_type == RenderType_Points ? GL_POINT : GL_FILL;
-    GLenum primitive_type = render_type == RenderType_Lines ? GL_LINES : GL_TRIANGLES;
-    uint num_indices = render_type == RenderType_Lines ? LineIndices.size() : TriangleIndices.size();
+    GLenum polygon_mode = render_mode == RenderMode_Points ? GL_POINT : GL_FILL;
+    GLenum primitive_type = render_mode == RenderMode_Lines ? GL_LINES : GL_TRIANGLES;
+    uint num_indices = render_mode == RenderMode_Lines ? LineIndices.size() : TriangleIndices.size();
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
     if (Transforms.size() == 1) {
         glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
@@ -112,7 +112,7 @@ void Geometry::Load(fs::path file_path) {
     }
     fclose(fp);
 
-    CenterVertices();
+    Center();
     ComputeNormals();
 }
 
@@ -130,7 +130,7 @@ std::pair<vec3, vec3> Geometry::ComputeBounds() {
     return {min, max};
 }
 
-void Geometry::CenterVertices() {
+void Geometry::Center() {
     const auto [min, max] = ComputeBounds();
     Vertices -= (min + max) / 2.0f;
 }
@@ -299,7 +299,7 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
         }
     }
 
-    CenterVertices();
+    Center();
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
     // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the y-axis (the up/down axis).
     Vertices *= {1.0, -1.0, 1.0};

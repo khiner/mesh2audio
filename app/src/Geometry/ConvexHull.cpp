@@ -25,7 +25,7 @@ reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm
     return convex_mesh;
 }
 
-GeometryData ConvexMeshToGeometryData(reactphysics3d::ConvexMesh *mesh) {
+static GeometryData ConvexMeshToGeometryData(reactphysics3d::ConvexMesh *mesh) {
     // Copy the vertices.
     const auto &half_edge = mesh->getHalfEdgeStructure();
     const uint num_vertices = half_edge.getNbVertices();

@@ -6,8 +6,6 @@ namespace reactphysics3d {
 class ConvexMesh;
 }
 
-static GeometryData ConvexMeshToGeometryData(reactphysics3d::ConvexMesh *mesh);
-
 struct ConvexHull {
     enum Mode {
         QuickHull, // https://github.com/akuukka/quickhull
