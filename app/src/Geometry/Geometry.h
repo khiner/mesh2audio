@@ -12,6 +12,7 @@ inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
 
+// todo use OpenMesh as the main mesh data structure, and derive all fields from it.
 struct Geometry {
     Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
     Geometry(fs::path file_path);

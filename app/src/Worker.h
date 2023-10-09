@@ -20,6 +20,7 @@ struct Worker {
     }
     void RenderLauncher() { RenderLauncher(Work); }
 
+    void Launch();
     void Launch(const std::function<void()> &work);
 
     std::thread Thread;

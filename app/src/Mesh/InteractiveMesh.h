@@ -46,6 +46,7 @@ struct InteractiveMesh : Mesh {
     }
 
     bool HasTets() const { return !Tets.Empty(); }
+    bool HasConvexHull() const { return !ConvexHull.Empty(); }
 
     std::string GenerateDsp() const;
     std::string GenerateDspAxisymmetric() const { return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : ""; }

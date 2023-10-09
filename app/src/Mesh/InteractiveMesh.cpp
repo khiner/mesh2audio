@@ -52,6 +52,11 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
     if (ActiveGeometryMode == mode) return;
 
     ActiveGeometryMode = mode;
+    if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
+        ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.Vertices, ConvexHull::Mode::RP3D));
+    } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
+        TetGenerator.Launch();
+    }
     EnableVertexAttributes();
 }
 
@@ -338,6 +343,49 @@ void InteractiveMesh::Render() {
 void InteractiveMesh::RenderConfig() {
     if (BeginTabBar("MeshConfigTabBar")) {
         if (BeginTabItem("Mesh")) {
+            SeparatorText("Current mesh");
+            Text("File: %s", FilePath.c_str());
+
+            TextUnformatted("View mode");
+            int geometry_mode = int(ActiveGeometryMode);
+            bool geometry_mode_changed = RadioButton("Triangular", &geometry_mode, GeometryMode_Triangular);
+            SameLine();
+            geometry_mode_changed |= RadioButton("Tetrahedral", &geometry_mode, GeometryMode_Tetrahedral);
+            SameLine();
+            geometry_mode_changed |= RadioButton("Convex hull", &geometry_mode, GeometryMode_ConvexHull);
+            if (geometry_mode_changed) SetGeometryMode(GeometryMode(geometry_mode));
+
+            if (ActiveGeometryMode == GeometryMode_Tetrahedral) {
+                const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
+                if (HasTets()) {
+                    Checkbox("Show excitable vertices", &ShowExcitableVertices);
+                    if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.Vertices.size())))) {
+                        UpdateExcitableVertices();
+                    }
+                    Text(
+                        "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
+                        Tets.Vertices.size(), Tets.TriangleIndices.size()
+                    );
+                } else {
+                    if (!can_generate_tet_mesh) {
+                        BeginDisabled();
+                        TextUnformatted("Disable |MeshProfile|->|ClosePath| to generate tet mesh.\n(Meshes with holes can only be used for axisymmetric simulations.)");
+                    }
+                }
+                Checkbox("Quality mode", &QualityTets);
+                TetGenerator.RenderLauncher(HasTets() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
+                if (!can_generate_tet_mesh) EndDisabled();
+            } else if (ActiveGeometryMode == GeometryMode_ConvexHull) {
+                if (HasConvexHull()) {
+                    Text(
+                        "Current convex hull:\n\tVertices: %lu\n\tIndices: %lu",
+                        ConvexHull.Vertices.size(), ConvexHull.TriangleIndices.size()
+                    );
+                }
+                if (Button(HasConvexHull() ? "Regenerate convex hull" : "Generate convex hull")) {
+                    SetGeometryMode(GeometryMode_ConvexHull);
+                }
+            }
             const auto &center = GetMainViewport()->GetCenter();
             SetNextWindowPos(center, ImGuiCond_Appearing, {0.5f, 0.5f});
             SetNextWindowSize(GetMainViewport()->Size / 4);
@@ -346,43 +394,6 @@ void InteractiveMesh::RenderConfig() {
                 UpdateTets();
                 SetGeometryMode(GeometryMode_Tetrahedral); // Automatically switch to tetrahedral view.
             }
-            SeparatorText("Create");
-
-            const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
-            if (!can_generate_tet_mesh) {
-                BeginDisabled();
-                TextUnformatted("Disable |MeshProfile|->|ClosePath| to generate tet mesh.\n(Meshes with holes can only be used for axisymmetric simulations.)");
-            }
-            Checkbox("Quality mode", &QualityTets);
-            TetGenerator.RenderLauncher(HasTets() ? "Regenerate tetrahedral mesh" : "Generate tetrahedral mesh");
-            if (!can_generate_tet_mesh) EndDisabled();
-
-            if (Button("Generate convex hull")) {
-                ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.Vertices, ConvexHull::Mode::RP3D));
-                SetGeometryMode(GeometryMode_ConvexHull);
-            }
-            SeparatorText("Current mesh");
-            Text("File: %s", FilePath.c_str());
-            if (HasTets()) {
-                Checkbox("Show excitable vertices", &ShowExcitableVertices);
-                if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.Vertices.size())))) {
-                    UpdateExcitableVertices();
-                }
-
-                Text(
-                    "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
-                    Tets.Vertices.size(), Tets.TriangleIndices.size()
-                );
-                TextUnformatted("View mode");
-                int geometry_mode = int(ActiveGeometryMode);
-                bool geometry_mode_changed = RadioButton("Triangular", &geometry_mode, GeometryMode_Triangular);
-                SameLine();
-                geometry_mode_changed |= RadioButton("Tetrahedral", &geometry_mode, GeometryMode_Tetrahedral);
-                if (geometry_mode_changed) SetGeometryMode(GeometryMode(geometry_mode));
-            } else {
-                TextUnformatted("No tetrahedral mesh loaded");
-            }
-
             SeparatorText("Transform");
             if (Checkbox("Gizmo##Transform", &Scene.ShowGizmo)) {
                 if (Scene.ShowGizmo) {

@@ -16,6 +16,10 @@ void Worker::Launch(const std::function<void()> &work) {
     });
 }
 
+void Worker::Launch() {
+    Launch(Work);
+}
+
 void Worker::RenderLauncher(const std::function<void()> &work) {
     if (Button(LaunchLabel.c_str())) {
         Launch(work);
