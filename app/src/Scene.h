@@ -8,7 +8,7 @@
 
 #include "ImGuizmo.h"
 
-#include "Geometry/Geometry.h"
+#include "Mesh/Mesh.h"
 
 struct ShaderProgram;
 struct Rect;
@@ -20,12 +20,14 @@ struct Scene {
 
     void SetCameraDistance(float);
 
-    void AddGeometry(Geometry *);
-    void RemoveGeometry(const Geometry *);
+    void AddMesh(Mesh *);
+    void RemoveMesh(const Mesh *);
 
     void Render();
     void RenderConfig();
     void RenderGizmoDebug();
+
+    std::vector<Mesh *> Meshes;
 
     LightBuffer Lights;
     glm::vec4 AmbientColor = {0.2, 0.2, 0.2, 1};
@@ -54,9 +56,8 @@ struct Scene {
 
     ShaderProgram *CurrShaderProgram = nullptr;
 
-    std::vector<Geometry *> Geometries;
-    std::unordered_map<uint, std::unique_ptr<Geometry>> LightPoints; // For visualizing light positions. Key is `Lights` index.
+    std::unordered_map<uint, std::unique_ptr<Mesh>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
-    std::unique_ptr<Rect> Grid, Floor;
+    std::unique_ptr<Mesh> Grid, Floor;
     std::unique_ptr<Physics> Physics;
 };

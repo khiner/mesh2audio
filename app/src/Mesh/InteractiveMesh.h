@@ -1,28 +1,36 @@
 #pragma once
 
+#include "Geometry/Arrow.h"
+#include "Geometry/Primitive/Sphere.h"
 #include "Material.h"
+#include "Mesh.h"
 #include "MeshProfile.h"
 #include "Scene.h"
 #include "Worker.h"
 
-#include "Geometry/Arrow.h"
-#include "Geometry/Primitive/Sphere.h"
-
 struct RealImpact;
 struct tetgenio;
 
-struct InteractiveMesh {
-    Scene &Scene;
-
-    enum ViewMode {
-        ViewMode_Triangular,
-        ViewMode_Tetrahedral,
-        ViewMode_ConvexHull,
+struct InteractiveMesh : Mesh {
+    enum GeometryMode {
+        GeometryMode_Triangular,
+        GeometryMode_Tetrahedral,
+        GeometryMode_ConvexHull,
     };
 
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     InteractiveMesh(::Scene &, fs::path file_path);
     ~InteractiveMesh();
+
+    inline const Geometry &ActiveGeometry() const override {
+        switch (ActiveGeometryMode) {
+            case GeometryMode_Triangular: return Triangles;
+            case GeometryMode_Tetrahedral: return Tets;
+            case GeometryMode_ConvexHull: return ConvexHull;
+        }
+    }
+
+    std::vector<const Geometry *> AllGeometries() const override { return {&Triangles, &Tets, &ConvexHull}; }
 
     void Update();
 
@@ -35,21 +43,6 @@ struct InteractiveMesh {
     bool HasProfile() const { return Profile != nullptr; }
     void SaveProfile(fs::path file_path) const {
         if (Profile != nullptr) Profile->SaveTesselation(file_path);
-    }
-
-    inline const Geometry &GetActiveGeometry() const {
-        switch (ActiveViewMode) {
-            case ViewMode_Triangular: return Triangles;
-            case ViewMode_Tetrahedral: return Tets;
-            case ViewMode_ConvexHull: return ConvexHull;
-        }
-    }
-    inline Geometry &GetActiveGeometry() {
-        switch (ActiveViewMode) {
-            case ViewMode_Triangular: return Triangles;
-            case ViewMode_Tetrahedral: return Tets;
-            case ViewMode_ConvexHull: return ConvexHull;
-        }
     }
 
     bool HasTets() const { return !Tets.Empty(); }
@@ -70,9 +63,7 @@ struct InteractiveMesh {
     fs::path FilePath; // Most recently loaded file path.
 
 private:
-    ViewMode ActiveViewMode = ViewMode_Triangular;
-
-    void SetViewMode(ViewMode);
+    void SetGeometryMode(GeometryMode);
 
     void UpdateHoveredVertex();
     void UpdateExcitableVertices();
@@ -86,13 +77,17 @@ private:
     void ExtrudeProfile();
     void LoadRealImpact(); // Load [RealImpact](https://github.com/khiner/RealImpact) in the same directory as the loaded .obj file.
 
-    Geometry Triangles, Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
+    Scene &Scene;
+
+    Geometry Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
 
     // Bounds of original loaded mesh, before any transformations.
     // Used to determine initial camera distance and scale of auto-generated geometries.
     std::pair<glm::vec3, glm::vec3> InitialBounds; // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
 
     glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};
+
+    GeometryMode ActiveGeometryMode = GeometryMode_Triangular;
 
     std::unique_ptr<tetgenio> TetGenResult;
     std::unique_ptr<MeshProfile> Profile;
@@ -102,9 +97,9 @@ private:
     Worker RealImpactLoader{"Load RealImpact", "Loading RealImpact data...", [&] { LoadRealImpact(); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-    Arrow HoveredVertexArrow{0.5, 0.1, 0.2, 0.3};
+    Mesh HoveredVertexArrow{Arrow{0.5, 0.1, 0.2, 0.3}};
 
     std::vector<int> ExcitableVertexIndices; // Indexes into `Tets` vertices.
-    Arrow ExcitableVertexArrows{0.25, 0.05, 0.1, 0.15}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
-    Sphere RealImpactListenerPoints{0.01}; // Instanced spheres for each listener point.
+    Mesh ExcitableVertexArrows{Arrow{0.25, 0.05, 0.1, 0.15}}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
+    Mesh RealImpactListenerPoints{Sphere{0.01}}; // Instanced spheres for each listener point.
 };

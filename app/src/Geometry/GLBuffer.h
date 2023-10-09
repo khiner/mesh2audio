@@ -11,19 +11,17 @@ using GLenum = uint;
 template<typename DataType>
 struct GLBuffer {
     GLBuffer(GLenum type, size_t size = 0) : Type(type) {
-        glGenBuffers(1, &BufferId);
         Data.reserve(size);
     }
 
-    ~GLBuffer() {
-        glDeleteBuffers(1, &BufferId);
-    }
+    virtual ~GLBuffer() = default;
 
     operator const std::vector<DataType> &() const { return Data; }
 
-    void Bind() const {
-        glBindBuffer(Type, BufferId);
-    }
+    void Generate() { glGenBuffers(1, &BufferId); }
+    void Delete() const { glDeleteBuffers(1, &BufferId); }
+    void Bind() const { glBindBuffer(Type, BufferId); }
+    void Unbind() const { glBindBuffer(Type, 0); }
 
     void BindData() const {
         Bind();
@@ -31,9 +29,6 @@ struct GLBuffer {
             glBufferData(Type, sizeof(DataType) * Data.size(), Data.data(), GL_STATIC_DRAW);
             Dirty = false;
         }
-    }
-    void Unbind() const {
-        glBindBuffer(Type, 0);
     }
 
     const DataType *data() const { return Data.data(); }

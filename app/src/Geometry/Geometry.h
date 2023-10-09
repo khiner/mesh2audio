@@ -12,37 +12,21 @@ inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
 
-enum RenderMode {
-    RenderMode_Smooth,
-    RenderMode_Lines,
-    RenderMode_Points,
-};
-
 struct Geometry {
     Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
     Geometry(fs::path file_path);
-    ~Geometry();
+    virtual ~Geometry() = default;
 
-    void Load(fs::path file_path);
-
-    void EnableVertexAttributes() const;
-
-    void SetupRender(RenderMode render_mode = RenderMode_Smooth);
-    void Render(RenderMode render_mode = RenderMode_Smooth) const;
-
-    void Clear();
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
+    void Load(fs::path file_path);
 
     bool Empty() const { return Vertices.empty(); }
 
-    std::pair<glm::vec3, glm::vec3> ComputeBounds(); // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
-
-    void SetGeometryData(const GeometryData &);
-    void SetPosition(const glm::vec3 &);
-    void SetTransform(const glm::mat4 &);
-    void SetColor(const glm::vec4 &);
     void Center();
+    void Clear();
+    void SetGeometryData(const GeometryData &);
 
+    std::pair<glm::vec3, glm::vec3> ComputeBounds(); // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
     void ComputeLineIndices();
 
@@ -51,11 +35,4 @@ struct Geometry {
     VertexBuffer Vertices;
     NormalBuffer Normals;
     IndexBuffer TriangleIndices, LineIndices;
-    ColorBuffer Colors;
-    TransformBuffer Transforms;
-
-    uint VertexArrayId;
-
-private:
-    void BindData(RenderMode render_mode = RenderMode_Smooth) const;
 };

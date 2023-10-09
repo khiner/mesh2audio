@@ -81,24 +81,27 @@ Scene::Scene() {
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
 
+    Lights.Generate();
     Lights.BindData();
     GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
     glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, Lights.BufferId);
 }
 
-Scene::~Scene() {}
-
-void Scene::AddGeometry(Geometry *geometry) {
-    if (!geometry) return;
-    if (std::find(Geometries.begin(), Geometries.end(), geometry) != Geometries.end()) return;
-
-    Geometries.push_back(geometry);
+Scene::~Scene() {
+    Lights.Delete();
 }
 
-void Scene::RemoveGeometry(const Geometry *geometry) {
-    if (!geometry) return;
+void Scene::AddMesh(Mesh *mesh) {
+    if (!mesh) return;
+    if (std::find(Meshes.begin(), Meshes.end(), mesh) != Meshes.end()) return;
 
-    Geometries.erase(std::remove(Geometries.begin(), Geometries.end(), geometry), Geometries.end());
+    Meshes.push_back(mesh);
+}
+
+void Scene::RemoveMesh(const Mesh *mesh) {
+    if (!mesh) return;
+
+    Meshes.erase(std::remove(Meshes.begin(), Meshes.end(), mesh), Meshes.end());
 }
 
 void Scene::Render() {
@@ -135,11 +138,11 @@ void Scene::Render() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    for (auto *geometry : Geometries) geometry->SetupRender(ActiveRenderMode);
+    for (auto *mesh : Meshes) mesh->SetupRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode_Points) glPointSize(PointRadius);
-    for (const auto *geometry : Geometries) geometry->Render(ActiveRenderMode);
+    for (const auto *mesh : Meshes) mesh->Render(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
     if (Grid) {
@@ -219,10 +222,12 @@ void Scene::RenderConfig() {
                     // Rendering of grid lines derives from a plane at z = 0.
                     // See `grid_lines_vertex.glsl` and `grid_lines_fragment.glsl` for details.
                     // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
-                    Grid = std::make_unique<Rect>(vec3{1, 1, 0}, vec3{-1, -1, 0}, vec3{-1, 1, 0}, vec3{1, -1, 0});
+                    Grid = std::make_unique<Mesh>(Rect{{1, 1, 0}, {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}});
                     Grid->Colors.clear();
-                    Grid->Normals.clear();
+                    Grid->ActiveGeometry().Normals.clear();
+                    Grid->Generate();
                 } else {
+                    Grid->Delete();
                     Grid.reset();
                 }
             }
@@ -230,11 +235,12 @@ void Scene::RenderConfig() {
             if (Checkbox("Show floor", &show_floor)) {
                 if (show_floor) {
                     float y = -1;
-                    Floor = std::make_unique<Rect>(vec3{1, y, 1}, vec3{-1, y, -1}, vec3{-1, y, 1}, vec3{1, y, -1}, vec3{0, 1, 0});
-                    Floor->SetTransform(glm::scale(Identity, vec3{50, 1, 50}));
-                    AddGeometry(Floor.get());
+                    Floor = std::make_unique<Mesh>(Rect{{1, y, 1}, {-1, y, -1}, {-1, y, 1}, {1, y, -1}, {0, 1, 0}});
+                    Floor->Generate();
+                    Floor->SetTransform(glm::scale(Identity, {50, 1, 50}));
+                    AddMesh(Floor.get());
                 } else {
-                    RemoveGeometry(Floor.get());
+                    RemoveMesh(Floor.get());
                     Floor.reset();
                 }
             }
@@ -298,12 +304,13 @@ void Scene::RenderConfig() {
                 bool show_lights = LightPoints.contains(i);
                 if (Checkbox("Show", &show_lights)) {
                     if (show_lights) {
-                        LightPoints[i] = std::make_unique<Sphere>(0.1);
+                        LightPoints[i] = std::make_unique<Mesh>(Sphere{0.1});
+                        LightPoints[i]->Generate();
                         LightPoints[i]->SetColor(Lights[i].Color);
                         LightPoints[i]->SetPosition(Lights[i].Position);
-                        AddGeometry(LightPoints[i].get());
+                        AddMesh(LightPoints[i].get());
                     } else {
-                        RemoveGeometry(LightPoints[i].get());
+                        RemoveMesh(LightPoints[i].get());
                         LightPoints.erase(i);
                     }
                 }
@@ -323,7 +330,7 @@ void Scene::RenderConfig() {
                 if (enable_physics) {
                     Physics = std::make_unique<::Physics>();
                     Physics->AddRigidBody({0, -1, 0}); // Floor.
-                    Physics->AddRigidBody(Geometries[0]);
+                    Physics->AddRigidBody(Meshes[0]);
                 } else {
                     Physics.reset();
                 }

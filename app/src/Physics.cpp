@@ -67,12 +67,12 @@ Physics::~Physics() {
 //     return ::PhysicsCommon.createPolyhedronMesh(PolygonVertices.get());
 // }
 
-void Physics::AddRigidBody(Geometry *geometry) {
+void Physics::AddRigidBody(Mesh *mesh) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
-    rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(geometry->Vertices);
+    rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->Triangles.Vertices);
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
-    // GeometryData ch_geom_data = ConvexHull::Generate(geometry->Vertices);
+    // GeometryData ch_geom_data = ConvexHull::Generate(mesh->Vertices);
     // auto *polyhedral_mesh = GeometryDataToPolyhedronMesh(ch_geom_data);
     // auto *shape = PhysicsCommon.createConvexMeshShape(polyhedral_mesh);
 
@@ -87,14 +87,14 @@ void Physics::AddRigidBody(Geometry *geometry) {
     //   - Count triangle faces.
     //   - Implement true flat shading by duplicating vertices and storing face normals (rather than vertex normals).
     //   - Store & render as polyhedral faces with arbitrary vertices per face, and mixed face types.
-    // auto [geom_min, geom_max] = geometry->ComputeBounds();
+    // auto [geom_min, geom_max] = mesh->ComputeBounds();
     // auto *shape = PhysicsCommon.createBoxShape(Glm2Rp3d((geom_max - geom_min) * 0.5f));
 
-    auto *body = World->createRigidBody(Glm2Rp3d(geometry->Transforms[0]));
+    auto *body = World->createRigidBody(Glm2Rp3d(mesh->Transforms[0]));
     body->setMass(1.f);
     body->addCollider(shape, {});
     body->setIsAllowedToSleep(false);
-    RigidBodies.push_back({body, geometry});
+    RigidBodies.push_back({body, mesh});
 }
 
 void Physics::AddRigidBody(const glm::vec3 &initial_pos) {
@@ -111,8 +111,8 @@ void Physics::AddRigidBody(const glm::vec3 &initial_pos) {
 void Physics::Tick() {
     World->update(1.0f / 60.0f);
     for (auto &rigid_body : RigidBodies) {
-        if (rigid_body.Geometry) {
-            rigid_body.Geometry->SetTransform(Rp3d2Glm(rigid_body.Body->getTransform()));
+        if (rigid_body.Mesh) {
+            rigid_body.Mesh->SetTransform(Rp3d2Glm(rigid_body.Body->getTransform()));
         }
     }
 }

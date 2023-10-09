@@ -1,7 +1,6 @@
 #include "Geometry.h"
 
 #include <fstream>
-#include <iostream>
 #include <unordered_set>
 
 #include <glm/gtx/string_cast.hpp>
@@ -10,67 +9,9 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
 Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
-    : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {
-    glGenVertexArrays(1, &VertexArrayId);
-    EnableVertexAttributes();
-}
+    : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {}
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
-
-Geometry::~Geometry() {
-    glDeleteVertexArrays(1, &VertexArrayId);
-}
-
-void Geometry::EnableVertexAttributes() const {
-    glBindVertexArray(VertexArrayId);
-
-    Vertices.Bind();
-    Vertices.EnableVertexAttribute(0);
-
-    Normals.Bind();
-    Normals.EnableVertexAttribute(1);
-
-    Colors.Bind();
-    Colors.EnableVertexAttribute(2);
-
-    Transforms.Bind();
-    Transforms.EnableVertexAttribute(3);
-    glBindVertexArray(0);
-}
-
-void Geometry::SetupRender(RenderMode render_mode) {
-    if (render_mode == RenderMode_Lines && LineIndices.empty()) ComputeLineIndices();
-    else if (render_mode != RenderMode_Lines && !LineIndices.empty()) LineIndices.clear(); // Save memory.
-}
-
-void Geometry::BindData(RenderMode render_mode) const {
-    glBindVertexArray(VertexArrayId);
-    Vertices.BindData();
-    if (!Normals.empty()) Normals.BindData();
-    const auto &indices = render_mode == RenderMode_Lines ? LineIndices : TriangleIndices;
-    indices.BindData();
-    Transforms.BindData();
-    Colors.BindData();
-    glBindVertexArray(0);
-}
-
-void Geometry::Render(RenderMode render_mode) const {
-    if (Transforms.empty()) return;
-
-    BindData(render_mode); // Only rebinds the data if it has changed.
-
-    glBindVertexArray(VertexArrayId);
-
-    GLenum polygon_mode = render_mode == RenderMode_Points ? GL_POINT : GL_FILL;
-    GLenum primitive_type = render_mode == RenderMode_Lines ? GL_LINES : GL_TRIANGLES;
-    uint num_indices = render_mode == RenderMode_Lines ? LineIndices.size() : TriangleIndices.size();
-    glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
-    if (Transforms.size() == 1) {
-        glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
-    } else {
-        glDrawElementsInstanced(primitive_type, num_indices, GL_UNSIGNED_INT, 0, Transforms.size());
-    }
-}
 
 void Geometry::Load(fs::path file_path) {
     if (file_path.extension() != ".obj") throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -167,21 +108,6 @@ void Geometry::SetGeometryData(const GeometryData &geom_data) {
     Vertices.assign(geom_data.Vertices.begin(), geom_data.Vertices.end());
     TriangleIndices.assign(geom_data.Indices.begin(), geom_data.Indices.end());
     ComputeNormals();
-}
-
-void Geometry::SetPosition(const vec3 &position) {
-    for (auto &transform : Transforms) {
-        transform[3][0] = position.x;
-        transform[3][1] = position.y;
-        transform[3][2] = position.z;
-    }
-}
-void Geometry::SetTransform(const mat4 &new_transform) {
-    for (auto &transform : Transforms) transform = new_transform;
-}
-void Geometry::SetColor(const vec4 &color) {
-    Colors.clear();
-    Colors.resize(Transforms.size(), color);
 }
 
 void Geometry::ComputeNormals() {

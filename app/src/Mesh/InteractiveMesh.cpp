@@ -13,7 +13,10 @@ using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string, std::to_string;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
-InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Scene(scene) {
+InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Mesh(), Scene(scene) {
+    ExcitableVertexArrows.Generate();
+    HoveredVertexArrow.Generate();
+
     const bool is_svg = file_path.extension() == ".svg";
     const bool is_obj = file_path.extension() == ".obj";
     if (!is_svg && !is_obj) throw std::runtime_error("Unsupported file type: " + file_path.string());
@@ -30,25 +33,29 @@ InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Scene(sce
     UpdateExcitableVertices();
     InitialBounds = Triangles.ComputeBounds();
 
-    Scene.AddGeometry(&GetActiveGeometry());
-    Scene.AddGeometry(&ExcitableVertexArrows);
-    Scene.AddGeometry(&HoveredVertexArrow);
+    Scene.AddMesh(this);
+    Scene.AddMesh(&ExcitableVertexArrows);
+    Scene.AddMesh(&HoveredVertexArrow);
     Scene.SetCameraDistance(glm::distance(InitialBounds.first, InitialBounds.second) * 2);
 }
 
-InteractiveMesh::~InteractiveMesh() {}
+InteractiveMesh::~InteractiveMesh() {
+    Scene.RemoveMesh(this);
+    Scene.RemoveMesh(&ExcitableVertexArrows);
+    Scene.RemoveMesh(&HoveredVertexArrow);
 
-void InteractiveMesh::SetViewMode(ViewMode view_mode) {
-    if (ActiveViewMode == view_mode) return;
-
-    Scene.RemoveGeometry(&GetActiveGeometry());
-    ActiveViewMode = view_mode;
-    Scene.AddGeometry(&GetActiveGeometry());
+    ExcitableVertexArrows.Delete();
+    HoveredVertexArrow.Delete();
 }
 
-void InteractiveMesh::Save(fs::path file_path) const {
-    GetActiveGeometry().Save(file_path);
+void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
+    if (ActiveGeometryMode == mode) return;
+
+    ActiveGeometryMode = mode;
+    EnableVertexAttributes();
 }
+
+void InteractiveMesh::Save(fs::path file_path) const { ActiveGeometry().Save(file_path); }
 
 mat4 InteractiveMesh::GetTransform() const {
     mat4 transform = Identity;
@@ -64,9 +71,7 @@ mat4 InteractiveMesh::GetTransform() const {
 
 void InteractiveMesh::ApplyTransform() {
     const mat4 transform = GetTransform();
-    Triangles.SetTransform(transform);
-    Tets.SetTransform(transform);
-    ConvexHull.SetTransform(transform);
+    SetTransform(transform);
     Scene.GizmoTransform = transform;
 }
 
@@ -77,7 +82,7 @@ void InteractiveMesh::ExtrudeProfile() {
     Tets.Clear();
     UpdateExcitableVertices();
     Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
-    SetViewMode(ViewMode_Triangular);
+    SetGeometryMode(GeometryMode_Triangular);
 }
 
 static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
@@ -90,7 +95,7 @@ static void SetColor(const float to[], float result[]) {
 }
 
 void InteractiveMesh::UpdateExcitableVertexColors() {
-    if (ActiveViewMode == ViewMode_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
+    if (ActiveGeometryMode == GeometryMode_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
             // todo update to use vec4 for all colors.
             static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
@@ -100,11 +105,11 @@ void InteractiveMesh::UpdateExcitableVertexColors() {
 
             static float vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
             if (!Audio::FaustState::IsRunning()) {
-                SetColor(DisabledExcitableVertexColor, vertex_color);
+                ::SetColor(DisabledExcitableVertexColor, vertex_color);
             } else if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
                 InterpolateColors(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::min(1.f, std::abs(*Audio::FaustState::ExciteValue)), vertex_color);
             } else {
-                SetColor(ExcitableVertexColor, vertex_color);
+                ::SetColor(ExcitableVertexColor, vertex_color);
             }
             ExcitableVertexArrows.Colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
@@ -137,11 +142,11 @@ void InteractiveMesh::UpdateExcitableVertices() {
 
 void InteractiveMesh::LoadRealImpact() {
     RealImpact = std::make_unique<::RealImpact>(FilePath.parent_path());
-    Scene.AddGeometry(&RealImpactListenerPoints);
+    Scene.AddMesh(&RealImpactListenerPoints);
 }
 
 void InteractiveMesh::UpdateTets() {
-    if (ActiveViewMode == ViewMode_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
+    if (ActiveGeometryMode == GeometryMode_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
 
     Tets.Clear();
     for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
@@ -228,7 +233,7 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 using namespace ImGui;
 
 void InteractiveMesh::UpdateHoveredVertex() {
-    const auto &geometry = GetActiveGeometry();
+    const auto &geometry = ActiveGeometry();
 
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
@@ -270,13 +275,13 @@ void InteractiveMesh::UpdateHoveredVertex() {
 }
 
 void InteractiveMesh::Update() {
-    if (ActiveViewMode == ViewMode_Tetrahedral && !HasTets()) SetViewMode(ViewMode_Triangular);
+    if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) SetGeometryMode(GeometryMode_Triangular);
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
 }
 
 void InteractiveMesh::Render() {
-    const auto &geometry = GetActiveGeometry();
+    const auto &geometry = ActiveGeometry();
     const auto &vertices = geometry.Vertices;
 
     // Handle mouse interactions.
@@ -339,7 +344,7 @@ void InteractiveMesh::RenderConfig() {
             if (TetGenerator.Render()) {
                 // Tet generation completed.
                 UpdateTets();
-                SetViewMode(ViewMode_Tetrahedral); // Automatically switch to tetrahedral view.
+                SetGeometryMode(GeometryMode_Tetrahedral); // Automatically switch to tetrahedral view.
             }
             SeparatorText("Create");
 
@@ -354,7 +359,7 @@ void InteractiveMesh::RenderConfig() {
 
             if (Button("Generate convex hull")) {
                 ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.Vertices, ConvexHull::Mode::RP3D));
-                SetViewMode(ViewMode_ConvexHull);
+                SetGeometryMode(GeometryMode_ConvexHull);
             }
             SeparatorText("Current mesh");
             Text("File: %s", FilePath.c_str());
@@ -369,11 +374,11 @@ void InteractiveMesh::RenderConfig() {
                     Tets.Vertices.size(), Tets.TriangleIndices.size()
                 );
                 TextUnformatted("View mode");
-                int view_mode = int(ActiveViewMode);
-                bool view_mode_chanded = RadioButton("Triangular", &view_mode, ViewMode_Triangular);
+                int geometry_mode = int(ActiveGeometryMode);
+                bool geometry_mode_changed = RadioButton("Triangular", &geometry_mode, GeometryMode_Triangular);
                 SameLine();
-                view_mode_chanded |= RadioButton("Tetrahedral", &view_mode, ViewMode_Tetrahedral);
-                if (view_mode_chanded) SetViewMode(ViewMode(view_mode));
+                geometry_mode_changed |= RadioButton("Tetrahedral", &geometry_mode, GeometryMode_Tetrahedral);
+                if (geometry_mode_changed) SetGeometryMode(GeometryMode(geometry_mode));
             } else {
                 TextUnformatted("No tetrahedral mesh loaded");
             }
@@ -383,8 +388,7 @@ void InteractiveMesh::RenderConfig() {
                 if (Scene.ShowGizmo) {
                     Scene.GizmoTransform = GetTransform();
                     Scene.GizmoCallback = [this](const glm::mat4 &transform) {
-                        Triangles.SetTransform(transform);
-                        Tets.SetTransform(transform);
+                        SetTransform(transform);
                         Translation = glm::vec3{transform[3]};
                         Scale = {glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
                         RotationAngles = glm::eulerAngles(glm::quat_cast(transform));
@@ -421,7 +425,7 @@ void InteractiveMesh::RenderConfig() {
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
-                const auto &vertex = GetActiveGeometry().Vertices[HoveredVertexIndex];
+                const auto &vertex = ActiveGeometry().Vertices[HoveredVertexIndex];
                 Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 
@@ -442,6 +446,7 @@ void InteractiveMesh::RenderConfig() {
                 RealImpact->Render();
             }
             if (RealImpactLoader.Render() && RealImpact) {
+                RealImpactListenerPoints.Generate();
                 const size_t num_points = RealImpact->NumListenerPoints();
                 RealImpactListenerPoints.Transforms.clear();
                 RealImpactListenerPoints.Colors.clear();

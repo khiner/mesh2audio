@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Geometry/Geometry.h"
+#include "Mesh/Mesh.h"
 
 namespace reactphysics3d {
 class RigidBody;
@@ -8,14 +8,14 @@ class RigidBody;
 
 struct RigidBody {
     reactphysics3d::RigidBody *Body;
-    Geometry *Geometry;
+    Mesh *Mesh;
 };
 
 struct Physics {
     Physics();
     ~Physics();
 
-    void AddRigidBody(Geometry *);
+    void AddRigidBody(Mesh *);
     void AddRigidBody(const glm::vec3 &initial_pos = {0, 0, 0});
 
     void Tick();
