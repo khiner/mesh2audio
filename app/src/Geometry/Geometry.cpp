@@ -13,6 +13,47 @@ Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
 
 Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
 
+void Geometry::EnableVertexAttributes() const {
+    static const GLuint VertexSlot = 0;
+    static const GLuint NormalSlot = 1;
+    glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
+    glEnableVertexAttribArray(VertexSlot);
+    glVertexAttribPointer(VertexSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
+    glEnableVertexAttribArray(NormalSlot);
+    glVertexAttribPointer(NormalSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+}
+
+void Geometry::Generate() {
+    glGenBuffers(1, &VertexBufferId);
+    glGenBuffers(1, &NormalBufferId);
+    glGenBuffers(1, &TriangleIndexBufferId);
+    glGenBuffers(1, &LineIndexBufferId);
+}
+
+void Geometry::Delete() const {
+    glDeleteBuffers(1, &VertexBufferId);
+    glDeleteBuffers(1, &NormalBufferId);
+    glDeleteBuffers(1, &TriangleIndexBufferId);
+    glDeleteBuffers(1, &LineIndexBufferId);
+}
+
+void Geometry::BindData(RenderMode render_mode) const {
+    glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Vertices.size(), Vertices.data(), GL_STATIC_DRAW);
+    if (!Normals.empty()) {
+        glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Normals.size(), Normals.data(), GL_STATIC_DRAW);
+    }
+    if (render_mode == RenderMode_Lines) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, LineIndexBufferId);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * LineIndices.size(), LineIndices.data(), GL_STATIC_DRAW);
+    } else {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleIndexBufferId);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * TriangleIndices.size(), TriangleIndices.data(), GL_STATIC_DRAW);
+    }
+}
+
 void Geometry::Load(fs::path file_path) {
     if (file_path.extension() != ".obj") throw std::runtime_error("Unsupported file type: " + file_path.string());
 
@@ -73,7 +114,7 @@ std::pair<vec3, vec3> Geometry::ComputeBounds() {
 
 void Geometry::Center() {
     const auto [min, max] = ComputeBounds();
-    Vertices -= (min + max) / 2.0f;
+    for (vec3 &v : Vertices) v -= (min + max) / 2.0f;
 }
 
 void Geometry::Clear() {
@@ -196,7 +237,7 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const uint base_index = slice * profile_size_no_connect + i;
             const uint next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
-            TriangleIndices.append({
+            TriangleIndices.insert(TriangleIndices.end(), {
                 // First triangle
                 base_index,
                 next_base_index + 1,
@@ -212,7 +253,7 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
     // Connect the top and bottom.
     if (!closed) {
         for (uint slice = 0; slice < slices; slice++) {
-            TriangleIndices.append({
+            TriangleIndices.insert(TriangleIndices.end(), {
                 // Top
                 uint(Vertices.size() - 2),
                 slice * profile_size_no_connect,
@@ -228,5 +269,5 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
     Center();
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.
     // However, they're correctly oriented top-to-bottom for 2D ImGui rendering, so we only invert the y-axis (the up/down axis).
-    Vertices *= {1.0, -1.0, 1.0};
+    for (auto &v : Vertices) v.y *= -1.0;
 }

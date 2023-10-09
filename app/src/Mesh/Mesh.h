@@ -11,12 +11,6 @@ struct VertexArray {
     uint Id = 0;
 };
 
-enum RenderMode {
-    RenderMode_Smooth,
-    RenderMode_Lines,
-    RenderMode_Points,
-};
-
 struct Mesh {
     Mesh() {}
     Mesh(Geometry &&triangles) : Triangles(std::move(triangles)) {}
@@ -40,11 +34,12 @@ struct Mesh {
     void SetColor(const glm::vec4 &);
 
     Geometry Triangles;
-    ColorBuffer Colors;
-    TransformBuffer Transforms;
+    std::vector<glm::vec4> Colors{{1, 1, 1, 1}};
+    std::vector<glm::mat4> Transforms{glm::mat4{1}};
 
 private:
     VertexArray VertexArray;
+    GLuint ColorBufferId, TransformBufferId;
 
     void BindData(RenderMode render_mode = RenderMode_Smooth) const;
 };

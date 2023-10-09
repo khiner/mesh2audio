@@ -2,15 +2,23 @@
 
 #include <filesystem>
 
+#include <GL/glew.h>
+#include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
-#include "GLBuffer.h"
 #include "GeometryData.h"
 
 inline static const glm::mat4 Identity(1.f);
 inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 namespace fs = std::filesystem;
+
+enum RenderMode {
+    RenderMode_Smooth,
+    RenderMode_Lines,
+    RenderMode_Points,
+};
 
 // todo use OpenMesh as the main mesh data structure, and derive all fields from it.
 struct Geometry {
@@ -33,7 +41,14 @@ struct Geometry {
 
     void ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
-    VertexBuffer Vertices;
-    NormalBuffer Normals;
-    IndexBuffer TriangleIndices, LineIndices;
+    void EnableVertexAttributes() const;
+    void Generate();
+    void Delete() const;
+    void BindData(RenderMode render_mode) const;
+
+    std::vector<glm::vec3> Vertices, Normals;
+    std::vector<uint> TriangleIndices, LineIndices;
+
+    GLuint VertexBufferId, NormalBufferId, TriangleIndexBufferId, LineIndexBufferId;
+    bool Dirty{false};
 };

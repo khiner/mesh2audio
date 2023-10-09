@@ -14,6 +14,11 @@ struct ShaderProgram;
 struct Rect;
 struct Physics;
 
+struct Light {
+    glm::vec4 Position{0.0f};
+    glm::vec4 Color{1.0f};
+};
+
 struct Scene {
     Scene();
     ~Scene();
@@ -29,7 +34,8 @@ struct Scene {
 
     std::vector<Mesh *> Meshes;
 
-    LightBuffer Lights;
+    GLuint LightBufferId;
+    std::vector<Light> Lights;
     glm::vec4 AmbientColor = {0.2, 0.2, 0.2, 1};
     // todo Diffusion and specular colors are object properties, not scene properties.
     glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};

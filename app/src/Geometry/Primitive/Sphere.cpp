@@ -4,9 +4,9 @@
 
 using glm::vec3;
 
-void AddVertex(VertexBuffer &vertices, const vec3 &vertex) { vertices.push_back(glm::normalize(vertex)); }
+static void AddVertex(std::vector<glm::vec3> &vertices, const vec3 &vertex) { vertices.push_back(glm::normalize(vertex)); }
 
-uint GetMidIndex(uint p1, uint p2, VertexBuffer &vertices, std::unordered_map<uint, uint> &cache) {
+uint GetMidIndex(uint p1, uint p2, std::vector<glm::vec3> &vertices, std::unordered_map<uint, uint> &cache) {
     const uint key = (std::min(p1, p2) << 16) + std::max(p1, p2);
     auto found = cache.find(key);
     if (found != cache.end()) return found->second;
@@ -50,6 +50,6 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
     }
 
     Normals.assign(Vertices.begin(), Vertices.end());
-    Vertices *= radius;
+    for (auto &vertex : Vertices) vertex *= radius;
     ComputeLineIndices();
 }

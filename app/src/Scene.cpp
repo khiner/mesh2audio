@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include <glm/gtx/quaternion.hpp>
+
 #include "GLCanvas.h"
 #include "Geometry/Primitive/Rect.h"
 #include "Geometry/Primitive/Sphere.h"
@@ -81,14 +83,16 @@ Scene::Scene() {
     CurrShaderProgram = MainShaderProgram.get();
     CurrShaderProgram->Use();
 
-    Lights.Generate();
-    Lights.BindData();
+    glGenBuffers(1, &LightBufferId);
+    glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
+
     GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
-    glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, Lights.BufferId);
+    glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, LightBufferId);
 }
 
 Scene::~Scene() {
-    Lights.Delete();
+    glDeleteBuffers(1, &LightBufferId);
 }
 
 void Scene::AddMesh(Mesh *mesh) {
@@ -120,7 +124,8 @@ void Scene::Render() {
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
     Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
 
-    Lights.BindData();
+    glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
 
     CurrShaderProgram->Use();
 

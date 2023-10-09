@@ -3,6 +3,7 @@
 #include "date.h"
 #include "mesh2faust.h"
 #include "tetgen.h"
+#include <glm/gtx/quaternion.hpp>
 
 #include "Audio.h"
 #include "RealImpact.h"
@@ -163,7 +164,7 @@ void InteractiveMesh::UpdateTets() {
         const uint tri_i = i * 3;
         // Order of triangle indices important for normal calculation.
         const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 2], c = tri_indices[tri_i + 1];
-        Tets.TriangleIndices.append({a, b, c});
+        Tets.TriangleIndices.insert(Tets.TriangleIndices.end(), {a, b, c});
     }
     Tets.ComputeNormals(); // todo better surface normals
 
