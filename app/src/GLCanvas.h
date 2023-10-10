@@ -8,7 +8,7 @@ struct GLCanvas {
     ~GLCanvas();
 
     // RGBA background color.
-    void SetupRender(uint width, uint height, float r, float g, float b, float a);
+    void PrepareRender(uint width, uint height, float r, float g, float b, float a);
     uint Render(); // Returns `TextureId` after binding the frame buffer.
 
 private:

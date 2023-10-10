@@ -44,19 +44,16 @@ void Mesh::BindData(RenderMode render_mode) const {
     VertexArray.Bind();
     ActiveGeometry().BindData(render_mode);
 
-    glBindBuffer(GL_ARRAY_BUFFER, TransformBufferId);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Transforms.size(), Transforms.data(), GL_STATIC_DRAW);
+    if (Dirty) {
+        glBindBuffer(GL_ARRAY_BUFFER, TransformBufferId);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Transforms.size(), Transforms.data(), GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ARRAY_BUFFER, ColorBufferId);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Colors.size(), Colors.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, ColorBufferId);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Colors.size(), Colors.data(), GL_STATIC_DRAW);
+    }
+    Dirty = false;
 
     VertexArray.Unbind();
-}
-
-void Mesh::SetupRender(RenderMode mode) {
-    auto &geom = ActiveGeometry();
-    if (mode == RenderMode_Lines && geom.LineIndices.empty()) geom.ComputeLineIndices();
-    else if (mode != RenderMode_Lines && !geom.LineIndices.empty()) geom.LineIndices.clear(); // Save memory.
 }
 
 void Mesh::Render(RenderMode mode) const {
@@ -69,26 +66,10 @@ void Mesh::Render(RenderMode mode) const {
     GLenum primitive_type = mode == RenderMode_Lines ? GL_LINES : GL_TRIANGLES;
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
 
-    auto &geom = ActiveGeometry();
-    uint num_indices = mode == RenderMode_Lines ? geom.LineIndices.size() : geom.TriangleIndices.size();
+    uint num_indices = ActiveGeometry().GetIndices(mode).size();
     if (Transforms.size() == 1) {
         glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
     } else {
         glDrawElementsInstanced(primitive_type, num_indices, GL_UNSIGNED_INT, 0, Transforms.size());
     }
-}
-
-void Mesh::SetPosition(const vec3 &position) {
-    for (auto &transform : Transforms) {
-        transform[3][0] = position.x;
-        transform[3][1] = position.y;
-        transform[3][2] = position.z;
-    }
-}
-void Mesh::SetTransform(const mat4 &new_transform) {
-    for (auto &transform : Transforms) transform = new_transform;
-}
-void Mesh::SetColor(const vec4 &color) {
-    Colors.clear();
-    Colors.resize(Transforms.size(), color);
 }

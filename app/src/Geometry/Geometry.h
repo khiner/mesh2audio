@@ -29,26 +29,56 @@ struct Geometry {
     void Save(fs::path file_path) const; // Export the mesh to a .obj file.
     void Load(fs::path file_path);
 
-    bool Empty() const { return Vertices.empty(); }
+    inline bool Empty() const { return Vertices.empty(); }
+    inline const std::vector<glm::vec3> &GetVertices() const { return Vertices; }
+    inline const std::vector<glm::vec3> &GetNormals() const { return Normals; }
+    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode_Lines ? LineIndices : TriangleIndices; }
+    inline const glm::vec3 &GetVertex(uint index) const { return Vertices[index]; }
+    inline const glm::vec3 &GetNormal(uint index) const { return Normals[index]; }
 
-    void Center();
-    void Clear();
-    void SetGeometryData(const GeometryData &);
+    void ClearNormals() {
+        Normals.clear();
+        Dirty = true;
+    }
 
-    std::pair<glm::vec3, glm::vec3> ComputeBounds(); // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
+    void Center() {
+        const auto [min, max] = ComputeBounds();
+        for (glm::vec3 &v : Vertices) v -= (min + max) / 2.0f;
+        Dirty = true;
+    }
+
+    void Clear() {
+        Vertices.clear();
+        Normals.clear();
+        TriangleIndices.clear();
+        LineIndices.clear();
+        Dirty = true;
+    }
+
+    void SetGeometryData(const GeometryData &geom_data) {
+        Clear();
+        Vertices.assign(geom_data.Vertices.begin(), geom_data.Vertices.end());
+        TriangleIndices.assign(geom_data.Indices.begin(), geom_data.Indices.end());
+        ComputeNormals();
+    }
+
+    std::pair<glm::vec3, glm::vec3> ComputeBounds() const; // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
     void ComputeNormals(); // If `Normals` is empty, compute the normals for each triangle.
-    void ComputeLineIndices();
 
     void ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices, uint slices, bool closed = false);
 
     void EnableVertexAttributes() const;
     void Generate();
     void Delete() const;
-    void BindData(RenderMode render_mode) const;
 
+    void BindData(RenderMode) const;
+    void PrepareRender(RenderMode);
+
+    GLuint VertexBufferId, NormalBufferId, TriangleIndexBufferId, LineIndexBufferId;
+
+protected:
     std::vector<glm::vec3> Vertices, Normals;
     std::vector<uint> TriangleIndices, LineIndices;
 
-    GLuint VertexBufferId, NormalBufferId, TriangleIndexBufferId, LineIndexBufferId;
-    bool Dirty{false};
+    mutable bool Dirty{true};
 };

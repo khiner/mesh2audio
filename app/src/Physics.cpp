@@ -15,7 +15,7 @@ static glm::mat4 Rp3d2Glm(const rp3d::Transform &transform) {
     return result;
 }
 
-static rp3d::Transform Glm2Rp3d(glm::mat4 &transform) {
+static rp3d::Transform Glm2Rp3d(glm::mat4 transform) {
     rp3d::Transform result;
     result.setFromOpenGL(&transform[0][0]);
     return result;
@@ -69,7 +69,7 @@ Physics::~Physics() {
 
 void Physics::AddRigidBody(Mesh *mesh) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
-    rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->Triangles.Vertices);
+    rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
     // GeometryData ch_geom_data = ConvexHull::Generate(mesh->Vertices);
@@ -90,7 +90,7 @@ void Physics::AddRigidBody(Mesh *mesh) {
     // auto [geom_min, geom_max] = mesh->ComputeBounds();
     // auto *shape = PhysicsCommon.createBoxShape(Glm2Rp3d((geom_max - geom_min) * 0.5f));
 
-    auto *body = World->createRigidBody(Glm2Rp3d(mesh->Transforms[0]));
+    auto *body = World->createRigidBody(Glm2Rp3d(mesh->GetTransform()));
     body->setMass(1.f);
     body->addCollider(shape, {});
     body->setIsAllowedToSleep(false);

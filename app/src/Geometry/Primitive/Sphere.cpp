@@ -51,5 +51,4 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
 
     Normals.assign(Vertices.begin(), Vertices.end());
     for (auto &vertex : Vertices) vertex *= radius;
-    ComputeLineIndices();
 }

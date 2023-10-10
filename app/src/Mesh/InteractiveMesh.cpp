@@ -54,7 +54,7 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 
     ActiveGeometryMode = mode;
     if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
-        ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.Vertices, ConvexHull::Mode::RP3D));
+        ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
     } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
         TetGenerator.Launch();
     }
@@ -102,6 +102,8 @@ static void SetColor(const float to[], float result[]) {
 
 void InteractiveMesh::UpdateExcitableVertexColors() {
     if (ActiveGeometryMode == GeometryMode_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
+        std::vector<vec4> colors;
+        colors.reserve(ExcitableVertexIndices.size());
         for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
             // todo update to use vec4 for all colors.
             static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
@@ -117,33 +119,43 @@ void InteractiveMesh::UpdateExcitableVertexColors() {
             } else {
                 ::SetColor(ExcitableVertexColor, vertex_color);
             }
-            ExcitableVertexArrows.Colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
+            colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
         }
+        ExcitableVertexArrows.SetColors(std::move(colors));
     }
 }
 
 void InteractiveMesh::UpdateExcitableVertices() {
-    ExcitableVertexArrows.Transforms.clear();
-    ExcitableVertexArrows.Colors.clear();
     ExcitableVertexIndices.clear();
-    if (Tets.Vertices.empty()) return;
+    if (Tets.GetVertices().empty()) {
+        ExcitableVertexArrows.ClearTransforms();
+        ExcitableVertexArrows.ClearColors();
+        return;
+    }
 
     // Linearly sample excitable vertices from all available vertices.
     ExcitableVertexIndices.resize(NumExcitableVertices);
     for (int i = 0; i < NumExcitableVertices; i++) {
         const float t = float(i) / (NumExcitableVertices - 1);
-        ExcitableVertexIndices[i] = int(t * (Tets.Vertices.size() - 1));
+        ExcitableVertexIndices[i] = int(t * (Tets.GetVertices().size() - 1));
     }
+
+    std::vector<mat4> transforms;
+    std::vector<vec4> colors;
+    transforms.reserve(ExcitableVertexIndices.size());
+    colors.reserve(ExcitableVertexIndices.size());
 
     // Point arrows at each excitable vertex.
     float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
     mat4 scale = glm::scale(Identity, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
-        mat4 translate = glm::translate(Identity, Tets.Vertices[vertex_index]);
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(Tets.Normals[vertex_index])));
-        ExcitableVertexArrows.Transforms.push_back({translate * rotate * scale});
-        ExcitableVertexArrows.Colors.push_back({1, 1, 1, 1});
+        mat4 translate = glm::translate(Identity, Tets.GetVertex(vertex_index));
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(Tets.GetNormal(vertex_index))));
+        transforms.push_back({translate * rotate * scale});
+        colors.push_back({1, 1, 1, 1});
     }
+    ExcitableVertexArrows.SetTransforms(std::move(transforms));
+    ExcitableVertexArrows.SetColors(std::move(colors));
 }
 
 void InteractiveMesh::LoadRealImpact() {
@@ -155,17 +167,22 @@ void InteractiveMesh::UpdateTets() {
     if (ActiveGeometryMode == GeometryMode_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
 
     Tets.Clear();
+
+    std::vector<vec3> vertices(TetGenResult->numberofpoints);
     for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
-        Tets.Vertices.push_back({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
+        vertices[i] = {TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]};
     }
 
+    std::vector<uint> triangle_indices;
     for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
         const auto &tri_indices = TetGenResult->trifacelist;
         const uint tri_i = i * 3;
         // Order of triangle indices important for normal calculation.
         const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 2], c = tri_indices[tri_i + 1];
-        Tets.TriangleIndices.insert(Tets.TriangleIndices.end(), {a, b, c});
+        triangle_indices.insert(triangle_indices.end(), {a, b, c});
     }
+
+    Tets.SetGeometryData({std::move(vertices), std::move(triangle_indices)});
     Tets.ComputeNormals(); // todo better surface normals
 
     UpdateExcitableVertices();
@@ -174,16 +191,18 @@ void InteractiveMesh::UpdateTets() {
 void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
-    in.numberofpoints = Triangles.Vertices.size();
+    const auto &vertices = Triangles.GetVertices();
+    const auto &triangle_indices = Triangles.GetIndices(RenderMode_Smooth);
+    in.numberofpoints = vertices.size();
     in.pointlist = new REAL[in.numberofpoints * 3];
 
-    for (uint i = 0; i < Triangles.Vertices.size(); ++i) {
-        in.pointlist[i * 3] = Triangles.Vertices[i].x;
-        in.pointlist[i * 3 + 1] = Triangles.Vertices[i].y;
-        in.pointlist[i * 3 + 2] = Triangles.Vertices[i].z;
+    for (uint i = 0; i < vertices.size(); ++i) {
+        in.pointlist[i * 3] = vertices[i].x;
+        in.pointlist[i * 3 + 1] = vertices[i].y;
+        in.pointlist[i * 3 + 2] = vertices[i].z;
     }
 
-    in.numberoffacets = Triangles.TriangleIndices.size() / 3;
+    in.numberoffacets = triangle_indices.size() / 3;
     in.facetlist = new tetgenio::facet[in.numberoffacets];
 
     for (uint i = 0; i < uint(in.numberoffacets); ++i) {
@@ -192,9 +211,9 @@ void InteractiveMesh::GenerateTets() {
         f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
         f.polygonlist[0].numberofvertices = 3;
         f.polygonlist[0].vertexlist = new int[f.polygonlist[0].numberofvertices];
-        f.polygonlist[0].vertexlist[0] = Triangles.TriangleIndices[i * 3];
-        f.polygonlist[0].vertexlist[1] = Triangles.TriangleIndices[i * 3 + 1];
-        f.polygonlist[0].vertexlist[2] = Triangles.TriangleIndices[i * 3 + 2];
+        f.polygonlist[0].vertexlist[0] = triangle_indices[i * 3];
+        f.polygonlist[0].vertexlist[1] = triangle_indices[i * 3 + 1];
+        f.polygonlist[0].vertexlist[2] = triangle_indices[i * 3 + 2];
     }
 
     const string options = QualityTets ? "pq" : "p";
@@ -252,7 +271,7 @@ void InteractiveMesh::UpdateHoveredVertex() {
         const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
         const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
-        const auto &vertices = geometry.Vertices;
+        const auto &vertices = geometry.GetVertices();
         for (size_t i = 0; i < vertices.size(); i++) {
             const auto &v = vertices[i];
             const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
@@ -269,15 +288,16 @@ void InteractiveMesh::UpdateHoveredVertex() {
         }
     }
 
-    HoveredVertexArrow.Transforms.clear();
-    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.Vertices.size())) {
+    std::vector<mat4> transforms;
+    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.GetVertices().size())) {
         // Point the arrow at the hovered vertex.
         float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
         mat4 scale = glm::scale(Identity, vec3{scale_factor});
-        mat4 translate = glm::translate(Identity, geometry.Vertices[HoveredVertexIndex]);
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(geometry.Normals[HoveredVertexIndex])));
-        HoveredVertexArrow.Transforms.push_back({translate * rotate * scale});
+        mat4 translate = glm::translate(Identity, geometry.GetVertex(HoveredVertexIndex));
+        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(geometry.GetNormal(HoveredVertexIndex))));
+        transforms.push_back({translate * rotate * scale});
     }
+    HoveredVertexArrow.SetTransforms(std::move(transforms));
 }
 
 void InteractiveMesh::Update() {
@@ -288,7 +308,7 @@ void InteractiveMesh::Update() {
 
 void InteractiveMesh::Render() {
     const auto &geometry = ActiveGeometry();
-    const auto &vertices = geometry.Vertices;
+    const auto &vertices = geometry.GetVertices();
 
     // Handle mouse interactions.
     const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
@@ -360,12 +380,12 @@ void InteractiveMesh::RenderConfig() {
                 const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
                 if (HasTets()) {
                     Checkbox("Show excitable vertices", &ShowExcitableVertices);
-                    if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.Vertices.size())))) {
+                    if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.GetVertices().size())))) {
                         UpdateExcitableVertices();
                     }
                     Text(
                         "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
-                        Tets.Vertices.size(), Tets.TriangleIndices.size()
+                        Tets.GetVertices().size(), Tets.GetIndices(RenderMode_Smooth).size()
                     );
                 } else {
                     if (!can_generate_tet_mesh) {
@@ -380,7 +400,7 @@ void InteractiveMesh::RenderConfig() {
                 if (HasConvexHull()) {
                     Text(
                         "Current convex hull:\n\tVertices: %lu\n\tIndices: %lu",
-                        ConvexHull.Vertices.size(), ConvexHull.TriangleIndices.size()
+                        ConvexHull.GetVertices().size(), ConvexHull.GetIndices(RenderMode_Smooth).size()
                     );
                 }
                 if (Button(HasConvexHull() ? "Regenerate convex hull" : "Generate convex hull")) {
@@ -437,7 +457,7 @@ void InteractiveMesh::RenderConfig() {
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
-                const auto &vertex = ActiveGeometry().Vertices[HoveredVertexIndex];
+                const auto &vertex = ActiveGeometry().GetVertex(HoveredVertexIndex);
                 Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 
@@ -460,12 +480,15 @@ void InteractiveMesh::RenderConfig() {
             if (RealImpactLoader.Render() && RealImpact) {
                 RealImpactListenerPoints.Generate();
                 const size_t num_points = RealImpact->NumListenerPoints();
-                RealImpactListenerPoints.Transforms.clear();
-                RealImpactListenerPoints.Colors.clear();
+
+                std::vector<mat4> transforms;
+                std::vector<vec4> colors;
                 for (size_t i = 0; i < num_points; i++) {
-                    RealImpactListenerPoints.Transforms.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
-                    RealImpactListenerPoints.Colors.push_back({1, 1, 1, 1});
+                    transforms.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
+                    colors.push_back({1, 1, 1, 1});
                 }
+                RealImpactListenerPoints.SetTransforms(std::move(transforms));
+                RealImpactListenerPoints.SetColors(std::move(colors));
             }
             EndTabItem();
         }

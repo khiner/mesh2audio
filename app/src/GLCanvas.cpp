@@ -43,7 +43,7 @@ static void CreateRenderbuffer(unsigned int &id, GLenum format, uint samples, ui
     }
 }
 
-void GLCanvas::SetupRender(uint width, uint height, float r, float g, float b, float a) {
+void GLCanvas::PrepareRender(uint width, uint height, float r, float g, float b, float a) {
     if (width != Width || height != Height) {
         Destroy();
         Width = width;

@@ -122,7 +122,7 @@ void Scene::Render() {
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-    Canvas.SetupRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+    Canvas.PrepareRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
 
     glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
@@ -143,7 +143,7 @@ void Scene::Render() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    for (auto *mesh : Meshes) mesh->SetupRender(ActiveRenderMode);
+    for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode_Points) glPointSize(PointRadius);
@@ -158,7 +158,7 @@ void Scene::Render() {
         // glUniform4fv(GridLinesShaderProgram->GetUniform(un::GridLinesColor), 1, &GridLinesColor[0]);
 
         glEnable(GL_BLEND);
-        Grid->SetupRender(RenderMode_Smooth);
+        Grid->PrepareRender(RenderMode_Smooth);
         Grid->Render(RenderMode_Smooth);
         glDisable(GL_BLEND);
     }
@@ -228,8 +228,8 @@ void Scene::RenderConfig() {
                     // See `grid_lines_vertex.glsl` and `grid_lines_fragment.glsl` for details.
                     // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
                     Grid = std::make_unique<Mesh>(Rect{{1, 1, 0}, {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}});
-                    Grid->Colors.clear();
-                    Grid->ActiveGeometry().Normals.clear();
+                    Grid->ClearColors();
+                    Grid->ActiveGeometry().ClearNormals();
                     Grid->Generate();
                 } else {
                     Grid->Delete();

@@ -22,6 +22,7 @@ void Geometry::EnableVertexAttributes() const {
     glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
     glEnableVertexAttribArray(NormalSlot);
     glVertexAttribPointer(NormalSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+    Dirty = true;
 }
 
 void Geometry::Generate() {
@@ -38,20 +39,60 @@ void Geometry::Delete() const {
     glDeleteBuffers(1, &LineIndexBufferId);
 }
 
+struct Line {
+    Line(uint a, uint b) : v1(std::min(a, b)), v2(std::max(a, b)) {}
+
+    struct Hash {
+        std::size_t operator()(const Line &line) const {
+            return std::hash<uint>()(line.v1) ^ (std::hash<uint>()(line.v2) << 1);
+        }
+    };
+
+    inline bool operator==(const Line &other) const { return v1 == other.v1 && v2 == other.v2; }
+
+    uint v1, v2;
+};
+
+void Geometry::PrepareRender(RenderMode mode) {
+    if (mode == RenderMode_Lines && LineIndices.empty()) {
+        // Compute unique lines from the triangle indices.
+        std::unordered_set<Line, Line::Hash> lines;
+        for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
+            lines.insert({TriangleIndices[i], TriangleIndices[i + 1]});
+            lines.insert({TriangleIndices[i + 1], TriangleIndices[i + 2]});
+            lines.insert({TriangleIndices[i + 2], TriangleIndices[i]});
+        }
+
+        LineIndices.resize(lines.size() * 2);
+        auto it = LineIndices.begin();
+        for (const auto &line : lines) {
+            (*it++) = line.v1;
+            (*it++) = line.v2;
+        }
+        Dirty = true;
+    } else if (mode != RenderMode_Lines && !LineIndices.empty()) {
+        LineIndices.clear(); // Save memory.
+        Dirty = true;
+    }
+}
+
 void Geometry::BindData(RenderMode render_mode) const {
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Vertices.size(), Vertices.data(), GL_STATIC_DRAW);
-    if (!Normals.empty()) {
-        glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Normals.size(), Normals.data(), GL_STATIC_DRAW);
+    if (Dirty) {
+        glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Vertices.size(), Vertices.data(), GL_STATIC_DRAW);
+        if (!Normals.empty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Normals.size(), Normals.data(), GL_STATIC_DRAW);
+        }
+        if (render_mode == RenderMode_Lines) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, LineIndexBufferId);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * LineIndices.size(), LineIndices.data(), GL_STATIC_DRAW);
+        } else {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleIndexBufferId);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * TriangleIndices.size(), TriangleIndices.data(), GL_STATIC_DRAW);
+        }
     }
-    if (render_mode == RenderMode_Lines) {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, LineIndexBufferId);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * LineIndices.size(), LineIndices.data(), GL_STATIC_DRAW);
-    } else {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleIndexBufferId);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * TriangleIndices.size(), TriangleIndices.data(), GL_STATIC_DRAW);
-    }
+    Dirty = false;
 }
 
 void Geometry::Load(fs::path file_path) {
@@ -98,7 +139,7 @@ void Geometry::Load(fs::path file_path) {
     ComputeNormals();
 }
 
-std::pair<vec3, vec3> Geometry::ComputeBounds() {
+std::pair<vec3, vec3> Geometry::ComputeBounds() const {
     vec3 min{INFINITY, INFINITY, INFINITY};
     vec3 max{-INFINITY, -INFINITY, -INFINITY};
     for (const vec3 &v : Vertices) {
@@ -110,18 +151,6 @@ std::pair<vec3, vec3> Geometry::ComputeBounds() {
         if (v.z > max.z) max.z = v.z;
     }
     return {min, max};
-}
-
-void Geometry::Center() {
-    const auto [min, max] = ComputeBounds();
-    for (vec3 &v : Vertices) v -= (min + max) / 2.0f;
-}
-
-void Geometry::Clear() {
-    Vertices.clear();
-    Normals.clear();
-    TriangleIndices.clear();
-    LineIndices.clear();
 }
 
 void Geometry::Save(fs::path file_path) const {
@@ -144,13 +173,6 @@ void Geometry::Save(fs::path file_path) const {
     out.close();
 }
 
-void Geometry::SetGeometryData(const GeometryData &geom_data) {
-    Clear();
-    Vertices.assign(geom_data.Vertices.begin(), geom_data.Vertices.end());
-    TriangleIndices.assign(geom_data.Indices.begin(), geom_data.Indices.end());
-    ComputeNormals();
-}
-
 void Geometry::ComputeNormals() {
     if (!Normals.empty()) return;
 
@@ -164,36 +186,7 @@ void Geometry::ComputeNormals() {
         const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
         for (int j = 0; j < 3; j++) Normals[TriangleIndices[i + j]] = normal;
     }
-}
-
-struct Line {
-    Line(uint a, uint b) : v1(std::min(a, b)), v2(std::max(a, b)) {}
-
-    struct Hash {
-        std::size_t operator()(const Line &line) const {
-            return std::hash<uint>()(line.v1) ^ (std::hash<uint>()(line.v2) << 1);
-        }
-    };
-
-    inline bool operator==(const Line &other) const { return v1 == other.v1 && v2 == other.v2; }
-
-    uint v1, v2;
-};
-
-void Geometry::ComputeLineIndices() {
-    std::unordered_set<Line, Line::Hash> lines;
-    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
-        lines.insert({TriangleIndices[i], TriangleIndices[i + 1]});
-        lines.insert({TriangleIndices[i + 1], TriangleIndices[i + 2]});
-        lines.insert({TriangleIndices[i + 2], TriangleIndices[i]});
-    }
-
-    LineIndices.resize(lines.size() * 2);
-    auto it = LineIndices.begin();
-    for (const auto &line : lines) {
-        (*it++) = line.v1;
-        (*it++) = line.v2;
-    }
+    Dirty = true;
 }
 
 void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint slices, bool closed) {
@@ -237,32 +230,38 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const uint base_index = slice * profile_size_no_connect + i;
             const uint next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
-            TriangleIndices.insert(TriangleIndices.end(), {
-                // First triangle
-                base_index,
-                next_base_index + 1,
-                base_index + 1,
-                // Second triangle
-                base_index,
-                next_base_index,
-                next_base_index + 1,
-            });
+            TriangleIndices.insert(
+                TriangleIndices.end(),
+                {
+                    // First triangle
+                    base_index,
+                    next_base_index + 1,
+                    base_index + 1,
+                    // Second triangle
+                    base_index,
+                    next_base_index,
+                    next_base_index + 1,
+                }
+            );
         }
     }
 
     // Connect the top and bottom.
     if (!closed) {
         for (uint slice = 0; slice < slices; slice++) {
-            TriangleIndices.insert(TriangleIndices.end(), {
-                // Top
-                uint(Vertices.size() - 2),
-                slice * profile_size_no_connect,
-                ((slice + 1) % slices) * profile_size_no_connect,
-                // Bottom
-                uint(Vertices.size() - 1),
-                slice * profile_size_no_connect + n - 3,
-                ((slice + 1) % slices) * profile_size_no_connect + n - 3,
-            });
+            TriangleIndices.insert(
+                TriangleIndices.end(),
+                {
+                    // Top
+                    uint(Vertices.size() - 2),
+                    slice * profile_size_no_connect,
+                    ((slice + 1) % slices) * profile_size_no_connect,
+                    // Bottom
+                    uint(Vertices.size() - 1),
+                    slice * profile_size_no_connect + n - 3,
+                    ((slice + 1) % slices) * profile_size_no_connect + n - 3,
+                }
+            );
         }
     }
 
