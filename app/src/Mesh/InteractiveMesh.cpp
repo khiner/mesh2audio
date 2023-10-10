@@ -54,7 +54,7 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 
     ActiveGeometryMode = mode;
     if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
-        ConvexHull.SetGeometryData(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
+        ConvexHull.SetTriangleBuffers(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
     } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
         TetGenerator.Launch();
     }
@@ -182,8 +182,7 @@ void InteractiveMesh::UpdateTets() {
         triangle_indices.insert(triangle_indices.end(), {a, b, c});
     }
 
-    Tets.SetGeometryData({std::move(vertices), std::move(triangle_indices)});
-    Tets.ComputeNormals(); // todo better surface normals
+    Tets.SetTriangleBuffers(std::move(vertices), std::move(triangle_indices));
 
     UpdateExcitableVertices();
 }

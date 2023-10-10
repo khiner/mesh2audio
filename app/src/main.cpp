@@ -135,11 +135,10 @@ int main(int, char **) {
 
     if (!MainScene) MainScene = std::make_unique<Scene>();
     MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
-    MainMesh->Generate();
-
     // Alternatively, we could initialize with a mesh obj file:
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "obj" / "bell" / "english.obj");
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
+    MainMesh->Generate();
 
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

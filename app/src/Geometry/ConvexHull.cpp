@@ -5,13 +5,14 @@
 
 static rp3d::PhysicsCommon pc{};
 
-static GeometryData ToGeometryData(const quickhull::ConvexHull<float> &hull) {
+static TriangleBuffers ToTriangleBuffers(const quickhull::ConvexHull<float> &hull) {
     const auto &vertices = hull.getVertexBuffer();
     const auto &indices = hull.getIndexBuffer();
-    GeometryData data;
-    for (const auto &vertex : vertices) data.Vertices.emplace_back(vertex.x, vertex.y, vertex.z);
-    for (size_t i = 0; i < indices.size(); i++) data.Indices.emplace_back(indices[i]);
-    return data;
+    std::vector<glm::vec3> tri_verts; // Return value.
+    std::vector<uint> tri_indices; // Return value.
+    for (const auto &vertex : vertices) tri_verts.emplace_back(vertex.x, vertex.y, vertex.z);
+    for (size_t i = 0; i < indices.size(); i++) tri_indices.emplace_back(indices[i]);
+    return {std::move(tri_verts), std::move(tri_indices)};
 }
 
 reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm::vec3> &points) {
@@ -25,7 +26,7 @@ reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm
     return convex_mesh;
 }
 
-static GeometryData ConvexMeshToGeometryData(reactphysics3d::ConvexMesh *mesh) {
+static TriangleBuffers ConvexMeshToTriangleBuffers(reactphysics3d::ConvexMesh *mesh) {
     // Copy the vertices.
     const auto &half_edge = mesh->getHalfEdgeStructure();
     const uint num_vertices = half_edge.getNbVertices();
@@ -54,12 +55,12 @@ static GeometryData ConvexMeshToGeometryData(reactphysics3d::ConvexMesh *mesh) {
     return {std::move(tri_verts), std::move(tri_indices)};
 }
 
-GeometryData ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
+TriangleBuffers ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
     if (mode == RP3D) {
         auto *convex_mesh = GenerateConvexMesh(points);
-        return ConvexMeshToGeometryData(convex_mesh);
+        return ConvexMeshToTriangleBuffers(convex_mesh);
     } else {
         static quickhull::QuickHull<float> qh{}; // Could be double as well.
-        return ToGeometryData(qh.getConvexHull(&points[0][0], points.size(), true, false));
+        return ToTriangleBuffers(qh.getConvexHull(&points[0][0], points.size(), true, false));
     }
 }

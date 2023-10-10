@@ -35,7 +35,7 @@ Physics::~Physics() {
 
 // static std::unique_ptr<rp3d::PolygonVertexArray> PolygonVertices;
 // static std::vector<rp3d::PolygonVertexArray::PolygonFace> PolygonFaces;
-// rp3d::PolyhedronMesh *GeometryDataToPolyhedronMesh(const GeometryData &data) {
+// rp3d::PolyhedronMesh *TriangleBuffersToPolyhedronMesh(const TriangleBuffers &data) {
 //     using namespace rp3d;
 //     const auto &vertices = data.Vertices;
 //     const auto &indices = data.Indices;
@@ -72,8 +72,8 @@ void Physics::AddRigidBody(Mesh *mesh) {
     rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
-    // GeometryData ch_geom_data = ConvexHull::Generate(mesh->Vertices);
-    // auto *polyhedral_mesh = GeometryDataToPolyhedronMesh(ch_geom_data);
+    // TriangleBuffers ch_tri_buffers = ConvexHull::Generate(mesh->Vertices);
+    // auto *polyhedral_mesh = TriangleBuffersToPolyhedronMesh(ch_tri_buffers);
     // auto *shape = PhysicsCommon.createConvexMeshShape(polyhedral_mesh);
 
     // Just using a bounding box for now.

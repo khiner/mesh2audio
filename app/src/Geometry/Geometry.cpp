@@ -8,10 +8,8 @@
 using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
 using std::string;
 
-Geometry::Geometry(uint num_vertices, uint num_normals, uint num_indices)
-    : Vertices(num_vertices), Normals(num_normals), TriangleIndices(num_indices) {}
-
-Geometry::Geometry(fs::path file_path) : Geometry() { Load(file_path); }
+Geometry::Geometry() {}
+Geometry::Geometry(fs::path file_path) { Load(file_path); }
 
 void Geometry::EnableVertexAttributes() const {
     static const GLuint VertexSlot = 0;
@@ -57,10 +55,10 @@ void Geometry::PrepareRender(RenderMode mode) {
     if (mode == RenderMode_Lines && LineIndices.empty()) {
         // Compute unique lines from the triangle indices.
         std::unordered_set<Line, Line::Hash> lines;
-        for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
-            lines.insert({TriangleIndices[i], TriangleIndices[i + 1]});
-            lines.insert({TriangleIndices[i + 1], TriangleIndices[i + 2]});
-            lines.insert({TriangleIndices[i + 2], TriangleIndices[i]});
+        for (size_t i = 0; i < Indices.size(); i += 3) {
+            lines.insert({Indices[i], Indices[i + 1]});
+            lines.insert({Indices[i + 1], Indices[i + 2]});
+            lines.insert({Indices[i + 2], Indices[i]});
         }
 
         LineIndices.resize(lines.size() * 2);
@@ -89,7 +87,7 @@ void Geometry::BindData(RenderMode render_mode) const {
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * LineIndices.size(), LineIndices.data(), GL_STATIC_DRAW);
         } else {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleIndexBufferId);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * TriangleIndices.size(), TriangleIndices.data(), GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * Indices.size(), Indices.data(), GL_STATIC_DRAW);
         }
     }
     Dirty = false;
@@ -128,9 +126,9 @@ void Geometry::Load(fs::path file_path) {
                 ungetc(second_char, fp);
                 fscanf(fp, "%d %d/%d %d/%d", &ignore, &fy, &ignore, &fz, &ignore);
             }
-            TriangleIndices.push_back(fx - 1);
-            TriangleIndices.push_back(fy - 1);
-            TriangleIndices.push_back(fz - 1);
+            Indices.push_back(fx - 1);
+            Indices.push_back(fy - 1);
+            Indices.push_back(fz - 1);
         }
     }
     fclose(fp);
@@ -164,10 +162,10 @@ void Geometry::Save(fs::path file_path) const {
     for (const vec3 &n : Normals) {
         out << "vn " << n.x << " " << n.y << " " << n.z << "\n";
     }
-    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
-        out << "f " << TriangleIndices[i] + 1 << "//" << TriangleIndices[i] + 1 << " "
-            << TriangleIndices[i + 1] + 1 << "//" << TriangleIndices[i + 1] + 1 << " "
-            << TriangleIndices[i + 2] + 1 << "//" << TriangleIndices[i + 2] + 1 << "\n";
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        out << "f " << Indices[i] + 1 << "//" << Indices[i] + 1 << " "
+            << Indices[i + 1] + 1 << "//" << Indices[i + 1] + 1 << " "
+            << Indices[i + 2] + 1 << "//" << Indices[i + 2] + 1 << "\n";
     }
 
     out.close();
@@ -179,12 +177,12 @@ void Geometry::ComputeNormals() {
     Normals.resize(Vertices.size());
 
     // Compute normals for each triangle.
-    for (size_t i = 0; i < TriangleIndices.size(); i += 3) {
-        const vec3 &v0 = Vertices[TriangleIndices[i]];
-        const vec3 &v1 = Vertices[TriangleIndices[i + 1]];
-        const vec3 &v2 = Vertices[TriangleIndices[i + 2]];
+    for (size_t i = 0; i < Indices.size(); i += 3) {
+        const vec3 &v0 = Vertices[Indices[i]];
+        const vec3 &v1 = Vertices[Indices[i + 1]];
+        const vec3 &v2 = Vertices[Indices[i + 2]];
         const vec3 normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-        for (int j = 0; j < 3; j++) Normals[TriangleIndices[i + j]] = normal;
+        for (int j = 0; j < 3; j++) Normals[Indices[i + j]] = normal;
     }
     Dirty = true;
 }
@@ -205,7 +203,7 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
     const int num_indices = slices * (profile_size_no_connect + (closed ? -1 : 0)) * 6;
     Vertices.reserve(num_vertices);
     Normals.reserve(num_vertices);
-    TriangleIndices.reserve(num_indices);
+    Indices.reserve(num_indices);
 
     for (uint slice = 0; slice < slices; slice++) {
         const float __angle = 2 * float(slice) / slices;
@@ -230,8 +228,8 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
         for (int i = 0; i < profile_size_no_connect - 1; i++) {
             const uint base_index = slice * profile_size_no_connect + i;
             const uint next_base_index = ((slice + 1) % slices) * profile_size_no_connect + i;
-            TriangleIndices.insert(
-                TriangleIndices.end(),
+            Indices.insert(
+                Indices.end(),
                 {
                     // First triangle
                     base_index,
@@ -249,8 +247,8 @@ void Geometry::ExtrudeProfile(const std::vector<vec2> &profile_vertices, uint sl
     // Connect the top and bottom.
     if (!closed) {
         for (uint slice = 0; slice < slices; slice++) {
-            TriangleIndices.insert(
-                TriangleIndices.end(),
+            Indices.insert(
+                Indices.end(),
                 {
                     // Top
                     uint(Vertices.size() - 2),

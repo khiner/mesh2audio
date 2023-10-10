@@ -7,7 +7,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
-#include "GeometryData.h"
+#include "GeometryBuffers.h"
 
 inline static const glm::mat4 Identity(1.f);
 inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
@@ -21,8 +21,8 @@ enum RenderMode {
 };
 
 // todo use OpenMesh as the main mesh data structure, and derive all fields from it.
-struct Geometry {
-    Geometry(uint num_vertices = 0, uint num_normals = 0, uint num_indices = 0);
+struct Geometry : GeometryBuffers {
+    Geometry();
     Geometry(fs::path file_path);
     virtual ~Geometry() = default;
 
@@ -30,9 +30,8 @@ struct Geometry {
     void Load(fs::path file_path);
 
     inline bool Empty() const { return Vertices.empty(); }
-    inline const std::vector<glm::vec3> &GetVertices() const { return Vertices; }
     inline const std::vector<glm::vec3> &GetNormals() const { return Normals; }
-    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode_Lines ? LineIndices : TriangleIndices; }
+    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode_Lines ? LineIndices : Indices; }
     inline const glm::vec3 &GetVertex(uint index) const { return Vertices[index]; }
     inline const glm::vec3 &GetNormal(uint index) const { return Normals[index]; }
 
@@ -50,15 +49,21 @@ struct Geometry {
     void Clear() {
         Vertices.clear();
         Normals.clear();
-        TriangleIndices.clear();
+        Indices.clear();
         LineIndices.clear();
         Dirty = true;
     }
 
-    void SetGeometryData(const GeometryData &geom_data) {
+    void SetTriangleBuffers(const TriangleBuffers &tri_buffers) {
         Clear();
-        Vertices.assign(geom_data.Vertices.begin(), geom_data.Vertices.end());
-        TriangleIndices.assign(geom_data.Indices.begin(), geom_data.Indices.end());
+        Vertices = tri_buffers.GetVertices();
+        Indices = tri_buffers.GetIndices();
+        ComputeNormals();
+    }
+    void SetTriangleBuffers(std::vector<glm::vec3> &&vertices, std::vector<uint> &&indices) {
+        Clear();
+        Vertices = std::move(vertices);
+        Indices = std::move(indices);
         ComputeNormals();
     }
 
@@ -74,11 +79,9 @@ struct Geometry {
     void BindData(RenderMode) const;
     void PrepareRender(RenderMode);
 
-    GLuint VertexBufferId, NormalBufferId, TriangleIndexBufferId, LineIndexBufferId;
-
 protected:
-    std::vector<glm::vec3> Vertices, Normals;
-    std::vector<uint> TriangleIndices, LineIndices;
-
     mutable bool Dirty{true};
+
+private:
+    GLuint VertexBufferId, NormalBufferId, TriangleIndexBufferId, LineIndexBufferId;
 };

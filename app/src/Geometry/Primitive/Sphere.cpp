@@ -34,19 +34,19 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
     // clang-format on
 
     for (auto &vertex : InitialVertices) AddVertex(Vertices, vertex);
-    TriangleIndices.assign(InitialIndices.begin(), InitialIndices.end());
+    Indices.assign(InitialIndices.begin(), InitialIndices.end());
 
     std::unordered_map<uint, uint> mid_index_cache;
     for (int i = 0; i < recursion_level; i++) {
         std::vector<uint> new_indices;
-        for (size_t j = 0; j < TriangleIndices.size(); j += 3) {
-            uint a = TriangleIndices[j], b = TriangleIndices[j + 1], c = TriangleIndices[j + 2];
+        for (size_t j = 0; j < Indices.size(); j += 3) {
+            uint a = Indices[j], b = Indices[j + 1], c = Indices[j + 2];
             uint ab = GetMidIndex(a, b, Vertices, mid_index_cache);
             uint bc = GetMidIndex(b, c, Vertices, mid_index_cache);
             uint ca = GetMidIndex(c, a, Vertices, mid_index_cache);
             new_indices.insert(new_indices.end(), {a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca});
         }
-        TriangleIndices.assign(new_indices.begin(), new_indices.end());
+        Indices.assign(new_indices.begin(), new_indices.end());
     }
 
     Normals.assign(Vertices.begin(), Vertices.end());
