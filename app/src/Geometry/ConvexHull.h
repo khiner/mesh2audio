@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TriangleBuffers.h"
+#include "MeshBuffers.h"
 
 namespace reactphysics3d {
 class ConvexMesh;
@@ -12,7 +12,7 @@ struct ConvexHull {
         RP3D, // reactphysics3d
     };
 
-    static TriangleBuffers Generate(const std::vector<glm::vec3> &points, Mode mode = QuickHull);
+    static OpenMesh::PolyMesh_ArrayKernelT<> Generate(const std::vector<glm::vec3> &points, Mode mode = QuickHull);
 
     static reactphysics3d::ConvexMesh *GenerateConvexMesh(const std::vector<glm::vec3> &points);
 };

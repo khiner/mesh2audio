@@ -46,3 +46,5 @@ add_subdirectory(tetgen)
 #=================== reactphysics3d ===================
 
 add_subdirectory(reactphysics3d)
+
+add_subdirectory(OpenMesh)

@@ -76,7 +76,7 @@ int main(int, char **) {
     const int glew_result = glewInit();
     // GLEW_ERROR_NO_GLX_DISPLAY seems to be a false alarm - still works for me!
     if (glew_result != GLEW_OK && glew_result != GLEW_ERROR_NO_GLX_DISPLAY) {
-        std::cout << "Error initializing `glew`: Error " << glew_result << '\n';
+        std::cerr << "Error initializing `glew`: Error " << glew_result << '\n';
         return -1;
     }
 
@@ -137,6 +137,7 @@ int main(int, char **) {
     MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "svg" / "bell" / "std.svg");
     // Alternatively, we could initialize with a mesh obj file:
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "obj" / "bell" / "english.obj");
+    // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "obj" / "bunny.obj");
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
     MainMesh->Generate();
 
@@ -187,7 +188,9 @@ int main(int, char **) {
                     nfdfilteritem_t filter[] = {{"Mesh object", "obj"}, {"SVG profile", "svg"}};
                     nfdresult_t result = NFD_OpenDialog(&file_path, filter, 2, "res/");
                     if (result == NFD_OKAY) {
+                        MainMesh->Delete();
                         MainMesh = std::make_unique<InteractiveMesh>(*MainScene, file_path);
+                        MainMesh->Generate();
                         NFD_FreePath(file_path);
                     } else if (result != NFD_CANCEL) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
