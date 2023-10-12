@@ -11,30 +11,30 @@ using std::string;
 Geometry::Geometry() {}
 Geometry::Geometry(fs::path file_path) { Load(file_path); }
 
+void Geometry::Generate() {
+    VertexBuffer.Generate();
+    NormalBuffer.Generate();
+    TriangleIndexBuffer.Generate();
+    LineIndexBuffer.Generate();
+}
+
 void Geometry::EnableVertexAttributes() const {
     static const GLuint VertexSlot = 0;
     static const GLuint NormalSlot = 1;
-    glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
+    VertexBuffer.Bind();
     glEnableVertexAttribArray(VertexSlot);
     glVertexAttribPointer(VertexSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
+    NormalBuffer.Bind();
     glEnableVertexAttribArray(NormalSlot);
     glVertexAttribPointer(NormalSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
     Dirty = true;
 }
 
-void Geometry::Generate() {
-    glGenBuffers(1, &VertexBufferId);
-    glGenBuffers(1, &NormalBufferId);
-    glGenBuffers(1, &TriangleIndexBufferId);
-    glGenBuffers(1, &LineIndexBufferId);
-}
-
 void Geometry::Delete() const {
-    glDeleteBuffers(1, &VertexBufferId);
-    glDeleteBuffers(1, &NormalBufferId);
-    glDeleteBuffers(1, &TriangleIndexBufferId);
-    glDeleteBuffers(1, &LineIndexBufferId);
+    VertexBuffer.Delete();
+    NormalBuffer.Delete();
+    TriangleIndexBuffer.Delete();
+    LineIndexBuffer.Delete();
 }
 
 struct Line {
@@ -76,19 +76,10 @@ void Geometry::PrepareRender(RenderMode mode) {
 
 void Geometry::BindData(RenderMode render_mode) const {
     if (Dirty) {
-        glBindBuffer(GL_ARRAY_BUFFER, VertexBufferId);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Vertices.size(), Vertices.data(), GL_STATIC_DRAW);
-        if (!Normals.empty()) {
-            glBindBuffer(GL_ARRAY_BUFFER, NormalBufferId);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * Normals.size(), Normals.data(), GL_STATIC_DRAW);
-        }
-        if (render_mode == RenderMode_Lines) {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, LineIndexBufferId);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * LineIndices.size(), LineIndices.data(), GL_STATIC_DRAW);
-        } else {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleIndexBufferId);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint) * Indices.size(), Indices.data(), GL_STATIC_DRAW);
-        }
+        VertexBuffer.SetData(Vertices);
+        if (!Normals.empty()) NormalBuffer.SetData(Normals);
+        if (render_mode == RenderMode_Lines) LineIndexBuffer.SetData(LineIndices);
+        else TriangleIndexBuffer.SetData(Indices);
     }
     Dirty = false;
 }

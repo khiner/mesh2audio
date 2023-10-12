@@ -4,8 +4,8 @@ using glm::vec3, glm::vec4, glm::mat4;
 
 void Mesh::Generate() {
     VertexArray.Generate();
-    glGenBuffers(1, &ColorBufferId);
-    glGenBuffers(1, &TransformBufferId);
+    ColorBuffer.Generate();
+    TransformBuffer.Generate();
     for (const auto *geom : static_cast<const Mesh *>(this)->AllGeometries()) {
         const_cast<Geometry *>(geom)->Generate();
     }
@@ -14,8 +14,8 @@ void Mesh::Generate() {
 
 void Mesh::Delete() const {
     VertexArray.Delete();
-    glDeleteBuffers(1, &TransformBufferId);
-    glDeleteBuffers(1, &ColorBufferId);
+    TransformBuffer.Delete();
+    ColorBuffer.Delete();
     for (const auto *geom : AllGeometries()) geom->Delete();
 }
 
@@ -25,12 +25,12 @@ void Mesh::EnableVertexAttributes() const {
 
     static const GLuint ColorSlot = 2;
     static const GLuint TransformSlot = 3;
-    glBindBuffer(GL_ARRAY_BUFFER, ColorBufferId);
+    ColorBuffer.Bind();
     glEnableVertexAttribArray(ColorSlot);
     glVertexAttribPointer(ColorSlot, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), 0);
     glVertexAttribDivisor(ColorSlot, 1); // Attribute is updated once per instance.
 
-    glBindBuffer(GL_ARRAY_BUFFER, TransformBufferId);
+    TransformBuffer.Bind();
     // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
     for (int i = 0; i < 4; i++) {
         glEnableVertexAttribArray(TransformSlot + i);
@@ -45,11 +45,8 @@ void Mesh::BindData(RenderMode render_mode) const {
     ActiveGeometry().BindData(render_mode);
 
     if (Dirty) {
-        glBindBuffer(GL_ARRAY_BUFFER, TransformBufferId);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Transforms.size(), Transforms.data(), GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ARRAY_BUFFER, ColorBufferId);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * Colors.size(), Colors.data(), GL_STATIC_DRAW);
+        TransformBuffer.SetData(Transforms);
+        ColorBuffer.SetData(Colors);
     }
     Dirty = false;
 

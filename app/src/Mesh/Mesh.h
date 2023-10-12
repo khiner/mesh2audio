@@ -2,7 +2,7 @@
 
 #include "Geometry/Geometry.h"
 
-struct VertexArray {
+struct GLVertexArray {
     void Generate() { glGenVertexArrays(1, &Id); }
     void Delete() const { glDeleteVertexArrays(1, &Id); }
     void Bind() const { glBindVertexArray(Id); }
@@ -74,8 +74,9 @@ private:
     std::vector<glm::vec4> Colors{{1, 1, 1, 1}};
     std::vector<glm::mat4> Transforms{glm::mat4{1}};
 
-    VertexArray VertexArray;
-    GLuint ColorBufferId, TransformBufferId;
+    GLVertexArray VertexArray;
+    GLBuffer<glm::vec4, GL_ARRAY_BUFFER> ColorBuffer;
+    GLBuffer<glm::mat4, GL_ARRAY_BUFFER> TransformBuffer;
     mutable bool Dirty{true};
 
     void BindData(RenderMode render_mode = RenderMode_Smooth) const;
