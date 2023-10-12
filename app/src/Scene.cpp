@@ -229,7 +229,6 @@ void Scene::RenderConfig() {
                     // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
                     Grid = std::make_unique<Mesh>(Rect{{1, 1, 0}, {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}});
                     Grid->ClearColors();
-                    Grid->ActiveGeometry().ClearNormals();
                     Grid->Generate();
                 } else {
                     Grid->Delete();

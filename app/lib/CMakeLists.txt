@@ -35,14 +35,9 @@ include_directories(faust/compiler/generator/cpp)
 add_subdirectory(faust/build EXCLUDE_FROM_ALL)
 target_compile_definitions(dynamiclib PUBLIC LLVM_BUILD_UNIVERSAL=1)
 
-#=================== CDT ===================
+#=================== Others ===================
 
 add_subdirectory(CDT/CDT)
-
-#=================== tetgen ===================
-
 add_subdirectory(tetgen)
-
-#=================== reactphysics3d ===================
-
 add_subdirectory(reactphysics3d)
+add_subdirectory(OpenMesh)

@@ -55,3 +55,6 @@
 [submodule "app/lib/quickhull"]
 	path = app/lib/quickhull
 	url = git@github.com:akuukka/quickhull.git
+[submodule "app/lib/OpenMesh"]
+	path = app/lib/OpenMesh
+	url = https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh.git

@@ -5,14 +5,17 @@
 
 static rp3d::PhysicsCommon pc{};
 
-static TriangleBuffers ToTriangleBuffers(const quickhull::ConvexHull<float> &hull) {
+static OpenMesh::PolyMesh_ArrayKernelT<> ToOpenMesh(const quickhull::ConvexHull<float> &hull) {
+    OpenMesh::PolyMesh_ArrayKernelT<> open_mesh;
+
     const auto &vertices = hull.getVertexBuffer();
     const auto &indices = hull.getIndexBuffer();
-    std::vector<glm::vec3> tri_verts; // Return value.
-    std::vector<uint> tri_indices; // Return value.
-    for (const auto &vertex : vertices) tri_verts.emplace_back(vertex.x, vertex.y, vertex.z);
-    for (size_t i = 0; i < indices.size(); i++) tri_indices.emplace_back(indices[i]);
-    return {std::move(tri_verts), std::move(tri_indices)};
+    for (const auto &vertex : vertices) open_mesh.add_vertex({vertex.x, vertex.y, vertex.z});
+
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        open_mesh.add_face({open_mesh.vertex_handle(indices[i]), open_mesh.vertex_handle(indices[i + 1]), open_mesh.vertex_handle(indices[i + 2])});
+    }
+    return open_mesh;
 }
 
 reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm::vec3> &points) {
@@ -26,41 +29,40 @@ reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm
     return convex_mesh;
 }
 
-static TriangleBuffers ConvexMeshToTriangleBuffers(reactphysics3d::ConvexMesh *mesh) {
+static OpenMesh::PolyMesh_ArrayKernelT<> ConvexMeshToOpenMesh(reactphysics3d::ConvexMesh *mesh) {
     // Copy the vertices.
     const auto &half_edge = mesh->getHalfEdgeStructure();
     const uint num_vertices = half_edge.getNbVertices();
 
-    std::vector<glm::vec3> tri_verts; // Return value.
-    tri_verts.reserve(num_vertices);
+    OpenMesh::PolyMesh_ArrayKernelT<> open_mesh; // Return value.
+    open_mesh.reserve(num_vertices, half_edge.getNbHalfEdges(), half_edge.getNbFaces()); // vertices, edges, faces.
     for (uint i = 0; i < num_vertices; ++i) {
         const auto &vertex = mesh->getVertex(half_edge.getVertex(i).vertexPointIndex);
-        tri_verts.emplace_back(vertex.x, vertex.y, vertex.z);
+        open_mesh.add_vertex({vertex.x, vertex.y, vertex.z});
     }
 
-    std::vector<uint> tri_indices; // Return value.
     const uint num_faces = half_edge.getNbFaces();
     for (uint i = 0; i < num_faces; ++i) {
         const auto &face = half_edge.getFace(i);
         if (face.faceVertices.size() < 3) throw std::runtime_error("Invalid face with less than 3 vertices.");
 
-        // Triangulate the polygonal face by fanning from the first vertex.
-        for (uint j = 1; j < face.faceVertices.size() - 1; ++j) {
-            tri_indices.push_back(face.faceVertices[0]);
-            tri_indices.push_back(face.faceVertices[j]);
-            tri_indices.push_back(face.faceVertices[j + 1]);
+        std::vector<OpenMesh::VertexHandle> open_mesh_face(face.faceVertices.size());
+        for (size_t j = 0; j < face.faceVertices.size(); ++j) {
+            const auto &vertex = face.faceVertices[j];
+            open_mesh_face[j] = open_mesh.vertex_handle(vertex);
         }
+        open_mesh.add_face(open_mesh_face);
     }
 
-    return {std::move(tri_verts), std::move(tri_indices)};
+    return open_mesh;
 }
 
-TriangleBuffers ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
+OpenMesh::PolyMesh_ArrayKernelT<> ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
     if (mode == RP3D) {
         auto *convex_mesh = GenerateConvexMesh(points);
-        return ConvexMeshToTriangleBuffers(convex_mesh);
+        return ConvexMeshToOpenMesh(convex_mesh);
     } else {
         static quickhull::QuickHull<float> qh{}; // Could be double as well.
-        return ToTriangleBuffers(qh.getConvexHull(&points[0][0], points.size(), true, false));
+        return ToOpenMesh(qh.getConvexHull(&points[0][0], points.size(), true, false));
     }
 }

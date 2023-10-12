@@ -28,6 +28,7 @@ InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Mesh(), S
         Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     } else {
         Triangles.Load(FilePath);
+        Triangles.Center();
     }
 
     HoveredVertexArrow.SetColor({1, 0, 0, 1});
@@ -54,7 +55,7 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 
     ActiveGeometryMode = mode;
     if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
-        ConvexHull.SetTriangleBuffers(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
+        ConvexHull.SetOpenMesh(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
     } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
         TetGenerator.Launch();
     }
@@ -168,21 +169,19 @@ void InteractiveMesh::UpdateTets() {
 
     Tets.Clear();
 
-    std::vector<vec3> vertices(TetGenResult->numberofpoints);
+    OpenMesh::PolyMesh_ArrayKernelT<> tet_mesh;
     for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
-        vertices[i] = {TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]};
+        tet_mesh.add_vertex({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
     }
 
-    std::vector<uint> triangle_indices;
     for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
         const auto &tri_indices = TetGenResult->trifacelist;
         const uint tri_i = i * 3;
-        // Order of triangle indices important for normal calculation.
-        const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 2], c = tri_indices[tri_i + 1];
-        triangle_indices.insert(triangle_indices.end(), {a, b, c});
+        const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
+        tet_mesh.add_face(tet_mesh.vertex_handle(a), tet_mesh.vertex_handle(b), tet_mesh.vertex_handle(c));
     }
 
-    Tets.SetTriangleBuffers(std::move(vertices), std::move(triangle_indices));
+    Tets.SetOpenMesh(tet_mesh);
 
     UpdateExcitableVertices();
 }
