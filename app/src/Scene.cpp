@@ -332,7 +332,7 @@ void Scene::RenderConfig() {
                 if (enable_physics) {
                     Physics = std::make_unique<::Physics>();
                     Physics->AddRigidBody(Floor.get(), Physics::BodyType::Static);
-                    Physics->AddRigidBody(Meshes[0]);
+                    Physics->AddRigidBody(Meshes[0], Physics::BodyType::Dynamic, true);
                 } else {
                     Physics.reset();
                 }

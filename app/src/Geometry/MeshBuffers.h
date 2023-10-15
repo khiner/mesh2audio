@@ -32,6 +32,7 @@ struct MeshBuffers {
     MeshBuffers(const fs::path &file_path) { Load(file_path); }
     virtual ~MeshBuffers() = default;
 
+    inline const MeshType &GetMesh() const { return Mesh; }
     inline const std::vector<glm::vec3> &GetVertices() const { return Vertices; }
     inline const std::vector<uint> &GetIndices() const { return Indices; }
     inline const std::vector<uint> &GetLineIndices() const { return LineIndices; }
@@ -159,16 +160,6 @@ private:
             LineIndices.push_back(Mesh.from_vertex_handle(heh).idx());
             LineIndices.push_back(Mesh.to_vertex_handle(heh).idx());
         }
-        // Each line around each face for now.
-        // for (const auto &fh : Mesh.faces()) {
-        //     auto v_it = Mesh.cfv_iter(fh);
-        //     for (size_t i = 0; i < Mesh.valence(fh); i++) {
-        //         const auto &first_vertex = *v_it;
-        //         const auto &last_vertex = *(++v_it);
-        //         LineIndices.push_back(first_vertex.idx());
-        //         LineIndices.push_back(last_vertex.idx());
-        //     }
-        // }
         Dirty = true;
     }
 
@@ -184,9 +175,6 @@ private:
         Dirty = true;
     }
 
-    // todo continue to get rid of all direct modifications to raw buffers.
-
-private:
     std::vector<glm::vec3> Vertices;
     std::vector<uint> Indices;
     std::vector<glm::vec3> Normals;

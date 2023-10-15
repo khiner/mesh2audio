@@ -39,9 +39,46 @@ Physics::~Physics() {
     PhysicsCommon.destroyPhysicsWorld(World);
 }
 
-void Physics::AddRigidBody(Mesh *mesh, BodyType body_type) {
+rp3d::ConvexMesh *OpenMeshToConvexMesh(const MeshBuffers::MeshType &mesh) {
+    // Copy the OpenMesh vertices and indices.
+    // todo I think I saw in the source a way to get the vertices and indices directly from the mesh.
+    std::vector<glm::vec3> vertices;
+    for (const auto &vh : mesh.vertices()) {
+        const auto &point = mesh.point(vh);
+        vertices.emplace_back(point[0], point[1], point[2]);
+    }
+
+    std::vector<uint> indices;
+    std::vector<rp3d::PolygonVertexArray::PolygonFace> poly_faces;
+    poly_faces.reserve(mesh.n_faces());
+    for (const auto &face : mesh.faces()) {
+        const uint num_vertices = face.valence();
+        const uint index_base = indices.size(); // Index of the first vertex of the polygon face inside the array of vertex indices.
+        poly_faces.emplace_back(num_vertices, index_base);
+        auto v_it = mesh.cfv_iter(face);
+        for (size_t i = 0; i < num_vertices; i++) {
+            indices.push_back(v_it->idx());
+            ++v_it;
+        }
+    }
+
+    const rp3d::PolygonVertexArray poly_vertices = {
+        uint(vertices.size()), &vertices[0][0], 3 * sizeof(float), &indices[0], sizeof(uint), uint(mesh.n_faces()), &poly_faces[0],
+        rp3d::PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE, rp3d::PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE};
+
+    std::vector<rp3d::Message> messages;
+    auto *convex_mesh = ::PhysicsCommon.createConvexMesh(poly_vertices, messages);
+    if (convex_mesh == nullptr) {
+        std::cerr << "Error while creating a ConvexMesh:" << std::endl;
+        for (const auto &message : messages) std::cerr << "Error: " << message.text << std::endl;
+    }
+
+    return convex_mesh;
+}
+
+void Physics::AddRigidBody(Mesh *mesh, BodyType body_type, bool is_concave) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
-    rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices());
+    rp3d::ConvexMesh *convex_mesh = is_concave ? ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices()) : OpenMeshToConvexMesh(mesh->GetTriangles().GetMesh());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
     // Uncomment to use bounding box for collisions.
