@@ -19,6 +19,7 @@ enum RenderMode {
 };
 
 struct MeshBuffers {
+    using MeshType = OpenMesh::PolyMesh_ArrayKernelT<>;
     using VH = OpenMesh::VertexHandle;
     using FH = OpenMesh::FaceHandle;
     using EH = OpenMesh::EdgeHandle;
@@ -99,7 +100,7 @@ struct MeshBuffers {
         UpdateVertices(); // Normals/indices are not affected.
     }
 
-    void SetOpenMesh(const OpenMesh::PolyMesh_ArrayKernelT<> &mesh) {
+    void SetOpenMesh(const MeshType &mesh) {
         Clear();
         Mesh = mesh;
         UpdateBuffersFromMesh();
@@ -117,7 +118,7 @@ struct MeshBuffers {
     }
 
 protected:
-    OpenMesh::PolyMesh_ArrayKernelT<> Mesh; // Default OpenMesh triangles instance variable
+    MeshType Mesh; // Default OpenMesh triangles instance variable
     mutable bool Dirty{true};
 
     void UpdateBuffersFromMesh() {
@@ -140,7 +141,7 @@ private:
     void UpdateIndices() {
         Indices.clear();
         // Copy and triangulate the mesh to calculate the triangle indices.
-        OpenMesh::PolyMesh_ArrayKernelT triangulated_mesh = Mesh;
+        auto triangulated_mesh = Mesh;
         triangulated_mesh.triangulate();
         for (const auto &fh : triangulated_mesh.faces()) {
             auto v_it = triangulated_mesh.cfv_iter(fh);

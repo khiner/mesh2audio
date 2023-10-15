@@ -5,17 +5,19 @@
 
 static rp3d::PhysicsCommon pc{};
 
-static OpenMesh::PolyMesh_ArrayKernelT<> ToOpenMesh(const quickhull::ConvexHull<float> &hull) {
-    OpenMesh::PolyMesh_ArrayKernelT<> open_mesh;
+using MeshType = MeshBuffers::MeshType;
+
+static MeshType ToOpenMesh(const quickhull::ConvexHull<float> &hull) {
+    MeshType mesh; // Return value.
 
     const auto &vertices = hull.getVertexBuffer();
     const auto &indices = hull.getIndexBuffer();
-    for (const auto &vertex : vertices) open_mesh.add_vertex({vertex.x, vertex.y, vertex.z});
+    for (const auto &vertex : vertices) mesh.add_vertex({vertex.x, vertex.y, vertex.z});
 
     for (size_t i = 0; i < indices.size(); i += 3) {
-        open_mesh.add_face({open_mesh.vertex_handle(indices[i]), open_mesh.vertex_handle(indices[i + 1]), open_mesh.vertex_handle(indices[i + 2])});
+        mesh.add_face({mesh.vertex_handle(indices[i]), mesh.vertex_handle(indices[i + 1]), mesh.vertex_handle(indices[i + 2])});
     }
-    return open_mesh;
+    return mesh;
 }
 
 reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm::vec3> &points) {
@@ -29,12 +31,12 @@ reactphysics3d::ConvexMesh *ConvexHull::GenerateConvexMesh(const std::vector<glm
     return convex_mesh;
 }
 
-static OpenMesh::PolyMesh_ArrayKernelT<> ConvexMeshToOpenMesh(reactphysics3d::ConvexMesh *mesh) {
+static MeshType ConvexMeshToOpenMesh(reactphysics3d::ConvexMesh *mesh) {
     // Copy the vertices.
     const auto &half_edge = mesh->getHalfEdgeStructure();
     const uint num_vertices = half_edge.getNbVertices();
 
-    OpenMesh::PolyMesh_ArrayKernelT<> open_mesh; // Return value.
+    MeshType open_mesh; // Return value.
     open_mesh.reserve(num_vertices, half_edge.getNbHalfEdges(), half_edge.getNbFaces()); // vertices, edges, faces.
     for (uint i = 0; i < num_vertices; ++i) {
         const auto &vertex = mesh->getVertex(half_edge.getVertex(i).vertexPointIndex);
@@ -57,7 +59,7 @@ static OpenMesh::PolyMesh_ArrayKernelT<> ConvexMeshToOpenMesh(reactphysics3d::Co
     return open_mesh;
 }
 
-OpenMesh::PolyMesh_ArrayKernelT<> ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
+MeshType ConvexHull::Generate(const std::vector<glm::vec3> &points, Mode mode) {
     if (mode == RP3D) {
         auto *convex_mesh = GenerateConvexMesh(points);
         return ConvexMeshToOpenMesh(convex_mesh);

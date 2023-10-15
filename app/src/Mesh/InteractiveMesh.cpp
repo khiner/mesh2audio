@@ -169,7 +169,7 @@ void InteractiveMesh::UpdateTets() {
 
     Tets.Clear();
 
-    OpenMesh::PolyMesh_ArrayKernelT<> tet_mesh;
+    MeshBuffers::MeshType tet_mesh;
     for (uint i = 0; i < uint(TetGenResult->numberofpoints); ++i) {
         tet_mesh.add_vertex({TetGenResult->pointlist[i * 3], TetGenResult->pointlist[i * 3 + 1], TetGenResult->pointlist[i * 3 + 2]});
     }
