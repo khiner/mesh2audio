@@ -1,5 +1,4 @@
 #include "Arrow.h"
-#include <vector>
 
 Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length, uint segments) : Geometry() {
     // Add all vertices and group handles.
