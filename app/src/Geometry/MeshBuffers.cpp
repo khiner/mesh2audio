@@ -17,8 +17,7 @@ void MeshBuffers::ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices,
     const int num_vertices = slices * profile_size_no_connect + (closed ? 0 : 2);
 
     Mesh.reserve(num_vertices, 0, 0); // vertices, edges, faces. todo edges & faces.
-    std::vector<OpenMesh::VertexHandle> top_face;
-    std::vector<OpenMesh::VertexHandle> bottom_face;
+    std::vector<VH> top_face, bottom_face;
     for (uint slice = 0; slice < slices; slice++) {
         const float __angle = 2 * float(slice) / slices;
         const float c = __cospif(__angle);

@@ -46,7 +46,7 @@ static OpenMesh::PolyMesh_ArrayKernelT<> ConvexMeshToOpenMesh(reactphysics3d::Co
         const auto &face = half_edge.getFace(i);
         if (face.faceVertices.size() < 3) throw std::runtime_error("Invalid face with less than 3 vertices.");
 
-        std::vector<OpenMesh::VertexHandle> open_mesh_face(face.faceVertices.size());
+        std::vector<MeshBuffers::VH> open_mesh_face(face.faceVertices.size());
         for (size_t j = 0; j < face.faceVertices.size(); ++j) {
             const auto &vertex = face.faceVertices[j];
             open_mesh_face[j] = open_mesh.vertex_handle(vertex);

@@ -19,6 +19,12 @@ enum RenderMode {
 };
 
 struct MeshBuffers {
+    using VH = OpenMesh::VertexHandle;
+    using FH = OpenMesh::FaceHandle;
+    using EH = OpenMesh::EdgeHandle;
+    using HH = OpenMesh::HalfedgeHandle;
+    using Point = OpenMesh::Vec3f;
+
     MeshBuffers() {
         Mesh.request_vertex_normals();
     }
