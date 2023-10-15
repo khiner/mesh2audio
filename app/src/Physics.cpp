@@ -7,7 +7,13 @@
 rp3d::PhysicsCommon PhysicsCommon;
 rp3d::PhysicsWorld *World;
 
-static rp3d::Vector3 Glm2Rp3d(const glm::vec3 &vec) { return {vec.x, vec.y, vec.z}; }
+static rp3d::BodyType ConvertBodyType(Physics::BodyType body_type) {
+    switch (body_type) {
+        case Physics::BodyType::Static: return rp3d::BodyType::STATIC;
+        case Physics::BodyType::Kinematic: return rp3d::BodyType::KINEMATIC;
+        case Physics::BodyType::Dynamic: return rp3d::BodyType::DYNAMIC;
+    }
+}
 
 static glm::mat4 Rp3d2Glm(const rp3d::Transform &transform) {
     glm::mat4 result;
@@ -33,30 +39,20 @@ Physics::~Physics() {
     PhysicsCommon.destroyPhysicsWorld(World);
 }
 
-void Physics::AddRigidBody(Mesh *mesh) {
+void Physics::AddRigidBody(Mesh *mesh, BodyType body_type) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
     rp3d::ConvexMesh *convex_mesh = ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
-    // Uncomment to just using a bounding boxes for collisions.
+    // Uncomment to use bounding box for collisions.
     // auto *shape = PhysicsCommon.createBoxShape(Glm2Rp3d((geom_max - geom_min) * 0.5f));
 
     auto *body = World->createRigidBody(Glm2Rp3d(mesh->GetTransform()));
+    body->setType(ConvertBodyType(body_type));
     body->setMass(1.f);
     body->addCollider(shape, {});
     body->setIsAllowedToSleep(false);
     RigidBodies.push_back({body, mesh});
-}
-
-void Physics::AddRigidBody(const glm::vec3 &initial_pos) {
-    auto transform = rp3d::Transform::identity();
-    transform.setPosition(Glm2Rp3d(initial_pos - glm::vec3{0, 1, 0})); // Make room for box representing plane.
-    auto *body = World->createRigidBody(transform);
-    body->setType(rp3d::BodyType::STATIC);
-    rp3d::Vector3 floor_half_extents(100, 1, 100);
-    auto *shape = PhysicsCommon.createBoxShape(floor_half_extents);
-    body->addCollider(shape, {});
-    RigidBodies.push_back({body, nullptr});
 }
 
 void Physics::Tick() {

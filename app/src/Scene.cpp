@@ -8,6 +8,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "GLCanvas.h"
+#include "Geometry/Primitive/Cuboid.h"
 #include "Geometry/Primitive/Rect.h"
 #include "Geometry/Primitive/Sphere.h"
 #include "Physics.h"
@@ -89,6 +90,12 @@ Scene::Scene() {
 
     GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
     glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, LightBufferId);
+
+    static const float floor_y = -1;
+    static const vec3 floor_half_extents = {20, 1, 20};
+    Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
+    Floor->Generate();
+    Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
 }
 
 Scene::~Scene() {
@@ -143,10 +150,13 @@ void Scene::Render() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
+    if (ShowFloor) Floor->PrepareRender(ActiveRenderMode);
     for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode_Points) glPointSize(PointRadius);
+
+    if (ShowFloor) Floor->Render(ActiveRenderMode);
     for (const auto *mesh : Meshes) mesh->Render(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
@@ -227,7 +237,7 @@ void Scene::RenderConfig() {
                     // Rendering of grid lines derives from a plane at z = 0.
                     // See `grid_lines_vertex.glsl` and `grid_lines_fragment.glsl` for details.
                     // Based on https://asliceofrendering.com/scene%20helper/2020/01/05/InfiniteGrid.
-                    Grid = std::make_unique<Mesh>(Rect{{1, 1, 0}, {-1, -1, 0}, {-1, 1, 0}, {1, -1, 0}});
+                    Grid = std::make_unique<Mesh>(Rect{{1, 1, 0}, {1, -1, 0}, {-1, -1, 0}, {-1, 1, 0}});
                     Grid->ClearColors();
                     Grid->Generate();
                 } else {
@@ -235,19 +245,7 @@ void Scene::RenderConfig() {
                     Grid.reset();
                 }
             }
-            bool show_floor = bool(Floor);
-            if (Checkbox("Show floor", &show_floor)) {
-                if (show_floor) {
-                    float y = -1;
-                    Floor = std::make_unique<Mesh>(Rect{{1, y, 1}, {-1, y, -1}, {-1, y, 1}, {1, y, -1}, {0, 1, 0}});
-                    Floor->Generate();
-                    Floor->SetTransform(glm::scale(Identity, {50, 1, 50}));
-                    AddMesh(Floor.get());
-                } else {
-                    RemoveMesh(Floor.get());
-                    Floor.reset();
-                }
-            }
+            Checkbox("Show floor", &ShowFloor);
             SeparatorText("Render mode");
             int render_mode = int(ActiveRenderMode);
             bool render_mode_changed = RadioButton("Smooth", &render_mode, RenderMode_Smooth);
@@ -333,7 +331,7 @@ void Scene::RenderConfig() {
             if (Checkbox("Enable physics", &enable_physics)) {
                 if (enable_physics) {
                     Physics = std::make_unique<::Physics>();
-                    Physics->AddRigidBody({0, -1, 0}); // Floor.
+                    Physics->AddRigidBody(Floor.get(), Physics::BodyType::Static);
                     Physics->AddRigidBody(Meshes[0]);
                 } else {
                     Physics.reset();

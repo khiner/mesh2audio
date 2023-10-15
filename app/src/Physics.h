@@ -4,7 +4,7 @@
 
 namespace reactphysics3d {
 class RigidBody;
-}
+} // namespace reactphysics3d
 
 struct RigidBody {
     reactphysics3d::RigidBody *Body;
@@ -12,11 +12,17 @@ struct RigidBody {
 };
 
 struct Physics {
+    // Mirrors `rp3d::BodyType`.
+    enum class BodyType {
+        Static,
+        Kinematic,
+        Dynamic,
+    };
+
     Physics();
     ~Physics();
 
-    void AddRigidBody(Mesh *);
-    void AddRigidBody(const glm::vec3 &initial_pos = {0, 0, 0});
+    void AddRigidBody(Mesh *, BodyType = BodyType::Dynamic);
 
     void Tick();
 
