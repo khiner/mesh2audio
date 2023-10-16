@@ -1,8 +1,6 @@
 #include "Scene.h"
 
-#include <algorithm>
 #include <format>
-#include <iostream>
 #include <string>
 
 #include <glm/gtx/quaternion.hpp>
@@ -14,15 +12,8 @@
 #include "Physics.h"
 #include "Shader/ShaderProgram.h"
 
-using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
-using std::string;
-
-using namespace ImGui;
-
-static GLCanvas Canvas;
-
 namespace UniformName {
-inline static const string
+inline static const std::string
     NumLights = "num_lights",
     AmbientColor = "ambient_color",
     DiffuseColor = "diffuse_color",
@@ -36,6 +27,8 @@ inline static const string
 } // namespace UniformName
 
 Scene::Scene() {
+    Canvas = std::make_unique<GLCanvas>();
+
     /**
       Initialize light positions using a three-point lighting system:
         1) Key light: The main light, positioned at a 45-degree angle from the subject.
@@ -64,7 +57,7 @@ Scene::Scene() {
     */
     static const float x_angle = M_PI * 0.1; // Elevation angle (0° is in the X-Z plane, positive angles rotate upwards)
     static const float y_angle = M_PI * 0.4; // Azimuth angle (0° is along +X axis, positive angles rotate counterclockwise)
-    static const vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
+    static const glm::vec3 eye(cosf(y_angle) * cosf(x_angle), sinf(x_angle), sinf(y_angle) * cosf(x_angle));
     CameraView = glm::lookAt(eye * CameraDistance, Origin, Up);
 
     namespace un = UniformName;
@@ -92,7 +85,7 @@ Scene::Scene() {
     glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, LightBufferId);
 
     static const float floor_y = -1;
-    static const vec3 floor_half_extents = {20, 1, 20};
+    static const glm::vec3 floor_half_extents = {20, 1, 20};
     Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
     Floor->Generate();
     Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
@@ -115,6 +108,15 @@ void Scene::RemoveMesh(const Mesh *mesh) {
     Meshes.erase(std::remove(Meshes.begin(), Meshes.end(), mesh), Meshes.end());
 }
 
+void Scene::SetCameraDistance(float distance) {
+    // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
+    const glm::vec3 eye = glm::inverse(CameraView)[3];
+    CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
+    CameraDistance = distance;
+}
+
+using namespace ImGui;
+
 void Scene::Render() {
     if (Physics) Physics->Tick();
 
@@ -129,7 +131,7 @@ void Scene::Render() {
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-    Canvas.PrepareRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+    Canvas->PrepareRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
 
     glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
@@ -144,9 +146,9 @@ void Scene::Render() {
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
-    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && ActiveRenderMode == RenderMode_Smooth ? 1 : 0);
+    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && ActiveRenderMode == RenderMode::Smooth ? 1 : 0);
 
-    if (ActiveRenderMode == RenderMode_Lines) {
+    if (ActiveRenderMode == RenderMode::Lines) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
@@ -154,7 +156,7 @@ void Scene::Render() {
     for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
-    if (ActiveRenderMode == RenderMode_Points) glPointSize(PointRadius);
+    if (ActiveRenderMode == RenderMode::Points) glPointSize(PointRadius);
 
     if (ShowFloor) Floor->Render(ActiveRenderMode);
     for (const auto *mesh : Meshes) mesh->Render(ActiveRenderMode);
@@ -168,14 +170,14 @@ void Scene::Render() {
         // glUniform4fv(GridLinesShaderProgram->GetUniform(un::GridLinesColor), 1, &GridLinesColor[0]);
 
         glEnable(GL_BLEND);
-        Grid->PrepareRender(RenderMode_Smooth);
-        Grid->Render(RenderMode_Smooth);
+        Grid->PrepareRender(RenderMode::Smooth);
+        Grid->Render(RenderMode::Smooth);
         glDisable(GL_BLEND);
     }
 
     // Render the scene to an OpenGl texture and display it (without changing the cursor position).
     const auto &cursor = GetCursorPos();
-    unsigned int texture_id = Canvas.Render();
+    unsigned int texture_id = Canvas->Render();
     Image((void *)(intptr_t)texture_id, content_region, {0, 1}, {1, 0});
     SetCursorPos(cursor);
 
@@ -207,7 +209,7 @@ void Scene::RenderGizmoDebug() {
 
     SeparatorText("Gizmo");
     using namespace ImGuizmo;
-    const string interaction_text = std::format(
+    const std::string interaction_text = std::format(
         "Interaction: {}",
         IsUsing()             ? "Using Gizmo" :
             IsOver(TRANSLATE) ? "Translate hovered" :
@@ -248,22 +250,22 @@ void Scene::RenderConfig() {
             Checkbox("Show floor", &ShowFloor);
             SeparatorText("Render mode");
             int render_mode = int(ActiveRenderMode);
-            bool render_mode_changed = RadioButton("Smooth", &render_mode, RenderMode_Smooth);
+            bool render_mode_changed = RadioButton("Smooth", &render_mode, int(RenderMode::Smooth));
             SameLine();
-            render_mode_changed |= RadioButton("Lines", &render_mode, RenderMode_Lines);
+            render_mode_changed |= RadioButton("Lines", &render_mode, int(RenderMode::Lines));
             SameLine();
-            render_mode_changed |= RadioButton("Point cloud", &render_mode, RenderMode_Points);
+            render_mode_changed |= RadioButton("Point cloud", &render_mode, int(RenderMode::Points));
             if (render_mode_changed) {
                 ActiveRenderMode = RenderMode(render_mode);
-                CurrShaderProgram = ActiveRenderMode == RenderMode_Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
+                CurrShaderProgram = ActiveRenderMode == RenderMode::Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
             }
-            if (ActiveRenderMode == RenderMode_Smooth) {
+            if (ActiveRenderMode == RenderMode::Smooth) {
                 Checkbox("Flat shading", &UseFlatShading);
             }
-            if (ActiveRenderMode == RenderMode_Lines) {
+            if (ActiveRenderMode == RenderMode::Lines) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);
             }
-            if (ActiveRenderMode == RenderMode_Points) {
+            if (ActiveRenderMode == RenderMode::Points) {
                 SliderFloat("Point radius", &PointRadius, 0.1, 10, "%.2f", ImGuiSliderFlags_Logarithmic);
             }
             EndTabItem();
@@ -342,11 +344,4 @@ void Scene::RenderConfig() {
         }
         EndTabBar();
     }
-}
-
-void Scene::SetCameraDistance(float distance) {
-    // Extract the eye position from inverse camera view matrix and update the camera view based on the new distance.
-    const vec3 eye = glm::inverse(CameraView)[3];
-    CameraView = glm::lookAt(eye * (distance / CameraDistance), Origin, Up);
-    CameraDistance = distance;
 }

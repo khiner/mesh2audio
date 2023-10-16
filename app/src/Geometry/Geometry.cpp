@@ -40,7 +40,7 @@ void Geometry::BindData(RenderMode render_mode) const {
     if (Dirty) {
         VertexBuffer.SetData(GetVertices());
         if (HasNormals()) NormalBuffer.SetData(GetNormals());
-        if (render_mode == RenderMode_Lines) LineIndexBuffer.SetData(GetLineIndices());
+        if (render_mode == RenderMode::Lines) LineIndexBuffer.SetData(GetLineIndices());
         else TriangleIndexBuffer.SetData(GetIndices());
     }
     Dirty = false;

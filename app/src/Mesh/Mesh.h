@@ -29,7 +29,7 @@ struct Mesh {
     void EnableVertexAttributes() const;
 
     inline void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
-    void Render(RenderMode mode = RenderMode_Smooth) const;
+    void Render(RenderMode mode = RenderMode::Smooth) const;
 
     void SetPosition(const glm::vec3 &position) {
         for (auto &transform : Transforms) {
@@ -66,7 +66,6 @@ struct Mesh {
         Dirty = true;
     }
 
-
 protected:
     Geometry Triangles;
 
@@ -79,5 +78,5 @@ private:
     GLBuffer<glm::mat4, GL_ARRAY_BUFFER> TransformBuffer;
     mutable bool Dirty{true};
 
-    void BindData(RenderMode render_mode = RenderMode_Smooth) const;
+    void BindData(RenderMode render_mode = RenderMode::Smooth) const;
 };

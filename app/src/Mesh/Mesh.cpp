@@ -59,8 +59,8 @@ void Mesh::Render(RenderMode mode) const {
     BindData(mode); // Only rebinds the data if it has changed.
     VertexArray.Bind();
 
-    GLenum polygon_mode = mode == RenderMode_Points ? GL_POINT : GL_FILL;
-    GLenum primitive_type = mode == RenderMode_Lines ? GL_LINES : GL_TRIANGLES;
+    GLenum polygon_mode = mode == RenderMode::Points ? GL_POINT : GL_FILL;
+    GLenum primitive_type = mode == RenderMode::Lines ? GL_LINES : GL_TRIANGLES;
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
 
     uint num_indices = ActiveGeometry().GetIndices(mode).size();

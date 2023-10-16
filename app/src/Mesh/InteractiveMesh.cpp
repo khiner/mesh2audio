@@ -65,15 +65,10 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 void InteractiveMesh::Save(fs::path file_path) const { ActiveGeometry().Save(file_path); }
 
 mat4 InteractiveMesh::GetTransform() const {
-    mat4 transform = Identity;
-    transform = glm::translate(transform, Translation);
-
-    mat4 rot_x = glm::rotate(Identity, glm::radians(RotationAngles.x), {1, 0, 0});
-    mat4 rot_y = glm::rotate(Identity, glm::radians(RotationAngles.y), {0, 1, 0});
-    mat4 rot_z = glm::rotate(Identity, glm::radians(RotationAngles.z), {0, 0, 1});
-    transform *= (rot_z * rot_y * rot_x);
-
-    return glm::scale(transform, Scale);
+    const mat4 rot_x = glm::rotate(Identity, glm::radians(RotationAngles.x), {1, 0, 0});
+    const mat4 rot_y = glm::rotate(Identity, glm::radians(RotationAngles.y), {0, 1, 0});
+    const mat4 rot_z = glm::rotate(Identity, glm::radians(RotationAngles.z), {0, 0, 1});
+    return glm::scale(glm::translate(Identity, Translation) * rot_z * rot_y * rot_x, Scale);
 }
 
 void InteractiveMesh::ApplyTransform() {
@@ -190,7 +185,7 @@ void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
     const auto &vertices = Triangles.GetVertices();
-    const auto &triangle_indices = Triangles.GetIndices(RenderMode_Smooth);
+    const auto &triangle_indices = Triangles.GetIndices(RenderMode::Smooth);
     in.numberofpoints = vertices.size();
     in.pointlist = new REAL[in.numberofpoints * 3];
 
@@ -383,7 +378,7 @@ void InteractiveMesh::RenderConfig() {
                     }
                     Text(
                         "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
-                        Tets.GetVertices().size(), Tets.GetIndices(RenderMode_Smooth).size()
+                        Tets.GetVertices().size(), Tets.GetIndices(RenderMode::Smooth).size()
                     );
                 } else {
                     if (!can_generate_tet_mesh) {
@@ -398,7 +393,7 @@ void InteractiveMesh::RenderConfig() {
                 if (HasConvexHull()) {
                     Text(
                         "Current convex hull:\n\tVertices: %lu\n\tIndices: %lu",
-                        ConvexHull.GetVertices().size(), ConvexHull.GetIndices(RenderMode_Smooth).size()
+                        ConvexHull.GetVertices().size(), ConvexHull.GetIndices(RenderMode::Smooth).size()
                     );
                 }
                 if (Button(HasConvexHull() ? "Regenerate convex hull" : "Generate convex hull")) {

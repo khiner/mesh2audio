@@ -10,6 +10,7 @@
 
 #include "Mesh/Mesh.h"
 
+struct GLCanvas;
 struct ShaderProgram;
 struct Rect;
 struct Physics;
@@ -23,14 +24,14 @@ struct Scene {
     Scene();
     ~Scene();
 
-    void SetCameraDistance(float);
-
     void AddMesh(Mesh *);
     void RemoveMesh(const Mesh *);
 
     void Render();
     void RenderConfig();
     void RenderGizmoDebug();
+
+    void SetCameraDistance(float);
 
     std::vector<Mesh *> Meshes;
 
@@ -48,7 +49,6 @@ struct Scene {
 
     glm::mat4 GizmoTransform{1};
     std::function<void(const glm::mat4 &)> GizmoCallback;
-
     ImGuizmo::OPERATION GizmoOp{ImGuizmo::TRANSLATE};
 
     glm::mat4 CameraView, CameraProjection;
@@ -56,7 +56,7 @@ struct Scene {
 
     inline static uint MaxNumLights = 5;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-    inline static RenderMode ActiveRenderMode = RenderMode_Smooth;
+    inline static RenderMode ActiveRenderMode = RenderMode::Smooth;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
 
@@ -64,6 +64,7 @@ struct Scene {
 
     std::unordered_map<uint, std::unique_ptr<Mesh>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
+    std::unique_ptr<GLCanvas> Canvas;
     std::unique_ptr<Mesh> Grid, Floor;
     std::unique_ptr<Physics> Physics;
 };

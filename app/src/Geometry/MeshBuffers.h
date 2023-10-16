@@ -12,10 +12,10 @@ using uint = unsigned int;
 
 namespace fs = std::filesystem;
 
-enum RenderMode {
-    RenderMode_Smooth,
-    RenderMode_Lines,
-    RenderMode_Points,
+enum class RenderMode {
+    Smooth,
+    Lines,
+    Points,
 };
 
 struct MeshBuffers {
@@ -37,7 +37,7 @@ struct MeshBuffers {
     inline const std::vector<uint> &GetIndices() const { return Indices; }
     inline const std::vector<uint> &GetLineIndices() const { return LineIndices; }
     inline const std::vector<glm::vec3> &GetNormals() const { return Normals; }
-    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode_Lines ? LineIndices : Indices; }
+    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode::Lines ? LineIndices : Indices; }
     inline const glm::vec3 &GetVertex(uint index) const { return Vertices[index]; }
     inline const glm::vec3 &GetNormal(uint index) const { return Normals[index]; }
 
