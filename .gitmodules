@@ -1,54 +1,54 @@
-[submodule "app/lib/imgui"]
-	path = app/lib/imgui
+[submodule "lib/imgui"]
+	path = lib/imgui
 	url = git@github.com:ocornut/imgui.git
 	branch = docking
-[submodule "app/lib/SDL"]
-	path = app/lib/SDL
+[submodule "lib/SDL"]
+	path = lib/SDL
 	url = git@github.com:libsdl-org/SDL.git
-[submodule "app/lib/implot"]
-	path = app/lib/implot
+[submodule "lib/implot"]
+	path = lib/implot
 	url = git@github.com:epezent/implot.git
-[submodule "app/lib/glm"]
-	path = app/lib/glm
+[submodule "lib/glm"]
+	path = lib/glm
 	url = git@github.com:g-truc/glm.git
-[submodule "app/lib/nativefiledialog"]
-	path = app/lib/nativefiledialog
+[submodule "lib/nativefiledialog"]
+	path = lib/nativefiledialog
 	url = git@github.com:btzy/nativefiledialog-extended.git
-[submodule "app/lib/faust"]
-	path = app/lib/faust
+[submodule "lib/faust"]
+	path = lib/faust
 	url = git@github.com:grame-cncm/faust.git
 	branch = master-dev
-[submodule "app/lib/miniaudio"]
-	path = app/lib/miniaudio
+[submodule "lib/miniaudio"]
+	path = lib/miniaudio
 	url = git@github.com:mackron/miniaudio.git
-[submodule "app/lib/ImGuizmo"]
-	path = app/lib/ImGuizmo
+[submodule "lib/ImGuizmo"]
+	path = lib/ImGuizmo
 	url = git@github.com:CedricGuillemet/ImGuizmo.git
-[submodule "app/lib/nanosvg"]
-	path = app/lib/nanosvg
+[submodule "lib/nanosvg"]
+	path = lib/nanosvg
 	url = git@github.com:memononen/nanosvg.git
-[submodule "app/lib/imspinner"]
-	path = app/lib/imspinner
+[submodule "lib/imspinner"]
+	path = lib/imspinner
 	url = git@github.com:dalerank/imspinner.git
-[submodule "app/lib/date"]
-	path = app/lib/date
+[submodule "lib/date"]
+	path = lib/date
 	url = git@github.com:HowardHinnant/date.git
-[submodule "app/lib/libnpy"]
-	path = app/lib/libnpy
+[submodule "lib/libnpy"]
+	path = lib/libnpy
 	url = git@github.com:llohse/libnpy.git
-[submodule "app/app/lib/libnpy"]
-	path = app/app/lib/libnpy
+[submodule "lib/libnpy"]
+	path = lib/libnpy
 	url = git@github.com:llohse/libnpy.git
-[submodule "app/lib/tetgen"]
-	path = app/lib/tetgen
+[submodule "lib/tetgen"]
+	path = lib/tetgen
 	url = git@github.com:libigl/tetgen.git
-[submodule "app/lib/reactphysics3d"]
-	path = app/lib/reactphysics3d
+[submodule "lib/reactphysics3d"]
+	path = lib/reactphysics3d
 	url = git@github.com:DanielChappuis/reactphysics3d.git
 	branch = develop
-[submodule "app/lib/quickhull"]
-	path = app/lib/quickhull
+[submodule "lib/quickhull"]
+	path = lib/quickhull
 	url = git@github.com:akuukka/quickhull.git
-[submodule "app/lib/OpenMesh"]
-	path = app/lib/OpenMesh
+[submodule "lib/OpenMesh"]
+	path = lib/OpenMesh
 	url = https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh.git

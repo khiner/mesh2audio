@@ -1,5 +1,0 @@
-{
-    "name": "Launch:Debug",
-    "program": "app/build/",
-    "cwd": "app/build/"
-}
