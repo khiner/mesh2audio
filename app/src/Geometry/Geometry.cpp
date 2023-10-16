@@ -10,38 +10,38 @@ using std::string;
 void Geometry::Generate() {
     VertexBuffer.Generate();
     NormalBuffer.Generate();
-    TriangleIndexBuffer.Generate();
-    LineIndexBuffer.Generate();
+    IndexBuffer.Generate();
 }
 
 void Geometry::EnableVertexAttributes() const {
-    static const GLuint VertexSlot = 0;
-    static const GLuint NormalSlot = 1;
     VertexBuffer.Bind();
+    static const GLuint VertexSlot = 0;
     glEnableVertexAttribArray(VertexSlot);
     glVertexAttribPointer(VertexSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+
     NormalBuffer.Bind();
+    static const GLuint NormalSlot = 1;
     glEnableVertexAttribArray(NormalSlot);
     glVertexAttribPointer(NormalSlot, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
+
     Dirty = true;
 }
 
 void Geometry::Delete() const {
     VertexBuffer.Delete();
     NormalBuffer.Delete();
-    TriangleIndexBuffer.Delete();
-    LineIndexBuffer.Delete();
+    IndexBuffer.Delete();
 }
 
 // Any mutating changes before each render.
 void Geometry::PrepareRender(RenderMode) {}
 
 void Geometry::BindData(RenderMode render_mode) const {
-    if (Dirty) {
+    if (Dirty || render_mode != LastBoundRenderMode) {
         VertexBuffer.SetData(GetVertices());
         if (HasNormals()) NormalBuffer.SetData(GetNormals());
-        if (render_mode == RenderMode::Lines) LineIndexBuffer.SetData(GetLineIndices());
-        else TriangleIndexBuffer.SetData(GetIndices());
+        IndexBuffer.SetData(render_mode == RenderMode::Lines ? GetLineIndices() : GetIndices());
     }
+    LastBoundRenderMode = render_mode;
     Dirty = false;
 }

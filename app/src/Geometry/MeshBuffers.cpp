@@ -40,13 +40,11 @@ void MeshBuffers::ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices,
             Mesh.add_face(Mesh.vertex_handle(base_index), Mesh.vertex_handle(next_base_index), Mesh.vertex_handle(next_base_index + 1), Mesh.vertex_handle(base_index + 1));
         }
     }
-    std::reverse(bottom_face.begin(), bottom_face.end()); // For consistent winding order.
     if (!closed) {
+        std::reverse(bottom_face.begin(), bottom_face.end()); // For consistent winding order.
         Mesh.add_face(top_face);
         Mesh.add_face(bottom_face);
     }
-
-    // Mesh.triangulate();
 
     Center();
     // SVG coordinates are upside-down relative to our 3D rendering coordinates.

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <iostream>
 
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
@@ -66,17 +65,11 @@ struct MeshBuffers {
 
     // [{min_x, min_y, min_z}, {max_x, max_y, max_z}]
     std::pair<glm::vec3, glm::vec3> ComputeBounds() const {
-        glm::vec3 min_coords(
-            std::numeric_limits<float>::max(),
-            std::numeric_limits<float>::max(),
-            std::numeric_limits<float>::max()
-        );
-        glm::vec3 max_coords(
-            std::numeric_limits<float>::lowest(),
-            std::numeric_limits<float>::lowest(),
-            std::numeric_limits<float>::lowest()
-        );
+        static const float min_float = std::numeric_limits<float>::lowest();
+        static const float max_float = std::numeric_limits<float>::max();
 
+        glm::vec3 min_coords(max_float, max_float, max_float);
+        glm::vec3 max_coords(min_float, min_float, min_float);
         for (const auto &vh : Mesh.vertices()) {
             const auto &point = Mesh.point(vh);
             min_coords.x = std::min(min_coords.x, point[0]);
@@ -150,8 +143,9 @@ private:
             Indices.push_back((++v_it)->idx());
             Indices.push_back((++v_it)->idx());
         }
-        Dirty = false;
+        Dirty = true;
     }
+
     void UpdateLineIndices() {
         LineIndices.clear();
         // Get all unique polygon lines.

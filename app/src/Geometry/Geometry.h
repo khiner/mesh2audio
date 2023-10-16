@@ -41,12 +41,13 @@ struct Geometry : MeshBuffers {
     void Generate();
     void Delete() const;
 
-    void BindData(RenderMode) const;
+    void BindData(RenderMode) const; // Only rebinds the data if it has changed.
     void PrepareRender(RenderMode);
 
 private:
     GLBuffer<glm::vec3, GL_ARRAY_BUFFER> VertexBuffer;
     GLBuffer<glm::vec3, GL_ARRAY_BUFFER> NormalBuffer;
-    GLBuffer<uint, GL_ELEMENT_ARRAY_BUFFER> TriangleIndexBuffer;
-    GLBuffer<uint, GL_ELEMENT_ARRAY_BUFFER> LineIndexBuffer;
+    GLBuffer<uint, GL_ELEMENT_ARRAY_BUFFER> IndexBuffer;
+
+    mutable RenderMode LastBoundRenderMode = RenderMode::Smooth;
 };

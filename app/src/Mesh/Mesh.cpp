@@ -23,9 +23,8 @@ void Mesh::EnableVertexAttributes() const {
     VertexArray.Bind();
     ActiveGeometry().EnableVertexAttributes();
 
-    static const GLuint ColorSlot = 2;
-    static const GLuint TransformSlot = 3;
     ColorBuffer.Bind();
+    static const GLuint ColorSlot = 2;
     glEnableVertexAttribArray(ColorSlot);
     glVertexAttribPointer(ColorSlot, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), 0);
     glVertexAttribDivisor(ColorSlot, 1); // Attribute is updated once per instance.
@@ -33,6 +32,7 @@ void Mesh::EnableVertexAttributes() const {
     TransformBuffer.Bind();
     // Since a `mat4` is actually 4 `vec4`s, we need to enable four attributes for it.
     for (int i = 0; i < 4; i++) {
+        static const GLuint TransformSlot = 3;
         glEnableVertexAttribArray(TransformSlot + i);
         glVertexAttribPointer(TransformSlot + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (GLvoid *)(i * sizeof(glm::vec4)));
         glVertexAttribDivisor(TransformSlot + i, 1); // Attribute is updated once per instance.
