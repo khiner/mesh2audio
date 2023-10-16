@@ -1,16 +1,16 @@
 # mesh2audio
 
-Generate axisymmetric 3D models, or import existing 3D models, and transform them into real-time playable physical audio models!
+Generate axisymmetric 3D models, or import existing 3D models and transform them into real-time playable physical audio models!
 
-Supports fast DSP generation of physical audio models that sound decently realistic, as well as blazing fast 2D axisymmetric model generation, at the expense of some fidelity.
+Supports fast DSP generation of physical audio models that sound decently realistic and blazing fast 2D axisymmetric model generation.
 
-The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer, or by using an audio input device (such as a microphone) to excite the vertices.
+The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer or by using an audio input device (such as a microphone) to excite the vertices.
 
 - Project video: https://youtu.be/RwxgOHVBDvc
 - Example audio output is in the [sound_samples](sound_samples/) directory.
 
 This project started as the final project for Karl Hiner and Ben Wilfong for GA Tech CSE-6730 Modeling & Simulation, Spring 2023.
-_The code as it was at the end of the school project repo is [here](https://github.com/GATech-CSE-6730-Spring-2023-Project/mesh2audio)._
+_The code as it was at the end of the school project is [here](https://github.com/GATech-CSE-6730-Spring-2023-Project/mesh2audio)._
 
 Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
 (Ben implemented everything under the `fem` directory.)
@@ -37,13 +37,13 @@ $ ln -s llvm-config-16 llvm-config
 $ export PATH="$(llvm-config --bindir):$PATH"
 ```
 
-Install GTK (for native file dialogs), and OpenGL dependencies:
+Install GTK (for native file dialogs) and OpenGL dependencies:
 
 ```shell
 $ sudo apt install build-essential libgtk-3-dev libglu1-mesa-dev freeglut3-dev mesa-common-dev libglew-dev
 ```
 
-### Clone, clean and build app
+### Clone, clean, and build app
 
 ```shell
 $ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
@@ -61,7 +61,7 @@ $ cd mesh2audio/app
 Debug build is generated in the `./build` directory relative to project (repo) root.
 Release build is generated in `./build-release`.
 
-On Linux, you will also need to build the `fem` executable (since the one that's committed to this repo was build on Mac):
+On Linux, you will also need to build the `fem` executable (since the one that's committed to this repo was built on Mac):
 
 ```shell
 $ sudo apt install gfortran
@@ -71,7 +71,7 @@ $ ./build.sh
 To run the freshly built application:
 
 ```sh
-# The pplication assumes it's being run from the build directory when locating its resource files.
+# The application assumes it's being run from the build directory when locating its resource files.
 $ cd build # or build-release
 $ ./mesh2audio
 ```
@@ -79,18 +79,20 @@ $ ./mesh2audio
 ## Stack
 
 - App: UI/UX/mesh/audio generation & editing
-  - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX, supporting many environments & backends.
+  - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX.
   - [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
   - [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
-  - [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D meshes into tetrahedral meshes.
-  - [CDT](https://github.com/artem-ogre/CDT): Constrained Delaunay Triangulation, the default 2D polygon triangulation method
-  - [earcut](https://github.com/mapbox/earcut.hpp): Simpler 2D polygon triangulation, provided as an option.
-  - [glm](https://github.com/g-truc/glm): Frontend maths.
+  - [glm](https://github.com/g-truc/glm): Graphics math.
+  - [OpenMesh](https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh): Main polyhedral mesh representation data structure.
+  - [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D surface meshes into tetrahedral meshes.
+  - [ReactPhysics3D](https://github.com/DanielChappuis/reactphysics3d/tree/develop): Collision detection and physics.
   - [nativefiledialog-extended](https://github.com/btzy/nativefiledialog-extended): Native file dialogs.
   - [nanosvg](https://github.com/memononen/nanosvg): Read path vertices from SVG files.
-  - [ImPlot](https://github.com/epezent/implot): Plotting
+  - [ImPlot](https://github.com/epezent/implot): Plotting.
   - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform and camera rotation gizmos.
   - [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loading spinners for ImGui.
+  - [CDT](https://github.com/artem-ogre/CDT): Constrained Delaunay Triangulation, the default 2D polygon triangulation method.
+  - [earcut](https://github.com/mapbox/earcut.hpp): Simpler 2D polygon triangulation, provided as an option.
 - FEM:
   - 2D FEM: Custom Fortran implementation by [Ben Wilfong](https://github.com/wilfonba)
-  - 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega)
+  - 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega) for generating mass/stiffness matrices + [Spectra](https://github.com/yixuan/spectra) for finding eigenvalues/vectors.
