@@ -50,76 +50,6 @@ vector<vec2> MeshProfile::GetVertices() const {
     return vertices;
 }
 
-static Eigen::SparseMatrix<double> ReadSparseMatrix(const fs::path &file_path) {
-    std::ifstream input_file(file_path);
-    if (!input_file.is_open()) throw std::runtime_error(string("Error opening file: ") + file_path.string());
-
-    vector<Eigen::Triplet<double>> K_triplets;
-    string line;
-    while (std::getline(input_file, line)) {
-        std::istringstream line_stream(line);
-        unsigned int i, j;
-        double entry;
-        string comma;
-        line_stream >> i >> comma >> j >> comma >> entry;
-
-        // Decrement indices by 1 since Eigen uses 0-based indexing.
-        K_triplets.emplace_back(i - 1, j - 1, entry);
-    }
-
-    input_file.close();
-
-    // Find matrix dimensions.
-    int num_rows = 0, num_cols = 0;
-    for (const auto &triplet : K_triplets) {
-        num_rows = std::max(num_rows, triplet.row() + 1);
-        num_cols = std::max(num_cols, triplet.col() + 1);
-    }
-
-    Eigen::SparseMatrix<double> matrix(num_rows, num_cols);
-    matrix.setFromTriplets(K_triplets.begin(), K_triplets.end());
-
-    return matrix;
-}
-
-static const fs::path TesselationDir = fs::path("./") / "profile_tesselation";
-
-string MeshProfile::GenerateDspAxisymmetric() const {
-    // Write the profile to an obj file.
-    const auto fem_dir = fs::path("./") / ".." / ".." / "fem";
-    fs::create_directory(TesselationDir); // Create the tesselation dir if it doesn't exist.
-    const auto obj_path = TesselationDir / SvgFilePath.filename().replace_extension(".obj");
-    SaveTesselation(obj_path);
-
-    // Execute the `fem` program to generate the mass/stiffness matrices.
-    fs::path obj_path_no_extension = obj_path;
-    obj_path_no_extension = obj_path_no_extension.replace_extension("");
-    const string fem_cmd = std::format(
-        "{} {} {} {} {}", (fem_dir / "fem").string(),
-        obj_path_no_extension.string(),
-        Material.YoungModulus, Material.PoissonRatio, Material.Density
-    );
-    int result = std::system(fem_cmd.c_str());
-    if (result != 0) throw std::runtime_error("Error executing fem command.");
-
-    const auto M = ReadSparseMatrix(obj_path_no_extension.string() + "_M.out");
-    const auto K = ReadSparseMatrix(obj_path_no_extension.string() + "_K.out");
-
-    const int num_vertices = TesselationVertices.size();
-    m2f::CommonArguments args{
-        "modalModel",
-        true, // freq control activated
-        20, // lowest mode freq
-        10000, // highest mode freq
-        40, // number of synthesized modes (default is 20)
-        80, // number of modes to be computed for the finite element analysis (default is 100)
-        {}, // specific excitation positions
-        NumExcitationVertices(), // number of excitation positions (default is max: -1)
-    };
-    static const int vertex_dim = 2;
-    return m2f::mesh2faust(M, K, num_vertices, vertex_dim, args);
-}
-
 static constexpr float Epsilon = 1e-6f;
 
 bool MeshProfile::IsClosed() const {
@@ -269,25 +199,6 @@ bool MeshProfile::Render() {
         }
     }
 
-    if (ShowTesselation && !TesselationIndices.empty()) {
-        for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
-            for (int j = 0; j < 3; j++) {
-                const ImVec2 vertex = TesselationVertices[TesselationIndices[i + j]];
-                dl->_Path.push_back(vertex * scale + offset);
-            }
-            dl->_Path.push_back(dl->_Path[0]); // Close triangle path.
-            dl->PathStroke(TesselationStrokeColorU32, 0, 1);
-        }
-    }
-    if (Audio::FaustState::IsRunning() && Audio::FaustState::Is2DModel) {
-        const int tesselation_index_pos = *Audio::FaustState::ExcitePos;
-        if (tesselation_index_pos >= 0 && size_t(tesselation_index_pos) < TesselationIndices.size()) {
-            const int tesselation_index = TesselationIndices[tesselation_index_pos];
-            const ImVec2 vertex = TesselationVertices[tesselation_index];
-            dl->AddCircleFilled(vertex * scale + offset, AnchorPointRadius, GetColorU32(ImGuiCol_ButtonHovered));
-        }
-    }
-
     if (modified) CreateVertices();
     return modified;
 }
@@ -305,21 +216,10 @@ bool MeshProfile::RenderConfig() {
     NewLine();
     Checkbox("Path", &ShowPath);
     SameLine();
-    Checkbox("Tesselation", &ShowTesselation);
     if (ShowPath) {
         SeparatorText("Path");
         SliderFloat("Stroke weight##Path", &PathLineThickness, 0.5f, 5.f);
         if (ColorEdit4("Color##Path", (float *)&PathLineColor)) PathLineColorU32 = ColorConvertFloat4ToU32(PathLineColor);
-    }
-    if (ShowTesselation) {
-        SeparatorText("Tesselation");
-        TextUnformatted("Tesselation mode");
-        modified |= RadioButton("Constrained Delaunay triangulation", &TessMode, TesselationMode_CDT) ||
-            RadioButton("Ear clipping", &TessMode, TesselationMode_Earcut);
-        if (TessMode == TesselationMode_CDT) {
-            modified |= SliderInt("Random points", &NumRandomTesselationPoints, 0, 300);
-        }
-        if (ColorEdit4("Color##Tesselation", (float *)&TesselationStrokeColor)) TesselationStrokeColorU32 = ColorConvertFloat4ToU32(TesselationStrokeColor);
     }
 
     if (AnchorPointRadius < ControlPointRadius) AnchorPointRadius = ControlPointRadius;
@@ -384,8 +284,6 @@ void MeshProfile::CreateVertices() {
     for (int i = 0; i < dl._Path.Size; i++) Vertices[i] = dl._Path[i];
 
     dl.PathClear();
-
-    Tesselate();
 }
 
 ImRect MeshProfile::CalcBounds() {
@@ -404,131 +302,4 @@ ImVec2 MeshProfile::GetControlPoint(size_t i, const ImVec2 &offset, float scale)
 }
 ImVec2 MeshProfile::GetVertex(size_t i, const ImVec2 &offset, float scale) const {
     return Vertices[i] * scale + offset;
-}
-
-#include <fstream>
-
-void MeshProfile::SaveTesselation(fs::path file_path) const {
-    std::ofstream out(file_path.c_str());
-    if (!out.is_open()) throw std::runtime_error(std::string("Error opening file: ") + file_path.string());
-
-    out << "# Vertices: " << TesselationVertices.size() << "\n";
-    out << "# Faces: " << TesselationIndices.size() / 3 << "\n";
-
-    out << std::setprecision(10);
-    for (const ImVec2 &v : TesselationVertices) {
-        out << "v " << v.x << " " << v.y << " " << 0 << "\n";
-    }
-    for (size_t i = 0; i < TesselationIndices.size() - 1; i += 3) {
-        out << "f ";
-        for (int j = 0; j < 3; j++) out << TesselationIndices[i + j] + 1 << " ";
-        out << "\n";
-    }
-    out.close();
-}
-
-#include "CDT.h"
-#include "earcut.hpp"
-#include <random>
-
-static float triangle_area(const CDT::Triangle &triangle, const CDT::Triangulation<float> &cdt) {
-    const auto &indices = triangle.vertices;
-    const auto &a = cdt.vertices[indices[0]];
-    const auto &b = cdt.vertices[indices[1]];
-    const auto &c = cdt.vertices[indices[2]];
-    return abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) * 0.5);
-}
-
-static std::mt19937 rng{std::random_device{}()};
-static ImVec2 toImVec2(const CDT::V2d<float> &v) { return {v.x, v.y}; }
-
-// Generate random points inside the triangulated polygon, weighting placement by triangle area.
-vector<ImVec2> GenerateRandomPointsInsidePolygon(CDT::Triangulation<float> &cdt, uint num_points) {
-    vector<ImVec2> points(num_points);
-
-    const auto &triangles = cdt.triangles;
-    vector<float> areas(triangles.size());
-    float total_area = 0.0f;
-    for (size_t i = 0; i < triangles.size(); ++i) {
-        const auto &triangle = triangles[i];
-        total_area += triangle_area(triangle, cdt);
-        areas[i] = total_area;
-    }
-    std::uniform_real_distribution<float> area_dist(0.0f, total_area);
-    std::uniform_real_distribution<float> coord_dist(0.0f, 1.0f);
-
-    for (uint i = 0; i < num_points; ++i) {
-        const float r = area_dist(rng);
-        size_t tri_idx = distance(areas.begin(), lower_bound(areas.begin(), areas.end(), r));
-        const auto &triangle = triangles[tri_idx];
-        const auto &indices = triangle.vertices;
-        const auto a = toImVec2(cdt.vertices[indices[0]]);
-        const auto b = toImVec2(cdt.vertices[indices[1]]);
-        const auto c = toImVec2(cdt.vertices[indices[2]]);
-
-        // Generate a random point inside the triangle.
-        float u = coord_dist(rng);
-        float v = coord_dist(rng);
-        if (u + v > 1.0f) {
-            u = 1.0f - u;
-            v = 1.0f - v;
-        }
-        points[i] = a * (1.0f - u - v) + b * u + c * v;
-    }
-
-    return points;
-}
-
-void MeshProfile::Tesselate() {
-    TesselationVertices.clear();
-    TesselationIndices.clear();
-    if (TessMode == TesselationMode_Earcut) {
-        vector<vector<std::array<float, 2>>> polygon{{}};
-        TesselationVertices.reserve(Vertices.size());
-        for (const auto &v : Vertices) {
-            // Earcut does not introduce new vertices - it only assigns indices to existing vertices.
-            // We could special-case on Earcut mode when drawing to use the profile vertices instead of copying them,
-            // but copying to handle both cases the same way is simpler.
-            TesselationVertices.push_back(v);
-            polygon[0].push_back({v.x, v.y});
-        }
-        TesselationIndices = mapbox::earcut<uint>(polygon);
-    } else { // CDT
-        CDT::Triangulation<float> cdt;
-        cdt.insertVertices(
-            Vertices.begin(), Vertices.end(),
-            [](const auto &p) { return p.x; },
-            [](const auto &p) { return p.y; }
-        );
-        vector<CDT::Edge> edges;
-        for (size_t i = 0; i < Vertices.size(); i++) {
-            edges.emplace_back(i, (i + 1) % Vertices.size());
-        }
-        cdt.insertEdges(edges);
-        cdt.eraseOuterTriangles();
-        if (NumRandomTesselationPoints > 0) {
-            const auto random_points = GenerateRandomPointsInsidePolygon(cdt, NumRandomTesselationPoints);
-            // We can't insert more points, so we have to create a new triangulation.
-            cdt = {};
-            cdt.insertVertices(
-                Vertices.begin(), Vertices.end(),
-                [](const auto &p) { return p.x; },
-                [](const auto &p) { return p.y; }
-            );
-            cdt.insertVertices(
-                random_points.begin(), random_points.end(),
-                [](const auto &p) { return p.x; },
-                [](const auto &p) { return p.y; }
-            );
-            cdt.insertEdges(edges);
-            cdt.eraseOuterTriangles();
-        }
-
-        TesselationVertices.reserve(cdt.vertices.size());
-        TesselationIndices.reserve(cdt.triangles.size() * 3);
-        for (const auto &v : cdt.vertices) TesselationVertices.push_back({v.x, v.y});
-        for (const auto &triangle : cdt.triangles) {
-            for (const auto v_index : triangle.vertices) TesselationIndices.push_back(v_index);
-        }
-    }
 }

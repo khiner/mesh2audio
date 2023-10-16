@@ -1,8 +1,5 @@
 #include <GL/glew.h>
 
-#include <fstream>
-#include <iostream>
-
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
@@ -28,7 +25,6 @@ static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<InteractiveMesh> MainMesh;
 
 static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
-static bool IsGeneratedDsp2d = false; // `false` means 3D.
 static string GeneratedDsp; // The most recently generated DSP code.
 
 ::Audio Audio{};
@@ -207,17 +203,6 @@ int main(int, char **) {
                         std::cerr << "Error: " << NFD_GetError() << '\n';
                     }
                 }
-                if (MenuItem("Export profile as obj", nullptr, false, MainMesh != nullptr && MainMesh->HasProfile())) {
-                    nfdchar_t *save_path;
-                    nfdfilteritem_t filter[] = {{"Mesh profile object", "obj"}};
-                    nfdresult_t result = NFD_SaveDialog(&save_path, filter, 1, nullptr, "res/");
-                    if (result == NFD_OKAY) {
-                        MainMesh->SaveProfile(save_path);
-                        NFD_FreePath(save_path);
-                    } else if (result != NFD_CANCEL) {
-                        std::cerr << "Error: " << NFD_GetError() << '\n';
-                    }
-                }
                 EndMenu();
             }
             if (BeginMenu("Windows")) {
@@ -290,34 +275,26 @@ int main(int, char **) {
                     const bool has_tetrahedral_mesh = MainMesh->HasTets();
                     const bool has_profile = MainMesh->HasProfile();
                     if (!has_tetrahedral_mesh) BeginDisabled();
-                    const bool generate_tet_dsp = Button("Generate 3D DSP");
+                    const bool generate_dsp = Button("Generate DSP");
                     if (!has_tetrahedral_mesh) {
                         SameLine();
                         TextUnformatted("Run |Mesh Controls|->|Mesh|->|Generate tetrahedral mesh|.");
                         EndDisabled();
                     }
                     if (!has_profile) BeginDisabled();
-                    const bool generate_axisymmetric_dsp = Button("Generate axisymmetric DSP");
                     if (!has_profile) {
                         SameLine();
                         TextUnformatted("Run |File|->|Open mesh| and select an SVG file.");
                         EndDisabled();
                     }
-                    if (generate_tet_dsp || generate_axisymmetric_dsp) {
+                    if (generate_dsp) {
                         DspGenerator.Launch([&] {
-                            const int num_excitations = generate_tet_dsp ? MainMesh->Num3DExcitationVertices() : MainMesh->Num2DExcitationVertices();
-                            const string model_dsp = generate_tet_dsp ? MainMesh->GenerateDsp() : MainMesh->GenerateDspAxisymmetric();
-                            if (!model_dsp.empty()) {
-                                GeneratedDsp = Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, num_excitations);
-                            } else {
-                                GeneratedDsp = "process = _;";
-                            }
+                            const string model_dsp = MainMesh->GenerateDsp();
+                            GeneratedDsp = model_dsp.empty() ? "process = _;" : Audio::FaustState::GenerateModelInstrumentDsp(model_dsp, MainMesh->NumExcitableVertices);
                         });
-                        IsGeneratedDsp2d = !generate_tet_dsp;
                     }
                     if (DspGenerator.Render()) {
                         Audio.Faust.Code = GeneratedDsp;
-                        Audio::FaustState::Is2DModel = IsGeneratedDsp2d;
                         GeneratedDsp = "";
                     }
                     if (has_tetrahedral_mesh || has_profile) {
@@ -326,7 +303,7 @@ int main(int, char **) {
                         static std::string selected_preset = "Bell";
                         if (BeginCombo("Presets", selected_preset.c_str())) {
                             for (const auto &[preset_name, material] : MaterialPresets) {
-                                bool is_selected = (preset_name == selected_preset);
+                                const bool is_selected = (preset_name == selected_preset);
                                 if (Selectable(preset_name.c_str(), is_selected)) {
                                     selected_preset = preset_name;
                                     Material = material;

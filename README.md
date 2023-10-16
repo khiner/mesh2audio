@@ -1,8 +1,6 @@
 # mesh2audio
 
-Generate axisymmetric 3D models, or import existing 3D models and transform them into real-time playable physical audio models!
-
-Supports fast DSP generation of physical audio models that sound decently realistic and blazing fast 2D axisymmetric model generation.
+Import or generate 3D models and transform them into real-time playable physical audio models!
 
 The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer or by using an audio input device (such as a microphone) to excite the vertices.
 
@@ -11,11 +9,7 @@ The generated audio model can be played in real-time by "striking" (clicking) on
 
 This project started as the final project for Karl Hiner and Ben Wilfong for GA Tech CSE-6730 Modeling & Simulation, Spring 2023.
 _The code as it was at the end of the school project is [here](https://github.com/GATech-CSE-6730-Spring-2023-Project/mesh2audio)._
-
-Custom 2D axisymmetric FEM model designed and implemented by [Ben Wilfong](https://github.com/wilfonba).
-(Ben implemented everything under the `fem` directory.)
-
-The rest of the code is basically a GUI wrapper around Ben's axysimmetric FEM, and the O.G., [mesh2faust](https://hal.science/hal-03162901/document) by Romain Michon, Sara R Martin, and Julius O Smith, with some performance improvements like using [tetgen](https://github.com/libigl/tetgen) instead of [VegaFEM](https://viterbi-web.usc.edu/~jbarbic/vega/) for converting triangular meshes to tetrahedral, and using Eigen/[Spectra](https://github.com/yixuan/spectra) instead of MKL/[Pardiso](https://www.intel.com/content/www/us/en/docs/onemkl/developer-reference-c/2023-0/onemkl-pardiso-parallel-direct-sparse-solver-iface.html) to find the eigenvalues of the mass/stiffness matrices, for compatibility with non-Intel processors such as ARM.
+_This original repo also supports low-fidelity axissymmetric audio model generation._
 
 ## Build app
 
@@ -61,13 +55,6 @@ $ cd mesh2audio/app
 Debug build is generated in the `./build` directory relative to project (repo) root.
 Release build is generated in `./build-release`.
 
-On Linux, you will also need to build the `fem` executable (since the one that's committed to this repo was built on Mac):
-
-```shell
-$ sudo apt install gfortran
-$ ./build.sh
-```
-
 To run the freshly built application:
 
 ```sh
@@ -78,21 +65,16 @@ $ ./mesh2audio
 
 ## Stack
 
-- App: UI/UX/mesh/audio generation & editing
-  - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.com/libsdl-org/SDL): Immediate-mode UI/UX.
-  - [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
-  - [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
-  - [glm](https://github.com/g-truc/glm): Graphics math.
-  - [OpenMesh](https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh): Main polyhedral mesh representation data structure.
-  - [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D surface meshes into tetrahedral meshes.
-  - [ReactPhysics3D](https://github.com/DanielChappuis/reactphysics3d/tree/develop): Collision detection and physics.
-  - [nativefiledialog-extended](https://github.com/btzy/nativefiledialog-extended): Native file dialogs.
-  - [nanosvg](https://github.com/memononen/nanosvg): Read path vertices from SVG files.
-  - [ImPlot](https://github.com/epezent/implot): Plotting.
-  - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform and camera rotation gizmos.
-  - [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loading spinners for ImGui.
-  - [CDT](https://github.com/artem-ogre/CDT): Constrained Delaunay Triangulation, the default 2D polygon triangulation method.
-  - [earcut](https://github.com/mapbox/earcut.hpp): Simpler 2D polygon triangulation, provided as an option.
-- FEM:
-  - 2D FEM: Custom Fortran implementation by [Ben Wilfong](https://github.com/wilfonba)
-  - 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega) for generating mass/stiffness matrices + [Spectra](https://github.com/yixuan/spectra) for finding eigenvalues/vectors.
+- [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.comlibsdl-org/SDL): Immediate-mode UI/UX.
+- [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audiograph, with real-time interactive vertex excitation.
+- [miniaudio](https://github.com/mackron/miniaudio): Continuously render themodal physical model of the input 3D volumetric mesh to audio.
+- [glm](https://github.com/g-truc/glm): Graphics math.
+- [OpenMesh](https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh): Mainpolyhedral mesh representation data structure.
+- [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D surfacemeshes into tetrahedral meshes.
+- [ReactPhysics3D](https://github.com/DanielChappuis/reactphysics3d/treedevelop): Collision detection and physics.
+- [nativefiledialog-extended](https://github.com/btzynativefiledialog-extended): Native file dialogs.
+- [nanosvg](https://github.com/memononen/nanosvg): Read path vertices fromSVG files.
+- [ImPlot](https://github.com/epezent/implot): Plotting.
+- [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform andcamera rotation gizmos.
+- [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loadingspinners for ImGui.
+- 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega) for generating mass/stiffness matrices + [Spectra](https://github.com/yixuan/spectra) for finding eigenvalues/vectors.

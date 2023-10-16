@@ -41,17 +41,11 @@ struct InteractiveMesh : Mesh {
     void Save(fs::path file_path) const; // Export the active mesh to a .obj file.
 
     bool HasProfile() const { return Profile != nullptr; }
-    void SaveProfile(fs::path file_path) const {
-        if (Profile != nullptr) Profile->SaveTesselation(file_path);
-    }
 
     bool HasTets() const { return !Tets.Empty(); }
     bool HasConvexHull() const { return !ConvexHull.Empty(); }
 
     std::string GenerateDsp() const;
-    std::string GenerateDspAxisymmetric() const { return Profile != nullptr ? Profile->GenerateDspAxisymmetric() : ""; }
-    int Num3DExcitationVertices() const { return NumExcitableVertices; }
-    int Num2DExcitationVertices() const { return Profile != nullptr ? Profile->NumExcitationVertices() : 0; }
 
     void ApplyTransform();
     glm::mat4 GetTransform() const;

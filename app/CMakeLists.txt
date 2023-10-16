@@ -62,8 +62,6 @@ include_directories(
     lib/fmt/include
     lib/faust/architecture
     lib/nanosvg/src
-    lib/earcut/include/mapbox
-    lib/CDT/CDT/include
     lib/date/include/date
     lib/libnpy/include
     lib/tetgen

@@ -3,11 +3,7 @@
 set(SDL3_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SDL)
 add_subdirectory(${SDL3_DIR})
 
-#=================== nativefiledialog ===================
-
-add_subdirectory(nativefiledialog)
-
-#=================== faust ===================
+#=================== Faust ===================
 
 # See [the docs](https://faustdoc.grame.fr/manual/embedding/#using-libfaust-with-the-llvm-backend) for general help.
 
@@ -37,7 +33,7 @@ target_compile_definitions(dynamiclib PUBLIC LLVM_BUILD_UNIVERSAL=1)
 
 #=================== Others ===================
 
-add_subdirectory(CDT/CDT)
+add_subdirectory(nativefiledialog)
 add_subdirectory(tetgen)
 add_subdirectory(reactphysics3d)
 add_subdirectory(OpenMesh)

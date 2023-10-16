@@ -11,19 +11,11 @@
 
 namespace fs = std::filesystem;
 
-enum TesselationMode_ {
-    TesselationMode_CDT, // Constrained Delaunay Triangulation
-    TesselationMode_Earcut, // Ear clipping
-};
-
-using TesselationMode = int;
-
 struct MeshProfile {
     explicit MeshProfile(fs::path svg_file_path); // Load a 2D profile from a .svg file.
 
     inline int NumControlPoints() const { return ControlPoints.size(); }
     int NumVertices() const { return Vertices.size(); }
-    int NumExcitationVertices() const { return TesselationIndices.size() / 2; }
 
     bool IsClosed() const; // Takes into account `ClosePath`, `OffsetX`, and vertex positions.
 
@@ -36,9 +28,6 @@ struct MeshProfile {
     // would be the last vertex, and the outside lip of the bell would be somewhere in the middle.
     std::vector<glm::vec2> GetVertices() const;
 
-    void SaveTesselation(fs::path file_path) const; // Export the tesselation to a 2D .obj file.
-    std::string GenerateDspAxisymmetric() const;
-
     bool Render(); // Render as a closed line shape (using ImGui). Returns `true` if the profile was modified.
     bool RenderConfig(); // Render config section (using ImGui).
 
@@ -46,17 +35,13 @@ struct MeshProfile {
     inline static int NumRadialSlices{60};
     inline static float CurveTolerance{0.0001f};
 
-    inline static TesselationMode TessMode = TesselationMode_CDT;
-    inline static int NumRandomTesselationPoints{0}; // Only used for CDT mode.
-
-    inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false}, ShowTesselation{false};
+    inline static bool ShowPath{true}, ShowAnchorPoints{true}, ShowControlPoints{false};
     inline static float PathLineThickness{2}, ControlLineThickness{1.5}, AnchorStrokeThickness{2};
-    inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1}, TesselationStrokeColor = {1, 0.65, 0, 1};
+    inline static ImVec4 PathLineColor = {1, 1, 1, 1}, AnchorFillColor = {0, 0, 0, 1}, AnchorStrokeColor = {1, 1, 1, 1}, ControlColor = {0, 1, 0, 1};
     inline static ImU32 PathLineColorU32 = ImGui::ColorConvertFloat4ToU32(PathLineColor),
                         AnchorFillColorU32 = ImGui::ColorConvertFloat4ToU32(AnchorFillColor),
                         AnchorStrokeColorU32 = ImGui::ColorConvertFloat4ToU32(AnchorStrokeColor),
-                        ControlColorU32 = ImGui::ColorConvertFloat4ToU32(ControlColor),
-                        TesselationStrokeColorU32 = ImGui::ColorConvertFloat4ToU32(TesselationStrokeColor);
+                        ControlColorU32 = ImGui::ColorConvertFloat4ToU32(ControlColor);
     inline static float AnchorPointRadius{6}, ControlPointRadius{3};
 
     // Offset applied to `Vertices`, used to extend the extruded mesh radially without stretching by creating a gap in the middle.
@@ -70,7 +55,6 @@ struct MeshProfile {
 
 private:
     void CreateVertices();
-    void Tesselate();
 
     ImRect CalcBounds(); // Calculate current bounds based on control points. Note: original bounds cached in `OriginalBounds`.
 
@@ -85,7 +69,4 @@ private:
 
     std::vector<ImVec2> ControlPoints;
     std::vector<ImVec2> Vertices; // Cached vertices, including Bezier curve segments.
-
-    std::vector<ImVec2> TesselationVertices;
-    std::vector<uint> TesselationIndices;
 };
