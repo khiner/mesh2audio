@@ -1,7 +1,5 @@
 #include "Mesh.h"
 
-using glm::vec3, glm::vec4, glm::mat4;
-
 void Mesh::Generate() {
     VertexArray.Generate();
     ColorBuffer.Generate();

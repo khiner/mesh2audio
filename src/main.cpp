@@ -175,7 +175,7 @@ int main(int, char **) {
             DockBuilderDockWindow(Windows.MeshControls.Name, controls_node_id);
             DockBuilderDockWindow(Windows.SceneControls.Name, controls_node_id);
             DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
-            DockBuilderDockWindow(Windows.Mesh.Name, mesh_node_id);
+            DockBuilderDockWindow(Windows.Scene.Name, mesh_node_id);
         }
         if (BeginMainMenuBar()) {
             if (BeginMenu("File")) {
@@ -210,7 +210,7 @@ int main(int, char **) {
                 MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
                 MenuItem(Windows.SceneControls.Name, nullptr, &Windows.SceneControls.Visible);
                 MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
-                MenuItem(Windows.Mesh.Name, nullptr, &Windows.Mesh.Visible);
+                MenuItem(Windows.Scene.Name, nullptr, &Windows.Scene.Visible);
                 MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
                 MenuItem(Windows.ImGuiDemo.Name, nullptr, &Windows.ImGuiDemo.Visible);
                 MenuItem(Windows.ImPlotDemo.Name, nullptr, &Windows.ImPlotDemo.Visible);
@@ -241,13 +241,12 @@ int main(int, char **) {
             End();
         }
 
-        if (Windows.Mesh.Visible) {
+        if (Windows.Scene.Visible) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-            Begin(Windows.Mesh.Name, &Windows.Mesh.Visible);
+            Begin(Windows.Scene.Name, &Windows.Scene.Visible);
 
             if (MainMesh != nullptr) MainMesh->Update();
             MainScene->Render();
-            if (MainMesh != nullptr) MainMesh->Render();
             End();
             PopStyleVar();
         }

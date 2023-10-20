@@ -4,6 +4,7 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -stdlib=libc++ -fexperimental-library")
 
 project(mesh2audio LANGUAGES C CXX)
+
 if(APPLE)
     enable_language(OBJC)
 endif()
@@ -59,7 +60,6 @@ include_directories(
     lib/ImGuizmo
     lib/glm
     lib/miniaudio
-    lib/fmt/include
     lib/faust/architecture
     lib/nanosvg/src
     lib/date/include/date

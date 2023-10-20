@@ -40,7 +40,7 @@ $ sudo apt install build-essential libgtk-3-dev libglu1-mesa-dev freeglut3-dev m
 ### Clone, clean, and build app
 
 ```shell
-$ git clone --recurse-submodules git@github.com:GATech-CSE-6730-Spring-2023-Project/mesh2audio.git
+$ git clone --recurse-submodules git@github.com:khiner/mesh2audio.git
 $ cd mesh2audio
 ```
 

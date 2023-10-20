@@ -54,7 +54,6 @@ struct Scene {
     glm::mat4 CameraView, CameraProjection;
     float CameraDistance = 4, fov = 50;
 
-    inline static uint MaxNumLights = 5;
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderMode ActiveRenderMode = RenderMode::Smooth;
 

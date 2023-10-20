@@ -10,7 +10,7 @@ struct WindowsState {
     Window AudioModel{"Audio model"};
     Window SceneControls{"Scene controls"};
     Window MeshControls{"Mesh controls"};
-    Window Mesh{"Mesh"};
+    Window Scene{"Scene"};
     Window MeshProfile{"Mesh profile"};
     // By default, these demo windows are docked, but not visible.
     Window ImGuiDemo{"Dear ImGui demo", false};

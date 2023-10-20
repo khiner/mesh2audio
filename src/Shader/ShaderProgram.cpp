@@ -2,7 +2,6 @@
 
 #include <format>
 #include <iostream>
-#include <vector>
 
 ShaderProgram::ShaderProgram(std::vector<const Shader *> &&shaders)
     : Shaders(std::move(shaders)) {

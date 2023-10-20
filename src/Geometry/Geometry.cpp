@@ -2,11 +2,6 @@
 
 #include <unordered_set>
 
-#include <glm/gtx/string_cast.hpp>
-
-using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
-using std::string;
-
 void Geometry::Generate() {
     VertexBuffer.Generate();
     NormalBuffer.Generate();

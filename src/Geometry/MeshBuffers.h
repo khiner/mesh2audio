@@ -68,19 +68,18 @@ struct MeshBuffers {
         static const float min_float = std::numeric_limits<float>::lowest();
         static const float max_float = std::numeric_limits<float>::max();
 
-        glm::vec3 min_coords(max_float, max_float, max_float);
-        glm::vec3 max_coords(min_float, min_float, min_float);
+        glm::vec3 min(max_float), max(min_float);
         for (const auto &vh : Mesh.vertices()) {
             const auto &point = Mesh.point(vh);
-            min_coords.x = std::min(min_coords.x, point[0]);
-            min_coords.y = std::min(min_coords.y, point[1]);
-            min_coords.z = std::min(min_coords.z, point[2]);
-            max_coords.x = std::max(max_coords.x, point[0]);
-            max_coords.y = std::max(max_coords.y, point[1]);
-            max_coords.z = std::max(max_coords.z, point[2]);
+            min.x = std::min(min.x, point[0]);
+            min.y = std::min(min.y, point[1]);
+            min.z = std::min(min.z, point[2]);
+            max.x = std::max(max.x, point[0]);
+            max.y = std::max(max.y, point[1]);
+            max.z = std::max(max.z, point[2]);
         }
 
-        return {min_coords, max_coords};
+        return {min, max};
     }
 
     // Centers the actual points to the center of gravity, not just a transform.

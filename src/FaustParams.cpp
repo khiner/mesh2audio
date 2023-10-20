@@ -11,7 +11,6 @@ bool RadioButtons(const char *label, float *value, const FaustParams::NamesAndVa
     PushID(label);
     BeginGroup();
 
-    const auto &style = GetStyle();
     Text("%s", label);
     bool changed = false;
     for (int i = 0; i < int(names_and_values.names.size()); i++) {
