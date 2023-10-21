@@ -12,7 +12,7 @@ struct ConvexHull {
         RP3D, // reactphysics3d
     };
 
-    static OpenMesh::PolyMesh_ArrayKernelT<> Generate(const std::vector<glm::vec3> &points, Mode mode = QuickHull);
+    static OpenMesh::PolyMesh_ArrayKernelT<> Generate(const float *points, size_t num_points, Mode mode = QuickHull);
 
-    static reactphysics3d::ConvexMesh *GenerateConvexMesh(const std::vector<glm::vec3> &points);
+    static reactphysics3d::ConvexMesh *GenerateConvexMesh(const float *points, size_t num_points);
 };

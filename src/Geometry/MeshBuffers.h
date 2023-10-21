@@ -27,9 +27,18 @@ struct MeshBuffers {
     using Point = OpenMesh::Vec3f;
 
     MeshBuffers() {
+        Mesh.request_face_normals();
+        Mesh.request_vertex_normals();
     }
-    MeshBuffers(const fs::path &file_path) { Load(file_path); }
-    virtual ~MeshBuffers() = default;
+    MeshBuffers(const fs::path &file_path) {
+        Mesh.request_face_normals();
+        Mesh.request_vertex_normals();
+        Load(file_path);
+    }
+    virtual ~MeshBuffers() {
+        Mesh.release_vertex_normals();
+        Mesh.release_face_normals();
+    }
 
     void PrepareRender(RenderMode mode) {
         if (ActiveRenderMode == mode) return;
@@ -39,11 +48,18 @@ struct MeshBuffers {
 
     inline const MeshType &GetMesh() const { return Mesh; }
 
-    inline const std::vector<glm::vec3> &GetVertices() const { return UniqueVertices; }
-    inline const glm::vec3 &GetVertex(uint index) const { return UniqueVertices[index]; }
-    inline const glm::vec3 &GetNormal(uint index) const { return UniqueNormals[index]; }
+    inline const float *GetVertices() const { return (float *)Mesh.points(); }
+    inline glm::vec3 GetVertex(uint index) const {
+        const auto &p = Mesh.point(VH(index));
+        return {p[0], p[1], p[2]};
+    }
 
-    inline uint NumVertices() const { return UniqueVertices.size(); }
+    inline glm::vec3 GetVertexNormal(uint index) const {
+        const auto &n = Mesh.normal(VH(index));
+        return {n[0], n[1], n[2]};
+    }
+
+    inline uint NumVertices() const { return Mesh.n_vertices(); }
     inline uint NumIndices() const { return Indices.size(); }
 
     uint FindVertextNearestTo(const glm::vec3 point) const;
@@ -108,13 +124,13 @@ struct MeshBuffers {
 
         glm::vec3 min(max_float), max(min_float);
         for (const auto &vh : Mesh.vertices()) {
-            const auto &point = Mesh.point(vh);
-            min.x = std::min(min.x, point[0]);
-            min.y = std::min(min.y, point[1]);
-            min.z = std::min(min.z, point[2]);
-            max.x = std::max(max.x, point[0]);
-            max.y = std::max(max.y, point[1]);
-            max.z = std::max(max.z, point[2]);
+            const auto &p = Mesh.point(vh);
+            min.x = std::min(min.x, p[0]);
+            min.y = std::min(min.y, p[1]);
+            min.z = std::min(min.z, p[2]);
+            max.x = std::max(max.x, p[0]);
+            max.y = std::max(max.y, p[1]);
+            max.z = std::max(max.z, p[2]);
         }
 
         return {min, max};
@@ -134,6 +150,8 @@ struct MeshBuffers {
     void SetOpenMesh(const MeshType &mesh) {
         Clear();
         Mesh = mesh;
+        Mesh.request_face_normals();
+        Mesh.request_vertex_normals();
         UpdateBuffersFromMesh();
     }
 
@@ -159,23 +177,19 @@ protected:
     }
 
     void UpdateVertices() {
-        UniqueVertices.clear();
         Vertices.clear();
-
-        for (const auto &vh : Mesh.vertices()) {
-            const auto &point = Mesh.point(vh);
-            UniqueVertices.emplace_back(point[0], point[1], point[2]);
-        }
-
         if (ActiveRenderMode == RenderMode::Flat) {
             for (const auto &fh : Mesh.faces()) {
                 for (const auto &vh : Mesh.fv_range(fh)) {
-                    const auto &point = Mesh.point(vh);
-                    Vertices.emplace_back(point[0], point[1], point[2]);
+                    const auto &p = Mesh.point(vh);
+                    Vertices.emplace_back(p[0], p[1], p[2]);
                 }
             }
         } else {
-            Vertices = UniqueVertices;
+            for (const auto &vh : Mesh.vertices()) {
+                const auto &p = Mesh.point(vh);
+                Vertices.emplace_back(p[0], p[1], p[2]);
+            }
         }
         Dirty = true;
     }
@@ -189,35 +203,26 @@ protected:
     }
 
     void UpdateNormals() {
-        UniqueNormals.clear();
         Normals.clear();
 
-        Mesh.request_face_normals();
-        Mesh.request_vertex_normals();
         Mesh.update_normals();
-        for (const auto &vh : Mesh.vertices()) {
-            const auto &normal = Mesh.normal(vh);
-            UniqueNormals.emplace_back(normal[0], normal[1], normal[2]);
-        }
         if (ActiveRenderMode == RenderMode::Flat) {
             for (const auto &fh : Mesh.faces()) {
-                const auto &normal = Mesh.normal(fh);
+                const auto &n = Mesh.normal(fh);
                 // Duplicate the normal for each vertex.
                 for (size_t i = 0; i < Mesh.valence(fh); ++i) {
-                    Normals.emplace_back(normal[0], normal[1], normal[2]);
+                    Normals.emplace_back(n[0], n[1], n[2]);
                 }
             }
         } else {
-            Normals = UniqueNormals;
+            for (const auto &vh : Mesh.vertices()) {
+                const auto &n = Mesh.normal(vh);
+                Normals.emplace_back(n[0], n[1], n[2]);
+            }
         }
-        Mesh.release_vertex_normals();
-        Mesh.release_face_normals();
 
         Dirty = true;
     }
-
-    // todo instead of duplicating vertices, map indices (based on active render mode) to unique vertices.
-    std::vector<glm::vec3> UniqueVertices, UniqueNormals;
 
     // Used for rendering. Note that `Vertices` and `Normals` depend on the active render mode, and may contain duplicates.
     std::vector<glm::vec3> Vertices;

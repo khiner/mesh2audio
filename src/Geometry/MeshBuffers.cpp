@@ -5,8 +5,8 @@
 uint MeshBuffers::FindVertextNearestTo(const glm::vec3 point) const {
     uint nearest_index = 0;
     float nearest_distance = std::numeric_limits<float>::max();
-    for (uint i = 0; i < UniqueVertices.size(); ++i) {
-        const float distance = glm::distance(point, UniqueVertices[i]);
+    for (uint i = 0; i < NumVertices(); i++) {
+        const float distance = glm::distance(point, GetVertex(i));
         if (distance < nearest_distance) {
             nearest_distance = distance;
             nearest_index = i;

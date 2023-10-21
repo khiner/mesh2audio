@@ -54,7 +54,7 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 
     ActiveGeometryMode = mode;
     if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
-        ConvexHull.SetOpenMesh(ConvexHull::Generate(Triangles.GetVertices(), ConvexHull::Mode::RP3D));
+        ConvexHull.SetOpenMesh(ConvexHull::Generate(Triangles.GetVertices(), Triangles.NumVertices(), ConvexHull::Mode::RP3D));
     } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
         TetGenerator.Launch();
     }
@@ -133,7 +133,7 @@ void InteractiveMesh::UpdateExcitableVertices() {
     mat4 scale = glm::scale(Identity, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
         mat4 translate = glm::translate(Identity, Tets.GetVertex(vertex_index));
-        mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(Tets.GetNormal(vertex_index))));
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(Tets.GetVertexNormal(vertex_index))));
         transforms.push_back({translate * rotate * scale});
         colors.push_back({1, 1, 1, 1});
     }
@@ -171,15 +171,14 @@ void InteractiveMesh::UpdateTets() {
 void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
-    const auto &vertices = Triangles.GetVertices();
+    const float *vertices = Triangles.GetVertices();
     const auto &triangle_indices = Triangles.GenerateTriangleIndices();
-    in.numberofpoints = vertices.size();
+    in.numberofpoints = Triangles.NumVertices();
     in.pointlist = new REAL[in.numberofpoints * 3];
-
-    for (uint i = 0; i < vertices.size(); ++i) {
-        in.pointlist[i * 3] = vertices[i].x;
-        in.pointlist[i * 3 + 1] = vertices[i].y;
-        in.pointlist[i * 3 + 2] = vertices[i].z;
+    for (uint i = 0; i < uint(in.numberofpoints); ++i) {
+        in.pointlist[i * 3] = vertices[i * 3];
+        in.pointlist[i * 3 + 1] = vertices[i * 3 + 1];
+        in.pointlist[i * 3 + 2] = vertices[i * 3 + 2];
     }
 
     in.numberoffacets = triangle_indices.size() / 3;
@@ -271,7 +270,7 @@ void InteractiveMesh::UpdateHoveredVertex() {
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.NumVertices())) {
         // Point the arrow at the hovered vertex.
         mat4 translate = glm::translate(Identity, geometry.GetVertex(HoveredVertexIndex));
-        mat4 rotate = glm::mat4_cast(glm::rotation(Up, geometry.GetNormal(HoveredVertexIndex)));
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, geometry.GetVertexNormal(HoveredVertexIndex)));
         transforms.push_back(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}));
     }
     HoveredVertexArrow.SetTransforms(std::move(transforms));

@@ -84,14 +84,7 @@ Physics::~Physics() {
 }
 
 rp3d::ConvexMesh *OpenMeshToConvexMesh(const MeshBuffers::MeshType &mesh) {
-    // Copy the OpenMesh vertices and indices.
-    // todo I think I saw in the source a way to get the vertices and indices directly from the mesh.
-    std::vector<glm::vec3> vertices;
-    for (const auto &vh : mesh.vertices()) {
-        const auto &point = mesh.point(vh);
-        vertices.emplace_back(point[0], point[1], point[2]);
-    }
-
+    // Copy the OpenMesh indices. (Points can be directly copied.)
     std::vector<uint> indices;
     std::vector<rp3d::PolygonVertexArray::PolygonFace> poly_faces;
     poly_faces.reserve(mesh.n_faces());
@@ -107,7 +100,7 @@ rp3d::ConvexMesh *OpenMeshToConvexMesh(const MeshBuffers::MeshType &mesh) {
     }
 
     const rp3d::PolygonVertexArray poly_vertices = {
-        uint(vertices.size()), &vertices[0][0], 3 * sizeof(float), &indices[0], sizeof(uint), uint(mesh.n_faces()), &poly_faces[0],
+        uint(mesh.n_vertices()), mesh.points(), 3 * sizeof(float), &indices[0], sizeof(uint), uint(mesh.n_faces()), &poly_faces[0],
         rp3d::PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE, rp3d::PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE};
 
     std::vector<rp3d::Message> messages;
@@ -122,7 +115,7 @@ rp3d::ConvexMesh *OpenMeshToConvexMesh(const MeshBuffers::MeshType &mesh) {
 
 void Physics::AddRigidBody(Mesh *mesh, BodyType body_type, bool is_concave) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
-    rp3d::ConvexMesh *convex_mesh = is_concave ? ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices()) : OpenMeshToConvexMesh(mesh->GetTriangles().GetMesh());
+    rp3d::ConvexMesh *convex_mesh = is_concave ? ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices(), mesh->GetTriangles().NumVertices()) : OpenMeshToConvexMesh(mesh->GetTriangles().GetMesh());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
     // Uncomment to use bounding box for collisions.
