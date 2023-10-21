@@ -13,7 +13,8 @@ struct GLVertexArray {
 
 struct Mesh {
     Mesh() {}
-    Mesh(Geometry &&triangles) : Triangles(std::move(triangles)) {}
+    // If `parent` is provided, the mesh will be rendered relative to the parent's transform.
+    Mesh(Geometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
     virtual ~Mesh() {}
 
     virtual const Geometry &ActiveGeometry() const { return Triangles; }
@@ -28,7 +29,7 @@ struct Mesh {
     void Delete() const;
     void EnableVertexAttributes() const;
 
-    inline void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
+    virtual void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
     void Render(RenderMode mode) const;
     virtual void PostRender(RenderMode) {}
 
@@ -73,11 +74,13 @@ struct Mesh {
 
 protected:
     Geometry Triangles;
+    Mesh *Parent{nullptr};
+
+    std::vector<glm::vec4> Colors{{1, 1, 1, 1}};
+    std::vector<glm::mat4> Transforms{glm::mat4{1}}; // If `Parent != nullptr`, this is relative to the parent's transform.
+    mutable std::vector<glm::mat4> AbsoluteTransforms{}; // If `Parent != nullptr`, this is a combined transform of the parent and child. Otherwise, it's empty.
 
 private:
-    std::vector<glm::vec4> Colors{{1, 1, 1, 1}};
-    std::vector<glm::mat4> Transforms{glm::mat4{1}};
-
     GLVertexArray VertexArray;
     GLBuffer<glm::vec4, GL_ARRAY_BUFFER> ColorBuffer;
     GLBuffer<glm::mat4, GL_ARRAY_BUFFER> TransformBuffer;

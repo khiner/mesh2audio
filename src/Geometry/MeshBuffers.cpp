@@ -1,5 +1,20 @@
 #include "MeshBuffers.h"
 
+#include <glm/geometric.hpp>
+
+uint MeshBuffers::FindVertexNearest(const glm::vec3 point) const {
+    uint nearest_index = 0;
+    float nearest_distance = std::numeric_limits<float>::max();
+    for (uint i = 0; i < Vertices.size(); ++i) {
+        const float distance = glm::distance(point, Vertices[i]);
+        if (distance < nearest_distance) {
+            nearest_distance = distance;
+            nearest_index = i;
+        }
+    }
+    return nearest_index;
+}
+
 void MeshBuffers::ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices, uint slices, bool closed) {
     Clear();
     if (profile_vertices.size() < 3) return;

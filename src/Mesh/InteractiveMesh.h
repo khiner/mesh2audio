@@ -32,10 +32,14 @@ struct InteractiveMesh : Mesh {
 
     std::vector<const Geometry *> AllGeometries() const override { return {&Triangles, &Tets, &ConvexHull}; }
 
-    void Update();
+    const Geometry &GetTets() const { return Tets; }
 
-    void Render();
+    void PrepareRender(RenderMode) override;
     void PostRender(RenderMode) override;
+
+    // Trigger the nearest excitation vertex nearest to the provided vertex.
+    void TriggerVertex(uint vertex_index, float amount = 1);
+    void ReleaseTrigger();
 
     void RenderConfig();
     void RenderProfile();
@@ -94,9 +98,9 @@ private:
     Worker RealImpactLoader{"Load RealImpact", "Loading RealImpact data...", [&] { LoadRealImpact(); }};
 
     int HoveredVertexIndex = -1, CameraTargetVertexIndex = -1;
-    Mesh HoveredVertexArrow{Arrow{0.5, 0.1, 0.2, 0.3}};
+    Mesh HoveredVertexArrow{Arrow{0.5, 0.1, 0.2, 0.3}, this};
 
     std::vector<int> ExcitableVertexIndices; // Indexes into `Tets` vertices.
-    Mesh ExcitableVertexArrows{Arrow{0.25, 0.05, 0.1, 0.15}}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
+    Mesh ExcitableVertexArrows{Arrow{0.25, 0.05, 0.1, 0.15}, this}; // Instanced arrows for each excitable vertex, with less emphasis than `HoveredVertexArrow`.
     Mesh RealImpactListenerPoints{Sphere{0.01}}; // Instanced spheres for each listener point.
 };

@@ -275,13 +275,23 @@ int main(int, char **) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
             Begin(Windows.Scene.Name, &Windows.Scene.Visible);
 
-            if (MainMesh != nullptr) MainMesh->Update();
             MainScene->Render();
             if (MainPhysics) {
                 const auto &collisions = MainPhysics->Tick();
-                for (const auto &collision : collisions) {
-                    collision.Point1.Body->Mesh->SetColor({1, 0, 0, 1});
-                    collision.Point2.Body->Mesh->SetColor({1, 0, 0, 1});
+                if (MainMesh && MainMesh->HasTets()) {
+                    for (const auto &collision : collisions) {
+                        glm::vec3 point;
+                        if (collision.Point1.Body->Mesh == MainMesh.get()) point = collision.Point1.Position;
+                        else if (collision.Point2.Body->Mesh == MainMesh.get()) point = collision.Point2.Position;
+                        else continue;
+
+                        const uint nearest_vertex = MainMesh->GetTets().FindVertexNearest(point);
+                        // todo find good scaling
+                        // todo release vertex
+                        // todo multiple simultaneous vertex triggers (need to modify the DSP)
+                        const float amount = std::max(1.f, collision.PenetrationDepth);
+                        MainMesh->TriggerVertex(nearest_vertex, amount);
+                    }
                 }
             }
             End();

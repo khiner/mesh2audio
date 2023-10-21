@@ -43,7 +43,13 @@ void Mesh::BindData(RenderMode render_mode) const {
     ActiveGeometry().BindData(render_mode);
 
     if (Dirty) {
-        TransformBuffer.SetData(Transforms);
+        if (Parent) {
+            AbsoluteTransforms = Transforms;
+            for (auto &transform : AbsoluteTransforms) transform = Parent->GetTransform() * transform;
+            TransformBuffer.SetData(AbsoluteTransforms);
+        } else {
+            TransformBuffer.SetData(Transforms);
+        }
         ColorBuffer.SetData(Colors);
     }
     Dirty = false;

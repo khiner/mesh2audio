@@ -133,7 +133,7 @@ void InteractiveMesh::UpdateExcitableVertices() {
     mat4 scale = glm::scale(Identity, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
         mat4 translate = glm::translate(Identity, Tets.GetVertex(vertex_index));
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(Tets.GetNormal(vertex_index))));
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(Tets.GetNormal(vertex_index))));
         transforms.push_back({translate * rotate * scale});
         colors.push_back({1, 1, 1, 1});
     }
@@ -253,13 +253,13 @@ void InteractiveMesh::UpdateHoveredVertex() {
         float min_vertex_camera_distance = FLT_MAX;
         const auto &vertices = geometry.GetVertices();
         for (size_t i = 0; i < vertices.size(); i++) {
-            const auto &v = vertices[i];
-            const vec4 pos_clip_space = view_projection * vec4{v.x, v.y, v.z, 1.0f};
+            const auto &v = Transforms[0] * glm::vec4{vertices[i], 1};
+            const vec4 pos_clip_space = view_projection * v;
             const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
             const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
             const float screen_dist_squared = pow(mouse_pos.x - vertex_screen.x, 2) + pow(mouse_pos.y - vertex_screen.y, 2);
             if (screen_dist_squared <= VertexHoverRadiusSquared) {
-                const float vertex_camera_distance = glm::distance(camera_position, v);
+                const float vertex_camera_distance = glm::distance(camera_position, glm::vec3{v});
                 if (vertex_camera_distance < min_vertex_camera_distance) {
                     min_vertex_camera_distance = vertex_camera_distance;
                     HoveredVertexIndex = i;
@@ -271,25 +271,48 @@ void InteractiveMesh::UpdateHoveredVertex() {
     std::vector<mat4> transforms;
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.GetVertices().size())) {
         // Point the arrow at the hovered vertex.
-        float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
-        mat4 scale = glm::scale(Identity, vec3{scale_factor});
         mat4 translate = glm::translate(Identity, geometry.GetVertex(HoveredVertexIndex));
-        mat4 rotate = glm::toMat4(glm::rotation(Up, glm::normalize(geometry.GetNormal(HoveredVertexIndex))));
-        transforms.push_back({translate * rotate * scale});
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(geometry.GetNormal(HoveredVertexIndex))));
+        transforms.push_back(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}));
     }
     HoveredVertexArrow.SetTransforms(std::move(transforms));
 }
 
-void InteractiveMesh::Update() {
+void InteractiveMesh::PrepareRender(RenderMode mode) {
+    Mesh::PrepareRender(mode);
+
     if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) SetGeometryMode(GeometryMode_Triangular);
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
 }
 
-void InteractiveMesh::PostRender(RenderMode) {
-    const auto &geometry = ActiveGeometry();
-    const auto &vertices = geometry.GetVertices();
+void InteractiveMesh::TriggerVertex(uint vertex_index, float amount) {
+    if (ExcitableVertexIndices.empty() || !Audio::FaustState::IsRunning()) return;
 
+    const auto &vertices = ActiveGeometry().GetVertices();
+    const auto &vertex = vertices[vertex_index];
+    int nearest_excite_vertex_pos = -1;
+    float min_dist = FLT_MAX;
+    for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+        const auto &excite_vertex_index = ExcitableVertexIndices[i];
+        const auto &excite_vertex = vertices[excite_vertex_index];
+        const float dist = glm::distance(excite_vertex, vertex);
+        if (dist < min_dist) {
+            min_dist = dist;
+            nearest_excite_vertex_pos = i;
+        }
+    }
+    if (nearest_excite_vertex_pos >= 0) { // Shouldn't ever be false, but sanity check.
+        *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
+        *Audio::FaustState::ExciteValue = amount;
+    }
+}
+
+void InteractiveMesh::ReleaseTrigger() {
+    if (Audio::FaustState::IsRunning()) *Audio::FaustState::ExciteValue = 0.f;
+}
+
+void InteractiveMesh::PostRender(RenderMode) {
     // Handle mouse interactions.
     const bool mouse_clicked = IsMouseClicked(0), mouse_released = IsMouseReleased(0);
     if (!Scene.ShowGizmo && IsWindowHovered()) {
@@ -297,45 +320,24 @@ void InteractiveMesh::PostRender(RenderMode) {
         else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
         // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
-        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
-            const auto &hovered_vertex = vertices[HoveredVertexIndex];
-            int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
-            float min_dist = FLT_MAX;
-            for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-                const auto &excite_vertex_index = ExcitableVertexIndices[i];
-                const auto &excite_vertex = vertices[excite_vertex_index];
-                const float dist = glm::distance(excite_vertex, hovered_vertex);
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    nearest_excite_vertex_pos = i;
-                }
-            }
-            if (nearest_excite_vertex_pos >= 0) { // Shouldn't ever be false, but sanity check.
-                *Audio::FaustState::ExcitePos = nearest_excite_vertex_pos;
-                *Audio::FaustState::ExciteValue = 1.f;
-            }
-        }
+        if (mouse_clicked && HoveredVertexIndex >= 0) TriggerVertex(HoveredVertexIndex, 1.f);
     }
 
     // When mouse is released, release the excitation trigger
     // (even if mouse was pressed, dragged outside the window, and released).
-    if (mouse_released && Audio::FaustState::IsRunning()) *Audio::FaustState::ExciteValue = 0.f;
+    if (mouse_released) ReleaseTrigger();
 
     // Rotate the camera to the targeted vertex.
     if (CameraTargetVertexIndex >= 0) {
         static const float CameraMovementSpeed = 0.5;
 
         const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
-        const auto &target_vertex = vertices[CameraTargetVertexIndex];
+        const auto &target_vertex = ActiveGeometry().GetVertex(CameraTargetVertexIndex);
         const vec3 target_direction = glm::normalize(target_vertex - Origin);
-        // Calculate the direction from the origin to the camera position
         const vec3 current_direction = glm::normalize(camera_position - Origin);
-        // Create quaternions representing the two directions
-        const glm::quat current_quat = glm::quatLookAt(current_direction, Up);
-        const glm::quat target_quat = glm::quatLookAt(target_direction, Up);
         // Interpolate linearly between the two quaternions along the sphere defined by the camera distance.
         const float lerp_factor = glm::clamp(CameraMovementSpeed / Scene.CameraDistance, 0.0f, 1.0f);
-        const glm::quat new_quat = glm::slerp(current_quat, target_quat, lerp_factor);
+        const glm::quat new_quat = glm::slerp(glm::quatLookAt(current_direction, Up), glm::quatLookAt(target_direction, Up), lerp_factor);
         const vec3 new_camera_direction = new_quat * vec3{0.0f, 0.0f, -1.0f};
         Scene.CameraView = glm::lookAt(Origin + new_camera_direction * Scene.CameraDistance, Origin, Up);
     }

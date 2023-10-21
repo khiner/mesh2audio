@@ -40,6 +40,7 @@ struct MeshBuffers {
     inline const glm::vec3 &GetVertex(uint index) const { return Vertices[index]; }
     inline const glm::vec3 &GetNormal(uint index) const { return Normals[index]; }
 
+    uint FindVertexNearest(const glm::vec3 point) const;
     inline bool HasNormals() const { return !Normals.empty(); }
     inline bool Empty() const { return Vertices.empty(); }
 
