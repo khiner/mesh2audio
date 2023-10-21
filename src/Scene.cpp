@@ -6,10 +6,8 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "GLCanvas.h"
-#include "Geometry/Primitive/Cuboid.h"
 #include "Geometry/Primitive/Rect.h"
 #include "Geometry/Primitive/Sphere.h"
-#include "Physics.h"
 #include "Shader/ShaderProgram.h"
 
 namespace UniformName {
@@ -83,12 +81,6 @@ Scene::Scene() {
 
     GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
     glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, LightBufferId);
-
-    static const float floor_y = -1;
-    static const glm::vec3 floor_half_extents = {20, 1, 20};
-    Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
-    Floor->Generate();
-    Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
 }
 
 Scene::~Scene() {
@@ -118,8 +110,6 @@ void Scene::SetCameraDistance(float distance) {
 using namespace ImGui;
 
 void Scene::Render() {
-    if (Physics) Physics->Tick();
-
     const auto &io = ImGui::GetIO();
     const bool window_hovered = IsWindowHovered();
     if (window_hovered && io.MouseWheel != 0) {
@@ -152,15 +142,12 @@ void Scene::Render() {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    if (ShowFloor) Floor->PrepareRender(ActiveRenderMode);
     for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode::Points) glPointSize(PointRadius);
 
-    if (ShowFloor) Floor->Render(ActiveRenderMode);
     for (const auto *mesh : Meshes) mesh->Render(ActiveRenderMode);
-    if (ShowFloor) Floor->PostRender(ActiveRenderMode);
     for (auto *mesh : Meshes) mesh->PostRender(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
@@ -249,7 +236,6 @@ void Scene::RenderConfig() {
                     Grid.reset();
                 }
             }
-            Checkbox("Show floor", &ShowFloor);
             SeparatorText("Render mode");
             int render_mode = int(ActiveRenderMode);
             bool render_mode_changed = RadioButton("Smooth", &render_mode, int(RenderMode::Smooth));
@@ -328,20 +314,6 @@ void Scene::RenderConfig() {
                 }
                 PopID();
             }
-            EndTabItem();
-        }
-        if (BeginTabItem("Physics")) {
-            bool enable_physics = bool(Physics);
-            if (Checkbox("Enable physics", &enable_physics)) {
-                if (enable_physics) {
-                    Physics = std::make_unique<::Physics>();
-                    Physics->AddRigidBody(Floor.get(), Physics::BodyType::Static);
-                    Physics->AddRigidBody(Meshes[0], Physics::BodyType::Dynamic, true);
-                } else {
-                    Physics.reset();
-                }
-            }
-            if (Physics) Physics->RenderConfig();
             EndTabItem();
         }
         EndTabBar();

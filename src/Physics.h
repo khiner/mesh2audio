@@ -11,12 +11,25 @@ struct RigidBody {
     Mesh *Mesh;
 };
 
+struct CollisionAccumulator;
+
 struct Physics {
     // Mirrors `rp3d::BodyType`.
     enum class BodyType {
         Static,
         Kinematic,
         Dynamic,
+    };
+
+    struct Collision {
+        struct Point {
+            RigidBody *Body;
+            glm::vec3 Position;
+        };
+
+        Point Point1, Point2;
+        glm::vec3 Normal;
+        float PenetrationDepth;
     };
 
     Physics();
@@ -37,7 +50,9 @@ struct Physics {
     */
     void AddRigidBody(Mesh *, BodyType = BodyType::Dynamic, bool is_concave = false);
 
-    void Tick();
+    // Updates the transforms of the rigid bodies' meshes.
+    // Returns a list of collisions that occurred during the frame.
+    const std::vector<Collision> &Tick();
 
     void RenderConfig();
 
@@ -45,4 +60,5 @@ struct Physics {
 
 private:
     std::vector<RigidBody> RigidBodies;
+    std::unique_ptr<CollisionAccumulator> CollisionCallback;
 };

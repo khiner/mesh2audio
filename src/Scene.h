@@ -45,7 +45,7 @@ struct Scene {
     float LineWidth = 0.005, PointRadius = 1;
     bool CustomColors = false, UseFlatShading = true;
 
-    bool ShowCameraGizmo = true, ShowGizmo = false, ShowBounds = false, ShowFloor = true;
+    bool ShowCameraGizmo = true, ShowGizmo = false, ShowBounds = false;
 
     glm::mat4 GizmoTransform{1};
     std::function<void(const glm::mat4 &)> GizmoCallback;
@@ -65,5 +65,4 @@ struct Scene {
 
     std::unique_ptr<GLCanvas> Canvas;
     std::unique_ptr<Mesh> Grid, Floor;
-    std::unique_ptr<Physics> Physics;
 };

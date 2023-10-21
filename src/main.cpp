@@ -9,10 +9,13 @@
 #include "implot.h"
 #include <SDL.h>
 #include <SDL_opengl.h>
+#include <glm/gtx/quaternion.hpp>
 #include <nfd.h>
 
 #include "Audio.h"
+#include "Geometry/Primitive/Cuboid.h"
 #include "Mesh/InteractiveMesh.h"
+#include "Physics.h"
 #include "RealImpact.h"
 #include "Window.h"
 #include "Worker.h"
@@ -23,6 +26,8 @@ static WindowsState Windows;
 
 static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<InteractiveMesh> MainMesh;
+static std::unique_ptr<Physics> MainPhysics;
+static std::unique_ptr<Mesh> Floor;
 
 static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
 static string GeneratedDsp; // The most recently generated DSP code.
@@ -135,7 +140,15 @@ int main(int, char **) {
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "obj" / "bell" / "english.obj");
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("res") / "obj" / "bunny.obj");
     // MainMesh = std::make_unique<InteractiveMesh>(*MainScene, fs::path("../../../") / "RealImpact" / "dataset" / "22_Cup" / "preprocessed" / "transformed.obj");
+
     MainMesh->Generate();
+
+    static const float floor_y = -1;
+    static const glm::vec3 floor_half_extents = {20, 1, 20};
+    Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
+    Floor->Generate();
+    Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
+    MainScene->AddMesh(Floor.get());
 
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -174,6 +187,7 @@ int main(int, char **) {
             auto mesh_profile_node_id = DockBuilderSplitNode(mesh_node_id, ImGuiDir_Right, 0.8f, nullptr, &mesh_node_id);
             DockBuilderDockWindow(Windows.MeshControls.Name, controls_node_id);
             DockBuilderDockWindow(Windows.SceneControls.Name, controls_node_id);
+            DockBuilderDockWindow(Windows.PhysicsControls.Name, controls_node_id);
             DockBuilderDockWindow(Windows.MeshProfile.Name, mesh_profile_node_id);
             DockBuilderDockWindow(Windows.Scene.Name, mesh_node_id);
         }
@@ -210,6 +224,7 @@ int main(int, char **) {
                 MenuItem(Windows.AudioModel.Name, nullptr, &Windows.AudioModel.Visible);
                 MenuItem(Windows.SceneControls.Name, nullptr, &Windows.SceneControls.Visible);
                 MenuItem(Windows.MeshControls.Name, nullptr, &Windows.MeshControls.Visible);
+                MenuItem(Windows.PhysicsControls.Name, nullptr, &Windows.PhysicsControls.Visible);
                 MenuItem(Windows.Scene.Name, nullptr, &Windows.Scene.Visible);
                 MenuItem(Windows.MeshProfile.Name, nullptr, &Windows.MeshProfile.Visible);
                 MenuItem(Windows.ImGuiDemo.Name, nullptr, &Windows.ImGuiDemo.Visible);
@@ -240,6 +255,21 @@ int main(int, char **) {
             }
             End();
         }
+        if (Windows.PhysicsControls.Visible) {
+            Begin(Windows.PhysicsControls.Name, &Windows.PhysicsControls.Visible);
+            bool enable_physics = bool(MainPhysics);
+            if (Checkbox("Enable physics", &enable_physics)) {
+                if (enable_physics) {
+                    MainPhysics = std::make_unique<Physics>();
+                    MainPhysics->AddRigidBody(Floor.get(), Physics::BodyType::Static);
+                    MainPhysics->AddRigidBody(MainMesh.get(), Physics::BodyType::Dynamic, true);
+                } else {
+                    MainPhysics.reset();
+                }
+            }
+            if (MainPhysics) MainPhysics->RenderConfig();
+            End();
+        }
 
         if (Windows.Scene.Visible) {
             PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
@@ -247,6 +277,13 @@ int main(int, char **) {
 
             if (MainMesh != nullptr) MainMesh->Update();
             MainScene->Render();
+            if (MainPhysics) {
+                const auto &collisions = MainPhysics->Tick();
+                for (const auto &collision : collisions) {
+                    collision.Point1.Body->Mesh->SetColor({1, 0, 0, 1});
+                    collision.Point2.Body->Mesh->SetColor({1, 0, 0, 1});
+                }
+            }
             End();
             PopStyleVar();
         }
