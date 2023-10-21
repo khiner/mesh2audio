@@ -29,7 +29,8 @@ struct Mesh {
     void EnableVertexAttributes() const;
 
     inline void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
-    void Render(RenderMode mode = RenderMode::Smooth) const;
+    void Render(RenderMode mode) const;
+    virtual void PostRender(RenderMode) {}
 
     void SetPosition(const glm::vec3 &position) {
         for (auto &transform : Transforms) {
@@ -49,6 +50,10 @@ struct Mesh {
     }
     void ClearTransforms() {
         Transforms.clear();
+        Dirty = true;
+    }
+    void SetColor(uint instance, const glm::vec4 &color) {
+        Colors[instance] = color;
         Dirty = true;
     }
     void SetColor(const glm::vec4 &color) {

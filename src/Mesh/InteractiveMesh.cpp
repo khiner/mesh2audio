@@ -10,8 +10,7 @@
 
 #include "Geometry/ConvexHull.h"
 
-using glm::vec2, glm::vec3, glm::vec4, glm::mat4;
-using std::string, std::to_string;
+using glm::vec3, glm::vec4, glm::mat4;
 using seconds_t = std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>; // Alias for epoch seconds.
 
 InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Mesh(), Scene(scene) {
@@ -87,37 +86,25 @@ void InteractiveMesh::ExtrudeProfile() {
     SetGeometryMode(GeometryMode_Triangular);
 }
 
-static void InterpolateColors(const float a[], const float b[], float interpolation, float result[]) {
-    for (int i = 0; i < 4; i++) {
-        result[i] = a[i] * (1.0 - interpolation) + b[i] * interpolation;
-    }
-}
-static void SetColor(const float to[], float result[]) {
-    for (int i = 0; i < 4; i++) result[i] = to[i];
+static vec4 Interpolate(const vec4 a, const vec4 b, float interpolation) {
+    return a * (1.f - interpolation) + b * interpolation;
 }
 
 void InteractiveMesh::UpdateExcitableVertexColors() {
-    if (ActiveGeometryMode == GeometryMode_Tetrahedral && !Audio::FaustState::Is2DModel && ShowExcitableVertices && !ExcitableVertexIndices.empty()) {
-        std::vector<vec4> colors;
-        colors.reserve(ExcitableVertexIndices.size());
-        for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
-            // todo update to use vec4 for all colors.
-            static const float DisabledExcitableVertexColor[4] = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
-            static const float ExcitableVertexColor[4] = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
-            static const float ActiveExciteVertexColor[4] = {0, 1, 0, 1}; // The most recent excited vertex.
-            static const float ExcitedVertexBaseColor[4] = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
+    if (ActiveGeometryMode != GeometryMode_Tetrahedral || !ShowExcitableVertices || ExcitableVertexIndices.empty()) return;
 
-            static float vertex_color[4] = {1, 1, 1, 1}; // Initialized once and filled for every excitable vertex.
-            if (!Audio::FaustState::IsRunning()) {
-                ::SetColor(DisabledExcitableVertexColor, vertex_color);
-            } else if (Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos)) {
-                InterpolateColors(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::min(1.f, std::abs(*Audio::FaustState::ExciteValue)), vertex_color);
-            } else {
-                ::SetColor(ExcitableVertexColor, vertex_color);
-            }
-            colors[i] = {vertex_color[0], vertex_color[1], vertex_color[2], vertex_color[3]};
-        }
-        ExcitableVertexArrows.SetColors(std::move(colors));
+    for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
+        static const vec4 DisabledExcitableVertexColor = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
+        static const vec4 ExcitableVertexColor = {1, 1, 1, 1}; // Based on `NumExcitableVertices`.
+        static const vec4 ActiveExciteVertexColor = {0, 1, 0, 1}; // The most recent excited vertex.
+        static const vec4 ExcitedVertexBaseColor = {1, 0, 0, 1}; // The color of the excited vertex when the gate has abs value of 1.
+
+        vec4 color = !Audio::FaustState::IsRunning() ?
+            DisabledExcitableVertexColor :
+            Audio::FaustState::ExcitePos != nullptr && int(i) == int(*Audio::FaustState::ExcitePos) ?
+            Interpolate(ActiveExciteVertexColor, ExcitedVertexBaseColor, std::min(1.f, std::abs(*Audio::FaustState::ExciteValue))) :
+            ExcitableVertexColor;
+        ExcitableVertexArrows.SetColor(i, std::move(color));
     }
 }
 
@@ -209,13 +196,13 @@ void InteractiveMesh::GenerateTets() {
         f.polygonlist[0].vertexlist[2] = triangle_indices[i * 3 + 2];
     }
 
-    const string options = QualityTets ? "pq" : "p";
+    const std::string options = QualityTets ? "pq" : "p";
     TetGenResult = std::make_unique<tetgenio>();
     std::vector<char> options_mutable(options.begin(), options.end());
     tetrahedralize(options_mutable.data(), &in, TetGenResult.get());
 }
 
-string InteractiveMesh::GenerateDsp() const {
+std::string InteractiveMesh::GenerateDsp() const {
     if (!TetGenResult) return "";
 
     std::vector<int> tet_indices;
@@ -299,7 +286,7 @@ void InteractiveMesh::Update() {
     UpdateExcitableVertexColors();
 }
 
-void InteractiveMesh::Render() {
+void InteractiveMesh::PostRender(RenderMode) {
     const auto &geometry = ActiveGeometry();
     const auto &vertices = geometry.GetVertices();
 
@@ -310,7 +297,7 @@ void InteractiveMesh::Render() {
         else if (mouse_released) CameraTargetVertexIndex = HoveredVertexIndex;
 
         // On click, trigger the nearest excitation vertex nearest to the clicked vertex.
-        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning() && !Audio::FaustState::Is2DModel) {
+        if (mouse_clicked && HoveredVertexIndex >= 0 && !ExcitableVertexIndices.empty() && Audio::FaustState::IsRunning()) {
             const auto &hovered_vertex = vertices[HoveredVertexIndex];
             int nearest_excite_vertex_pos = -1; // Position in the excitation vertex indices.
             float min_dist = FLT_MAX;
@@ -349,7 +336,7 @@ void InteractiveMesh::Render() {
         // Interpolate linearly between the two quaternions along the sphere defined by the camera distance.
         const float lerp_factor = glm::clamp(CameraMovementSpeed / Scene.CameraDistance, 0.0f, 1.0f);
         const glm::quat new_quat = glm::slerp(current_quat, target_quat, lerp_factor);
-        const vec3 new_camera_direction = new_quat * glm::vec3(0.0f, 0.0f, -1.0f);
+        const vec3 new_camera_direction = new_quat * vec3{0.0f, 0.0f, -1.0f};
         Scene.CameraView = glm::lookAt(Origin + new_camera_direction * Scene.CameraDistance, Origin, Up);
     }
 }
@@ -414,7 +401,7 @@ void InteractiveMesh::RenderConfig() {
                     Scene.GizmoTransform = GetTransform();
                     Scene.GizmoCallback = [this](const glm::mat4 &transform) {
                         SetTransform(transform);
-                        Translation = glm::vec3{transform[3]};
+                        Translation = vec3{transform[3]};
                         Scale = {glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2])};
                         RotationAngles = glm::eulerAngles(glm::quat_cast(transform));
                     };

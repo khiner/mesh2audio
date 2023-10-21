@@ -35,6 +35,8 @@ struct InteractiveMesh : Mesh {
     void Update();
 
     void Render();
+    void PostRender(RenderMode) override;
+
     void RenderConfig();
     void RenderProfile();
     void RenderProfileConfig();

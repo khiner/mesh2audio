@@ -160,6 +160,8 @@ void Scene::Render() {
 
     if (ShowFloor) Floor->Render(ActiveRenderMode);
     for (const auto *mesh : Meshes) mesh->Render(ActiveRenderMode);
+    if (ShowFloor) Floor->PostRender(ActiveRenderMode);
+    for (auto *mesh : Meshes) mesh->PostRender(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
     if (Grid) {

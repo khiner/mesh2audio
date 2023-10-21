@@ -22,7 +22,6 @@ struct Audio {
         // These values point to the corresponding Faust parameter zones.
         inline static float *ExcitePos = nullptr;
         inline static float *ExciteValue = nullptr;
-        inline static bool Is2DModel = false; // `false` means current DSP is based on a 3D model.
 
         void Render() const;
 
