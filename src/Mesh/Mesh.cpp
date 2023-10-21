@@ -67,7 +67,7 @@ void Mesh::Render(RenderMode mode) const {
     GLenum primitive_type = mode == RenderMode::Lines ? GL_LINES : GL_TRIANGLES;
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
 
-    uint num_indices = ActiveGeometry().GetIndices(mode).size();
+    uint num_indices = ActiveGeometry().NumIndices();
     if (Transforms.size() == 1) {
         glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
     } else {

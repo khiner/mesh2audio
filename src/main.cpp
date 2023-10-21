@@ -144,7 +144,7 @@ int main(int, char **) {
     MainMesh->Generate();
 
     static const float floor_y = -1;
-    static const glm::vec3 floor_half_extents = {20, 1, 20};
+    static const glm::vec3 floor_half_extents = {10, 1, 10};
     Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
     Floor->Generate();
     Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
@@ -285,7 +285,7 @@ int main(int, char **) {
                         else if (collision.Point2.Body->Mesh == MainMesh.get()) point = collision.Point2.Position;
                         else continue;
 
-                        const uint nearest_vertex = MainMesh->GetTets().FindVertexNearest(point);
+                        const uint nearest_vertex = MainMesh->GetTets().FindVertextNearestTo(point);
                         // todo find good scaling
                         // todo release vertex
                         // todo multiple simultaneous vertex triggers (need to modify the DSP)

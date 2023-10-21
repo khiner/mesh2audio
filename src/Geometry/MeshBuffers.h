@@ -12,6 +12,7 @@ using uint = unsigned int;
 namespace fs = std::filesystem;
 
 enum class RenderMode {
+    Flat,
     Smooth,
     Lines,
     Points,
@@ -26,28 +27,64 @@ struct MeshBuffers {
     using Point = OpenMesh::Vec3f;
 
     MeshBuffers() {
-        Mesh.request_vertex_normals();
     }
     MeshBuffers(const fs::path &file_path) { Load(file_path); }
     virtual ~MeshBuffers() = default;
 
-    inline const MeshType &GetMesh() const { return Mesh; }
-    inline const std::vector<glm::vec3> &GetVertices() const { return Vertices; }
-    inline const std::vector<uint> &GetIndices() const { return Indices; }
-    inline const std::vector<uint> &GetLineIndices() const { return LineIndices; }
-    inline const std::vector<glm::vec3> &GetNormals() const { return Normals; }
-    inline const std::vector<uint> &GetIndices(RenderMode mode) const { return mode == RenderMode::Lines ? LineIndices : Indices; }
-    inline const glm::vec3 &GetVertex(uint index) const { return Vertices[index]; }
-    inline const glm::vec3 &GetNormal(uint index) const { return Normals[index]; }
+    void PrepareRender(RenderMode mode) {
+        if (ActiveRenderMode == mode) return;
+        ActiveRenderMode = mode;
+        UpdateBuffersFromMesh();
+    }
 
-    uint FindVertexNearest(const glm::vec3 point) const;
-    inline bool HasNormals() const { return !Normals.empty(); }
+    inline const MeshType &GetMesh() const { return Mesh; }
+
+    inline const std::vector<glm::vec3> &GetVertices() const { return UniqueVertices; }
+    inline const glm::vec3 &GetVertex(uint index) const { return UniqueVertices[index]; }
+    inline const glm::vec3 &GetNormal(uint index) const { return UniqueNormals[index]; }
+
+    inline uint NumVertices() const { return UniqueVertices.size(); }
+    inline uint NumIndices() const { return Indices.size(); }
+
+    uint FindVertextNearestTo(const glm::vec3 point) const;
     inline bool Empty() const { return Vertices.empty(); }
 
+    std::vector<uint> GenerateTriangleIndices() {
+        auto triangulated_mesh = Mesh; // `triangulate` is in-place, so we need to make a copy.
+        triangulated_mesh.triangulate();
+        std::vector<uint> indices;
+        for (const auto &fh : triangulated_mesh.faces()) {
+            auto v_it = triangulated_mesh.cfv_iter(fh);
+            indices.insert(indices.end(), {uint(v_it->idx()), uint((++v_it)->idx()), uint((++v_it)->idx())});
+        }
+        return indices;
+    }
+
+    std::vector<uint> GenerateTriangulatedFaceIndices() {
+        std::vector<uint> indices;
+        uint index = 0;
+        for (const auto &fh : Mesh.faces()) {
+            auto valence = Mesh.valence(fh);
+            for (uint i = 0; i < valence - 2; ++i) {
+                indices.insert(indices.end(), {index, index + i + 1, index + i + 2});
+            }
+            index += valence;
+        }
+        return indices;
+    }
+
+    std::vector<uint> GenerateLineIndices() {
+        std::vector<uint> indices;
+        for (const auto &eh : Mesh.edges()) {
+            const auto heh = Mesh.halfedge_handle(eh, 0);
+            indices.push_back(Mesh.from_vertex_handle(heh).idx());
+            indices.push_back(Mesh.to_vertex_handle(heh).idx());
+        }
+        return indices;
+    }
+
     bool Load(const fs::path &file_path) {
-        // Create an options object
         OpenMesh::IO::Options read_options; // No options used yet, but keeping this here for future use.
-        // Load .obj file into OpenMesh data structure
         if (!OpenMesh::IO::read_mesh(Mesh, file_path.string(), read_options)) {
             std::cerr << "Error loading mesh: " << file_path << std::endl;
             return false;
@@ -107,70 +144,83 @@ struct MeshBuffers {
         Vertices.clear();
         Normals.clear();
         Indices.clear();
-        LineIndices.clear();
         Dirty = true;
     }
 
 protected:
-    MeshType Mesh; // Default OpenMesh triangles instance variable
+    MeshType Mesh;
+    RenderMode ActiveRenderMode{RenderMode::Flat};
     mutable bool Dirty{true};
 
     void UpdateBuffersFromMesh() {
         UpdateVertices();
-        UpdateLineIndices();
-        UpdateIndices();
         UpdateNormals();
+        UpdateIndices();
     }
 
-private:
     void UpdateVertices() {
+        UniqueVertices.clear();
         Vertices.clear();
+
         for (const auto &vh : Mesh.vertices()) {
             const auto &point = Mesh.point(vh);
-            Vertices.emplace_back(point[0], point[1], point[2]);
+            UniqueVertices.emplace_back(point[0], point[1], point[2]);
+        }
+
+        if (ActiveRenderMode == RenderMode::Flat) {
+            for (const auto &fh : Mesh.faces()) {
+                for (const auto &vh : Mesh.fv_range(fh)) {
+                    const auto &point = Mesh.point(vh);
+                    Vertices.emplace_back(point[0], point[1], point[2]);
+                }
+            }
+        } else {
+            Vertices = UniqueVertices;
         }
         Dirty = true;
     }
 
     void UpdateIndices() {
-        Indices.clear();
-        // Copy and triangulate the mesh to calculate the triangle indices.
-        auto triangulated_mesh = Mesh;
-        triangulated_mesh.triangulate();
-        for (const auto &fh : triangulated_mesh.faces()) {
-            auto v_it = triangulated_mesh.cfv_iter(fh);
-            Indices.push_back(v_it->idx());
-            Indices.push_back((++v_it)->idx());
-            Indices.push_back((++v_it)->idx());
-        }
-        Dirty = true;
-    }
-
-    void UpdateLineIndices() {
-        LineIndices.clear();
-        // Get all unique polygon lines.
-        for (const auto &eh : Mesh.edges()) {
-            const auto heh = Mesh.halfedge_handle(eh, 0);
-            LineIndices.push_back(Mesh.from_vertex_handle(heh).idx());
-            LineIndices.push_back(Mesh.to_vertex_handle(heh).idx());
-        }
+        Indices =
+            ActiveRenderMode == RenderMode::Lines ? GenerateLineIndices() :
+            ActiveRenderMode == RenderMode::Flat  ? GenerateTriangulatedFaceIndices() :
+                                                    GenerateTriangleIndices();
         Dirty = true;
     }
 
     void UpdateNormals() {
+        UniqueNormals.clear();
+        Normals.clear();
+
+        Mesh.request_face_normals();
         Mesh.request_vertex_normals();
         Mesh.update_normals();
-        Normals.clear();
         for (const auto &vh : Mesh.vertices()) {
             const auto &normal = Mesh.normal(vh);
-            Normals.emplace_back(normal[0], normal[1], normal[2]);
+            UniqueNormals.emplace_back(normal[0], normal[1], normal[2]);
+        }
+        if (ActiveRenderMode == RenderMode::Flat) {
+            for (const auto &fh : Mesh.faces()) {
+                const auto &normal = Mesh.normal(fh);
+                // Duplicate the normal for each vertex.
+                for (size_t i = 0; i < Mesh.valence(fh); ++i) {
+                    Normals.emplace_back(normal[0], normal[1], normal[2]);
+                }
+            }
+        } else {
+            Normals = UniqueNormals;
         }
         Mesh.release_vertex_normals();
+        Mesh.release_face_normals();
+
         Dirty = true;
     }
 
+    // todo instead of duplicating vertices, map indices (based on active render mode) to unique vertices.
+    std::vector<glm::vec3> UniqueVertices, UniqueNormals;
+
+    // Used for rendering. Note that `Vertices` and `Normals` depend on the active render mode, and may contain duplicates.
     std::vector<glm::vec3> Vertices;
-    std::vector<uint> Indices;
     std::vector<glm::vec3> Normals;
-    std::vector<uint> LineIndices;
+    std::vector<uint> Indices;
 };

@@ -19,7 +19,6 @@ inline static const std::string
     ShininessFactor = "shininess_factor",
     Projection = "projection",
     CameraView = "camera_view",
-    FlatShading = "flat_shading",
     LineWidth = "line_width",
     GridLinesColor = "grid_lines_color";
 } // namespace UniformName
@@ -64,7 +63,7 @@ Scene::Scene() {
         TransformVertexShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex.glsl", {un::Projection, un::CameraView}},
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
-        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor, un::FlatShading}},
+        FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor}},
         GridLinesVertexShader{GL_VERTEX_SHADER, ShaderDir / "grid_lines_vertex.glsl", {un::Projection, un::CameraView}},
         GridLinesFragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "grid_lines_fragment.glsl", {}};
 
@@ -136,7 +135,6 @@ void Scene::Render() {
     glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
-    glUniform1i(CurrShaderProgram->GetUniform(un::FlatShading), UseFlatShading && ActiveRenderMode == RenderMode::Smooth ? 1 : 0);
 
     if (ActiveRenderMode == RenderMode::Lines) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
@@ -238,7 +236,9 @@ void Scene::RenderConfig() {
             }
             SeparatorText("Render mode");
             int render_mode = int(ActiveRenderMode);
-            bool render_mode_changed = RadioButton("Smooth", &render_mode, int(RenderMode::Smooth));
+            bool render_mode_changed = RadioButton("Flat", &render_mode, int(RenderMode::Flat));
+            SameLine();
+            render_mode_changed |= RadioButton("Smooth", &render_mode, int(RenderMode::Smooth));
             SameLine();
             render_mode_changed |= RadioButton("Lines", &render_mode, int(RenderMode::Lines));
             SameLine();
@@ -246,9 +246,6 @@ void Scene::RenderConfig() {
             if (render_mode_changed) {
                 ActiveRenderMode = RenderMode(render_mode);
                 CurrShaderProgram = ActiveRenderMode == RenderMode::Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
-            }
-            if (ActiveRenderMode == RenderMode::Smooth) {
-                Checkbox("Flat shading", &UseFlatShading);
             }
             if (ActiveRenderMode == RenderMode::Lines) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);

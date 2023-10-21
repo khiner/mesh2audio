@@ -8,7 +8,6 @@ struct Light {
 uniform int num_lights;
 uniform vec4 ambient_color, diffuse_color, specular_color;
 uniform float shininess_factor;
-uniform int flat_shading; // 0 for smooth shading, 1 for flat shading
 
 const int max_num_lights = 5; // Must be a constant. (Can't be a uniform.)
 layout (std140) uniform LightBlock {
@@ -30,7 +29,7 @@ vec4 compute_lighting(vec3 direction, vec4 light_color, vec3 normal, vec3 half_v
 void main (void) {
     vec3 fragment_position = frag_in_position.xyz / frag_in_position.w;
     vec3 eye_direction = normalize(-fragment_position);
-    vec3 normal = normalize(flat_shading == 1 ? cross(dFdx(fragment_position), dFdy(fragment_position)) : frag_in_normal);
+    vec3 normal = normalize(frag_in_normal);
     vec4 final_color = ambient_color;
     for (int i = 0; i < num_lights; i++) {
         vec4 light_pos = lights[i].position;

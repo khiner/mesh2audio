@@ -110,7 +110,7 @@ void InteractiveMesh::UpdateExcitableVertexColors() {
 
 void InteractiveMesh::UpdateExcitableVertices() {
     ExcitableVertexIndices.clear();
-    if (Tets.GetVertices().empty()) {
+    if (!HasTets()) {
         ExcitableVertexArrows.ClearTransforms();
         ExcitableVertexArrows.ClearColors();
         return;
@@ -120,7 +120,7 @@ void InteractiveMesh::UpdateExcitableVertices() {
     ExcitableVertexIndices.resize(NumExcitableVertices);
     for (int i = 0; i < NumExcitableVertices; i++) {
         const float t = float(i) / (NumExcitableVertices - 1);
-        ExcitableVertexIndices[i] = int(t * (Tets.GetVertices().size() - 1));
+        ExcitableVertexIndices[i] = int(t * (Tets.NumVertices() - 1));
     }
 
     std::vector<mat4> transforms;
@@ -159,7 +159,7 @@ void InteractiveMesh::UpdateTets() {
     for (uint i = 0; i < uint(TetGenResult->numberoftrifaces); ++i) {
         const auto &tri_indices = TetGenResult->trifacelist;
         const uint tri_i = i * 3;
-        const uint a = tri_indices[tri_i], b = tri_indices[tri_i + 1], c = tri_indices[tri_i + 2];
+        const uint a = tri_indices[tri_i + 2], b = tri_indices[tri_i + 1], c = tri_indices[tri_i];
         tet_mesh.add_face(tet_mesh.vertex_handle(a), tet_mesh.vertex_handle(b), tet_mesh.vertex_handle(c));
     }
 
@@ -172,7 +172,7 @@ void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
     const auto &vertices = Triangles.GetVertices();
-    const auto &triangle_indices = Triangles.GetIndices(RenderMode::Smooth);
+    const auto &triangle_indices = Triangles.GenerateTriangleIndices();
     in.numberofpoints = vertices.size();
     in.pointlist = new REAL[in.numberofpoints * 3];
 
@@ -251,9 +251,8 @@ void InteractiveMesh::UpdateHoveredVertex() {
         const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
         const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
-        const auto &vertices = geometry.GetVertices();
-        for (size_t i = 0; i < vertices.size(); i++) {
-            const auto &v = Transforms[0] * glm::vec4{vertices[i], 1};
+        for (size_t i = 0; i < geometry.NumVertices(); i++) {
+            const auto &v = Transforms[0] * glm::vec4{geometry.GetVertex(i), 1};
             const vec4 pos_clip_space = view_projection * v;
             const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
             const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
@@ -269,10 +268,10 @@ void InteractiveMesh::UpdateHoveredVertex() {
     }
 
     std::vector<mat4> transforms;
-    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.GetVertices().size())) {
+    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.NumVertices())) {
         // Point the arrow at the hovered vertex.
         mat4 translate = glm::translate(Identity, geometry.GetVertex(HoveredVertexIndex));
-        mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(geometry.GetNormal(HoveredVertexIndex))));
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, geometry.GetNormal(HoveredVertexIndex)));
         transforms.push_back(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}));
     }
     HoveredVertexArrow.SetTransforms(std::move(transforms));
@@ -289,13 +288,13 @@ void InteractiveMesh::PrepareRender(RenderMode mode) {
 void InteractiveMesh::TriggerVertex(uint vertex_index, float amount) {
     if (ExcitableVertexIndices.empty() || !Audio::FaustState::IsRunning()) return;
 
-    const auto &vertices = ActiveGeometry().GetVertices();
-    const auto &vertex = vertices[vertex_index];
+    const auto &geometry = ActiveGeometry();
+    const auto &vertex = geometry.GetVertex(vertex_index);
     int nearest_excite_vertex_pos = -1;
     float min_dist = FLT_MAX;
     for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
         const auto &excite_vertex_index = ExcitableVertexIndices[i];
-        const auto &excite_vertex = vertices[excite_vertex_index];
+        const auto &excite_vertex = geometry.GetVertex(excite_vertex_index);
         const float dist = glm::distance(excite_vertex, vertex);
         if (dist < min_dist) {
             min_dist = dist;
@@ -362,13 +361,10 @@ void InteractiveMesh::RenderConfig() {
                 const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
                 if (HasTets()) {
                     Checkbox("Show excitable vertices", &ShowExcitableVertices);
-                    if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.GetVertices().size())))) {
+                    if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.NumVertices())))) {
                         UpdateExcitableVertices();
                     }
-                    Text(
-                        "Current tetrahedral mesh:\n\tVertices: %lu\n\tIndices: %lu",
-                        Tets.GetVertices().size(), Tets.GetIndices(RenderMode::Smooth).size()
-                    );
+                    Text("Current tetrahedral mesh:\n\tVertices: %lu", Tets.NumVertices());
                 } else {
                     if (!can_generate_tet_mesh) {
                         BeginDisabled();
@@ -380,10 +376,7 @@ void InteractiveMesh::RenderConfig() {
                 if (!can_generate_tet_mesh) EndDisabled();
             } else if (ActiveGeometryMode == GeometryMode_ConvexHull) {
                 if (HasConvexHull()) {
-                    Text(
-                        "Current convex hull:\n\tVertices: %lu\n\tIndices: %lu",
-                        ConvexHull.GetVertices().size(), ConvexHull.GetIndices(RenderMode::Smooth).size()
-                    );
+                    Text("Current convex hull:\n\tVertices: %lu", ConvexHull.NumVertices());
                 }
                 if (Button(HasConvexHull() ? "Regenerate convex hull" : "Generate convex hull")) {
                     SetGeometryMode(GeometryMode_ConvexHull);

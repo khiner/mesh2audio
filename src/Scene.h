@@ -39,11 +39,11 @@ struct Scene {
     std::vector<Light> Lights;
     glm::vec4 AmbientColor = {0.2, 0.2, 0.2, 1};
     // todo Diffusion and specular colors are object properties, not scene properties.
-    glm::vec4 DiffusionColor = {0.2, 0.2, 0.2, 1};
-    glm::vec4 SpecularColor = {0.5, 0.5, 0.5, 1};
+    glm::vec4 DiffusionColor = {0.3, 0.3, 0.3, 1};
+    glm::vec4 SpecularColor = {0.15, 0.15, 0.15, 1};
     float Shininess = 10;
     float LineWidth = 0.005, PointRadius = 1;
-    bool CustomColors = false, UseFlatShading = true;
+    bool CustomColors = false;
 
     bool ShowCameraGizmo = true, ShowGizmo = false, ShowBounds = false;
 
@@ -55,7 +55,7 @@ struct Scene {
     float CameraDistance = 4, fov = 50;
 
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
-    inline static RenderMode ActiveRenderMode = RenderMode::Smooth;
+    inline static RenderMode ActiveRenderMode = RenderMode::Flat;
 
     std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
 

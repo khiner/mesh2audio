@@ -38,7 +38,6 @@ struct Geometry : MeshBuffers {
     void Delete() const;
 
     void BindData(RenderMode) const; // Only rebinds the data if it has changed.
-    void PrepareRender(RenderMode);
 
 private:
     GLBuffer<glm::vec3, GL_ARRAY_BUFFER> VertexBuffer;

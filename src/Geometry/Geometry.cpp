@@ -28,14 +28,11 @@ void Geometry::Delete() const {
     IndexBuffer.Delete();
 }
 
-// Any mutating changes before each render.
-void Geometry::PrepareRender(RenderMode) {}
-
 void Geometry::BindData(RenderMode render_mode) const {
     if (Dirty || render_mode != LastBoundRenderMode) {
-        VertexBuffer.SetData(GetVertices());
-        if (HasNormals()) NormalBuffer.SetData(GetNormals());
-        IndexBuffer.SetData(render_mode == RenderMode::Lines ? GetLineIndices() : GetIndices());
+        VertexBuffer.SetData(Vertices);
+        if (!Normals.empty()) NormalBuffer.SetData(Normals);
+        IndexBuffer.SetData(Indices);
     }
     LastBoundRenderMode = render_mode;
     Dirty = false;

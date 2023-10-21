@@ -1,15 +1,17 @@
 #include "Cuboid.h"
 
 Cuboid::Cuboid(glm::vec3 half_extents) : Geometry() {
+    const auto &he = half_extents;
     std::vector<Point> vertices = {
-        {-half_extents.x, -half_extents.y, -half_extents.z},
-        {half_extents.x, -half_extents.y, -half_extents.z},
-        {half_extents.x, half_extents.y, -half_extents.z},
-        {-half_extents.x, half_extents.y, -half_extents.z},
-        {-half_extents.x, -half_extents.y, half_extents.z},
-        {half_extents.x, -half_extents.y, half_extents.z},
-        {half_extents.x, half_extents.y, half_extents.z},
-        {-half_extents.x, half_extents.y, half_extents.z}};
+        {-he.x, -he.y, -he.z},
+        {he.x, -he.y, -he.z},
+        {he.x, he.y, -he.z},
+        {-he.x, he.y, -he.z},
+        {-he.x, -he.y, he.z},
+        {he.x, -he.y, he.z},
+        {he.x, he.y, he.z},
+        {-he.x, he.y, he.z},
+    };
 
     std::vector<VH> vhs;
     for (const auto &vertex : vertices) vhs.push_back(Mesh.add_vertex(vertex));

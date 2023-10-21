@@ -48,12 +48,9 @@ Sphere::Sphere(float radius, int recursion_level) : Geometry() {
         indices.assign(new_indices.begin(), new_indices.end());
     }
 
-    for (auto &vertex : vertices) vertex *= radius;
+    for (auto &v : vertices) v *= radius;
 
-    for (auto &vertex : vertices) {
-        Mesh.add_vertex({vertex.x, vertex.y, vertex.z});
-        Mesh.set_normal(Mesh.vertex_handle(Mesh.n_vertices() - 1), {vertex.x, vertex.y, vertex.z});
-    }
+    for (auto &v : vertices) Mesh.add_vertex({v.x, v.y, v.z});
     for (uint i = 0; i < indices.size(); i += 3) {
         Mesh.add_face(Mesh.vertex_handle(indices[i]), Mesh.vertex_handle(indices[i + 1]), Mesh.vertex_handle(indices[i + 2]));
     }
