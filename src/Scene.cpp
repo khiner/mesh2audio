@@ -6,6 +6,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "GLCanvas.h"
+#include "Geometry/Primitive/Cylinder.h"
 #include "Geometry/Primitive/Rect.h"
 #include "Geometry/Primitive/Sphere.h"
 #include "Shader/ShaderProgram.h"
@@ -149,6 +150,12 @@ void Scene::Render() {
     for (auto *mesh : Meshes) mesh->PostRender(ActiveRenderMode);
     // std::cout << "Draw time: " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start_time).count() << "us" << std::endl;
 
+    if (NormalIndicator) {
+        MainShaderProgram->Use();
+        NormalIndicator->PrepareRender(RenderMode::Flat);
+        NormalIndicator->Render(RenderMode::Flat);
+    }
+
     if (Grid) {
         GridLinesShaderProgram->Use();
         namespace un = UniformName;
@@ -217,6 +224,35 @@ void Scene::RenderGizmoDebug() {
     Checkbox("Bound sizing", &ShowBounds);
 }
 
+void Scene::UpdateNormalIndicators() {
+    NormalIndicator->ClearInstances();
+    if (NormalMode == NormalIndicatorMode::None) return;
+
+    for (const auto *mesh : Meshes) {
+        if (mesh->NumInstances() == 0) continue;
+
+        const auto [min, max] = mesh->ComputeBounds();
+        float scale_factor = 0.025f * glm::distance(min, max);
+        if (NormalMode == NormalIndicatorMode::Vertex) {
+            for (uint i = 0; i < mesh->NumVertices(); i++) {
+                glm::mat4 translate = glm::translate(Identity, mesh->GetVertex(i));
+                glm::mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(mesh->GetVertexNormal(i))));
+                glm::vec3 scale = glm::vec3{0.25, NormalIndicatorLength, 0.25} * scale_factor;
+                glm::mat4 transform = translate * rotate * glm::scale(Identity, scale);
+                NormalIndicator->AddInstance(transform, NormalIndicatorColor);
+            }
+        } else { // Face normals
+            for (uint i = 0; i < mesh->NumFaces(); i++) {
+                glm::mat4 translate = glm::translate(Identity, mesh->GetFaceCenter(i));
+                glm::mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(mesh->GetFaceNormal(i))));
+                glm::vec3 scale = glm::vec3{0.15, NormalIndicatorLength, 0.15} * scale_factor;
+                glm::mat4 transform = translate * rotate * glm::scale(Identity, scale);
+                NormalIndicator->AddInstance(transform, NormalIndicatorColor);
+            }
+        }
+    }
+}
+
 void Scene::RenderConfig() {
     if (BeginTabBar("SceneConfig")) {
         if (BeginTabItem("Geometries")) {
@@ -252,6 +288,33 @@ void Scene::RenderConfig() {
             }
             if (ActiveRenderMode == RenderMode::Points) {
                 SliderFloat("Point radius", &PointRadius, 0.1, 10, "%.2f", ImGuiSliderFlags_Logarithmic);
+            }
+            SeparatorText("Normal indicator mode");
+            int normal_mode = int(NormalMode);
+            bool normal_mode_changed = RadioButton("None", &normal_mode, int(NormalIndicatorMode::None));
+            SameLine();
+            normal_mode_changed |= RadioButton("Face normals", &normal_mode, int(NormalIndicatorMode::Face));
+            SameLine();
+            normal_mode_changed |= RadioButton("Vertex normals", &normal_mode, int(NormalIndicatorMode::Vertex));
+            if (NormalIndicatorMode(normal_mode) != NormalIndicatorMode::None && !NormalIndicator) {
+                NormalIndicator = std::make_unique<Mesh>(Cylinder{}, Meshes[0]);
+                NormalIndicator->Generate();
+            } else if (NormalIndicatorMode(normal_mode) == NormalIndicatorMode::None && NormalIndicator) {
+                NormalIndicator->Delete();
+                NormalIndicator.reset();
+            }
+
+            if (normal_mode_changed) NormalMode = NormalIndicatorMode(normal_mode);
+            if (NormalIndicator) {
+                if (normal_mode_changed) UpdateNormalIndicators();
+                if (ColorEdit3("Normal color", &NormalIndicatorColor[0])) {
+                    for (uint i = 0; i < NormalIndicator->NumInstances(); i++) {
+                        NormalIndicator->SetColor(i, NormalIndicatorColor);
+                    }
+                }
+                if (SliderFloat("Normal length", &NormalIndicatorLength, 0.1f, 2.f)) {
+                    UpdateNormalIndicators();
+                }
             }
             EndTabItem();
         }

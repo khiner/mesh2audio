@@ -86,7 +86,7 @@ void InteractiveMesh::ExtrudeProfile() {
     SetGeometryMode(GeometryMode_Triangular);
 }
 
-static vec4 Interpolate(const vec4 a, const vec4 b, float interpolation) {
+static vec4 Interpolate(const vec4 &a, const vec4 &b, float interpolation) {
     return a * (1.f - interpolation) + b * interpolation;
 }
 
@@ -111,8 +111,7 @@ void InteractiveMesh::UpdateExcitableVertexColors() {
 void InteractiveMesh::UpdateExcitableVertices() {
     ExcitableVertexIndices.clear();
     if (!HasTets()) {
-        ExcitableVertexArrows.ClearTransforms();
-        ExcitableVertexArrows.ClearColors();
+        ExcitableVertexArrows.ClearInstances();
         return;
     }
 
@@ -363,7 +362,7 @@ void InteractiveMesh::RenderConfig() {
                     if (SliderInt("Num. excitable vertices", &NumExcitableVertices, 1, std::min(200, int(Tets.NumVertices())))) {
                         UpdateExcitableVertices();
                     }
-                    Text("Current tetrahedral mesh:\n\tVertices: %lu", Tets.NumVertices());
+                    Text("Current tetrahedral mesh:\n\tVertices: %u", Tets.NumVertices());
                 } else {
                     if (!can_generate_tet_mesh) {
                         BeginDisabled();
@@ -375,7 +374,7 @@ void InteractiveMesh::RenderConfig() {
                 if (!can_generate_tet_mesh) EndDisabled();
             } else if (ActiveGeometryMode == GeometryMode_ConvexHull) {
                 if (HasConvexHull()) {
-                    Text("Current convex hull:\n\tVertices: %lu", ConvexHull.NumVertices());
+                    Text("Current convex hull:\n\tVertices: %u", ConvexHull.NumVertices());
                 }
                 if (Button(HasConvexHull() ? "Regenerate convex hull" : "Generate convex hull")) {
                     SetGeometryMode(GeometryMode_ConvexHull);

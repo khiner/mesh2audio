@@ -24,6 +24,19 @@ struct Mesh {
 
     const Geometry &GetTriangles() const { return Triangles; }
     const glm::mat4 &GetTransform() const { return Transforms[0]; }
+    std::pair<glm::vec3, glm::vec3> ComputeBounds() const { return ActiveGeometry().ComputeBounds(); }
+
+    uint NumInstances() const { return Transforms.size(); }
+    uint NumVertices() const { return ActiveGeometry().NumVertices(); }
+    uint NumFaces() const { return ActiveGeometry().NumFaces(); }
+    const glm::vec3 GetVertex(uint vi, uint instance = 0) const {
+        return Transforms[instance] * glm::vec4(ActiveGeometry().GetVertex(vi), 1);
+    }
+    const glm::vec3 GetFaceCenter(uint fi, uint instance = 0) const {
+        return Transforms[instance] * glm::vec4(ActiveGeometry().GetFaceCenter(fi), 1);
+    }
+    const glm::vec3 GetVertexNormal(uint vi) const { return ActiveGeometry().GetVertexNormal(vi); }
+    const glm::vec3 GetFaceNormal(uint fi) const { return ActiveGeometry().GetFaceNormal(fi); }
 
     void Generate();
     void Delete() const;
@@ -33,6 +46,17 @@ struct Mesh {
     void Render(RenderMode mode) const;
     virtual void PostRender(RenderMode) {}
 
+    void ClearInstances() {
+        Transforms.clear();
+        Colors.clear();
+        Dirty = true;
+    }
+    void AddInstance(const glm::mat4 &transform, const glm::vec4 &color = {1, 1, 1, 1}) {
+        Transforms.push_back(transform);
+        Colors.push_back(color);
+        Dirty = true;
+    }
+
     void SetPosition(const glm::vec3 &position) {
         for (auto &transform : Transforms) {
             transform[3][0] = position.x;
@@ -41,26 +65,24 @@ struct Mesh {
         }
         Dirty = true;
     }
-    void SetTransform(const glm::mat4 &new_transform) {
-        for (auto &transform : Transforms) transform = new_transform;
+    void SetTransform(uint instance, const glm::mat4 &transform) {
+        Transforms[instance] = transform;
         Dirty = true;
+    }
+    void SetTransform(const glm::mat4 &transform) {
+        for (uint instance = 0; instance < Transforms.size(); instance++) SetTransform(instance, transform);
     }
     void SetTransforms(std::vector<glm::mat4> &&transforms) {
         Transforms = std::move(transforms);
         Dirty = true;
     }
-    void ClearTransforms() {
-        Transforms.clear();
-        Dirty = true;
-    }
+
     void SetColor(uint instance, const glm::vec4 &color) {
         Colors[instance] = color;
         Dirty = true;
     }
     void SetColor(const glm::vec4 &color) {
-        Colors.clear();
-        Colors.resize(Transforms.size(), color);
-        Dirty = true;
+        for (uint instance = 0; instance < Colors.size(); instance++) SetColor(instance, color);
     }
     void SetColors(std::vector<glm::vec4> &&colors) {
         Colors = std::move(colors);
@@ -81,10 +103,10 @@ protected:
     mutable std::vector<glm::mat4> AbsoluteTransforms{}; // If `Parent != nullptr`, this is a combined transform of the parent and child. Otherwise, it's empty.
 
 private:
+    void BindData(RenderMode) const;
+
     GLVertexArray VertexArray;
     GLBuffer<glm::vec4, GL_ARRAY_BUFFER> ColorBuffer;
     GLBuffer<glm::mat4, GL_ARRAY_BUFFER> TransformBuffer;
     mutable bool Dirty{true};
-
-    void BindData(RenderMode render_mode = RenderMode::Smooth) const;
 };

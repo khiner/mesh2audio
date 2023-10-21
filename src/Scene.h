@@ -57,12 +57,24 @@ struct Scene {
     inline static float Bounds[6] = {-0.5f, -0.5f, -0.5f, 0.5f, 0.5f, 0.5f};
     inline static RenderMode ActiveRenderMode = RenderMode::Flat;
 
+private:
+    void UpdateNormalIndicators();
+
     std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
-
     ShaderProgram *CurrShaderProgram = nullptr;
-
     std::unordered_map<uint, std::unique_ptr<Mesh>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
     std::unique_ptr<GLCanvas> Canvas;
-    std::unique_ptr<Mesh> Grid, Floor;
+    std::unique_ptr<Mesh> Grid;
+    std::unique_ptr<Mesh> NormalIndicator; // Instanced mesh for displaying normals.
+    glm::vec4 NormalIndicatorColor = {0, 0, 1, 1};
+    float NormalIndicatorLength = 1.f; // This is normalized by a factor based on the mesh's bounding box diagonal length.
+
+    enum class NormalIndicatorMode {
+        None,
+        Vertex,
+        Face,
+    };
+
+    NormalIndicatorMode NormalMode = NormalIndicatorMode::None;
 };

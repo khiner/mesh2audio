@@ -48,6 +48,10 @@ struct MeshBuffers {
 
     inline const MeshType &GetMesh() const { return Mesh; }
 
+    inline uint NumVertices() const { return Mesh.n_vertices(); }
+    inline uint NumFaces() const { return Mesh.n_faces(); }
+    inline uint NumIndices() const { return Indices.size(); }
+
     inline const float *GetVertices() const { return (float *)Mesh.points(); }
     inline glm::vec3 GetVertex(uint index) const {
         const auto &p = Mesh.point(VH(index));
@@ -58,9 +62,15 @@ struct MeshBuffers {
         const auto &n = Mesh.normal(VH(index));
         return {n[0], n[1], n[2]};
     }
-
-    inline uint NumVertices() const { return Mesh.n_vertices(); }
-    inline uint NumIndices() const { return Indices.size(); }
+    inline glm::vec3 GetFaceNormal(uint index) const {
+        const auto &n = Mesh.normal(FH(index));
+        return {n[0], n[1], n[2]};
+    }
+    inline glm::vec3 GetFaceCenter(uint index) const {
+        const auto &fh = FH(index);
+        const auto &p = Mesh.calc_face_centroid(fh);
+        return {p[0], p[1], p[2]};
+    }
 
     uint FindVertextNearestTo(const glm::vec3 point) const;
     inline bool Empty() const { return Vertices.empty(); }
