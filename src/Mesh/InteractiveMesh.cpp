@@ -329,7 +329,7 @@ void InteractiveMesh::PostRender(RenderMode) {
         static const float CameraMovementSpeed = 0.5;
 
         const vec3 camera_position = glm::inverse(Scene.CameraView)[3];
-        const auto &target_vertex = ActiveGeometry().GetVertex(CameraTargetVertexIndex);
+        const auto &target_vertex = GetVertex(CameraTargetVertexIndex);
         const vec3 target_direction = glm::normalize(target_vertex - Origin);
         const vec3 current_direction = glm::normalize(camera_position - Origin);
         // Interpolate linearly between the two quaternions along the sphere defined by the camera distance.
@@ -337,6 +337,9 @@ void InteractiveMesh::PostRender(RenderMode) {
         const glm::quat new_quat = glm::slerp(glm::quatLookAt(current_direction, Up), glm::quatLookAt(target_direction, Up), lerp_factor);
         const vec3 new_camera_direction = new_quat * vec3{0.0f, 0.0f, -1.0f};
         Scene.CameraView = glm::lookAt(Origin + new_camera_direction * Scene.CameraDistance, Origin, Up);
+
+        // If the camera is close enough to the target, stop targeting.
+        if (glm::distance(current_direction, target_direction) < 0.001f) CameraTargetVertexIndex = -1;
     }
 }
 
@@ -430,7 +433,7 @@ void InteractiveMesh::RenderConfig() {
 
             SeparatorText("Debug");
             if (HoveredVertexIndex >= 0) {
-                const auto &vertex = ActiveGeometry().GetVertex(HoveredVertexIndex);
+                const auto &vertex = GetVertex(HoveredVertexIndex);
                 Text("Hovered vertex:\n\tIndex: %d\n\tPosition:\n\t\tx: %f\n\t\ty: %f\n\t\tz: %f", HoveredVertexIndex, vertex.x, vertex.y, vertex.z);
             }
 
