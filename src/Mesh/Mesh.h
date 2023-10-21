@@ -22,21 +22,17 @@ struct Mesh {
 
     virtual std::vector<const Geometry *> AllGeometries() const { return {&Triangles}; }
 
-    const Geometry &GetTriangles() const { return Triangles; }
-    const glm::mat4 &GetTransform() const { return Transforms[0]; }
-    std::pair<glm::vec3, glm::vec3> ComputeBounds() const { return ActiveGeometry().ComputeBounds(); }
-
     uint NumInstances() const { return Transforms.size(); }
     uint NumVertices() const { return ActiveGeometry().NumVertices(); }
     uint NumFaces() const { return ActiveGeometry().NumFaces(); }
-    const glm::vec3 GetVertex(uint vi, uint instance = 0) const {
-        return Transforms[instance] * glm::vec4(ActiveGeometry().GetVertex(vi), 1);
-    }
-    const glm::vec3 GetFaceCenter(uint fi, uint instance = 0) const {
-        return Transforms[instance] * glm::vec4(ActiveGeometry().GetFaceCenter(fi), 1);
-    }
+    const Geometry &GetTriangles() const { return Triangles; }
+    const glm::mat4 &GetTransform() const { return Transforms[0]; }
+    const glm::vec3 GetLocalVertex(uint vi) const { return ActiveGeometry().GetVertex(vi); }
+    const glm::vec3 GetVertex(uint vi, uint instance = 0) const { return Transforms[instance] * glm::vec4(GetLocalVertex(vi), 1); }
+    const glm::vec3 GetFaceCenter(uint fi, uint instance = 0) const { return Transforms[instance] * glm::vec4(ActiveGeometry().GetFaceCenter(fi), 1); }
     const glm::vec3 GetVertexNormal(uint vi) const { return ActiveGeometry().GetVertexNormal(vi); }
     const glm::vec3 GetFaceNormal(uint fi) const { return ActiveGeometry().GetFaceNormal(fi); }
+    std::pair<glm::vec3, glm::vec3> ComputeBounds() const { return ActiveGeometry().ComputeBounds(); }
 
     void Generate();
     void Delete() const;
@@ -51,9 +47,14 @@ struct Mesh {
         Colors.clear();
         Dirty = true;
     }
-    void AddInstance(const glm::mat4 &transform, const glm::vec4 &color = {1, 1, 1, 1}) {
+    void AddInstance(const glm::mat4 &transform, const glm::vec4 &color) {
         Transforms.push_back(transform);
         Colors.push_back(color);
+        Dirty = true;
+    }
+
+    void AddInstance(const glm::mat4 &transform) {
+        AddInstance(transform, Colors.empty() ? glm::vec4{1} : Colors[0]);
         Dirty = true;
     }
 

@@ -236,8 +236,6 @@ static constexpr float VertexHoverRadiusSquared = VertexHoverRadius * VertexHove
 using namespace ImGui;
 
 void InteractiveMesh::UpdateHoveredVertex() {
-    const auto &geometry = ActiveGeometry();
-
     // Find the hovered vertex, favoring the one nearest to the camera if multiple are hovered.
     HoveredVertexIndex = -1;
     if (IsWindowHovered()) {
@@ -249,8 +247,8 @@ void InteractiveMesh::UpdateHoveredVertex() {
         const auto &content_pos = GetWindowPos() + GetWindowContentRegionMin();
         const auto &view_projection = Scene.CameraProjection * Scene.CameraView;
         float min_vertex_camera_distance = FLT_MAX;
-        for (size_t i = 0; i < geometry.NumVertices(); i++) {
-            const auto &v = Transforms[0] * glm::vec4{geometry.GetVertex(i), 1};
+        for (size_t i = 0; i < NumVertices(); i++) {
+            const auto &v = vec4{GetVertex(i), 1};
             const vec4 pos_clip_space = view_projection * v;
             const vec4 tmp = (pos_clip_space / pos_clip_space.w) * 0.5f + 0.5f;
             const auto vertex_screen = ImVec2{tmp.x, 1.0f - tmp.y} * content_region + content_pos;
@@ -265,14 +263,14 @@ void InteractiveMesh::UpdateHoveredVertex() {
         }
     }
 
-    std::vector<mat4> transforms;
-    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(geometry.NumVertices())) {
+    HoveredVertexArrow.ClearInstances();
+    if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(NumVertices())) {
         // Point the arrow at the hovered vertex.
-        mat4 translate = glm::translate(Identity, geometry.GetVertex(HoveredVertexIndex));
-        mat4 rotate = glm::mat4_cast(glm::rotation(Up, geometry.GetVertexNormal(HoveredVertexIndex)));
-        transforms.push_back(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}));
+        // Note that we use local coordinates here, since the arrow is a child.
+        mat4 translate = glm::translate(Identity, GetLocalVertex(HoveredVertexIndex));
+        mat4 rotate = glm::mat4_cast(glm::rotation(Up, GetVertexNormal(HoveredVertexIndex)));
+        HoveredVertexArrow.AddInstance(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}), {1, 0, 0, 1});
     }
-    HoveredVertexArrow.SetTransforms(std::move(transforms));
 }
 
 void InteractiveMesh::PrepareRender(RenderMode mode) {
@@ -286,13 +284,12 @@ void InteractiveMesh::PrepareRender(RenderMode mode) {
 void InteractiveMesh::TriggerVertex(uint vertex_index, float amount) {
     if (ExcitableVertexIndices.empty() || !Audio::FaustState::IsRunning()) return;
 
-    const auto &geometry = ActiveGeometry();
-    const auto &vertex = geometry.GetVertex(vertex_index);
+    const auto &vertex = GetLocalVertex(vertex_index);
     int nearest_excite_vertex_pos = -1;
     float min_dist = FLT_MAX;
     for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
         const auto &excite_vertex_index = ExcitableVertexIndices[i];
-        const auto &excite_vertex = geometry.GetVertex(excite_vertex_index);
+        const auto &excite_vertex = GetLocalVertex(excite_vertex_index);
         const float dist = glm::distance(excite_vertex, vertex);
         if (dist < min_dist) {
             min_dist = dist;
