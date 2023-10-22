@@ -14,6 +14,7 @@
 
 #include "Audio.h"
 #include "Geometry/Primitive/Cuboid.h"
+#include "Geometry/Wireframe.h"
 #include "Mesh/InteractiveMesh.h"
 #include "Physics.h"
 #include "RealImpact.h"
@@ -28,6 +29,7 @@ static std::unique_ptr<Scene> MainScene;
 static std::unique_ptr<InteractiveMesh> MainMesh;
 static std::unique_ptr<Physics> MainPhysics;
 static std::unique_ptr<Mesh> Floor;
+static std::unique_ptr<Wireframe> FloorWireframe;
 
 static Worker DspGenerator{"Generate DSP code", "Generating DSP code..."};
 static string GeneratedDsp; // The most recently generated DSP code.
@@ -148,7 +150,14 @@ int main(int, char **) {
     Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
     Floor->Generate();
     Floor->SetTransform(glm::translate(I, {0, floor_y - floor_half_extents.y, 0}));
-    MainScene->AddMesh(Floor.get());
+
+    FloorWireframe = std::make_unique<Wireframe>(Floor.get());
+    for (auto &mesh : FloorWireframe->Meshes) {
+        mesh.Generate();
+        MainScene->AddMesh(&mesh);
+    }
+
+    // MainScene->AddMesh(Floor.get());
 
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

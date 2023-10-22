@@ -11,10 +11,15 @@ struct GLVertexArray {
     uint Id = 0;
 };
 
+struct TransformedGeometry : Geometry {
+    glm::mat4 Transform;
+};
+
 struct Mesh {
     Mesh() {}
     // If `parent` is provided, the mesh will be rendered relative to the parent's transform.
     Mesh(Geometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
+    Mesh(TransformedGeometry &&triangles, Mesh *parent = nullptr) : Transforms({triangles.Transform}), Triangles(std::move(triangles)), Parent(parent) {}
     virtual ~Mesh() {}
 
     virtual const Geometry &ActiveGeometry() const { return Triangles; }
@@ -26,6 +31,7 @@ struct Mesh {
     uint NumVertices() const { return ActiveGeometry().NumVertices(); }
     uint NumFaces() const { return ActiveGeometry().NumFaces(); }
     const Geometry &GetTriangles() const { return Triangles; }
+    Geometry &GetTriangles() { return Triangles; }
     const glm::mat4 &GetTransform() const { return Transforms[0]; }
     const glm::vec3 GetLocalVertex(uint vi) const { return ActiveGeometry().GetVertex(vi); }
     const glm::vec3 GetVertex(uint vi, uint instance = 0) const { return Transforms[instance] * glm::vec4(GetLocalVertex(vi), 1); }
@@ -96,12 +102,12 @@ struct Mesh {
     }
 
 protected:
-    Geometry Triangles;
-    Mesh *Parent{nullptr};
-
     std::vector<glm::vec4> Colors{{1, 1, 1, 1}};
     std::vector<glm::mat4> Transforms{glm::mat4{1}}; // If `Parent != nullptr`, this is relative to the parent's transform.
     mutable std::vector<glm::mat4> AbsoluteTransforms{}; // If `Parent != nullptr`, this is a combined transform of the parent and child. Otherwise, it's empty.
+
+    Geometry Triangles;
+    Mesh *Parent{nullptr};
 
 private:
     void BindData(RenderMode) const;
