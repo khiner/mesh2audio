@@ -276,7 +276,7 @@ void Scene::RenderConfig() {
                 CurrShaderProgram = ActiveRenderMode == RenderMode::Lines ? LinesShaderProgram.get() : MainShaderProgram.get();
             }
             if (ActiveRenderMode == RenderMode::Lines) {
-                SliderFloat("Line width", &LineWidth, 0.0001f, 0.04f, "%.4f", ImGuiSliderFlags_Logarithmic);
+                SliderFloat("Line width", &LineWidth, 0.0001f, 0.1f, "%.4f", ImGuiSliderFlags_Logarithmic);
             }
             if (ActiveRenderMode == RenderMode::Points) {
                 SliderFloat("Point radius", &PointRadius, 0.1, 10, "%.2f", ImGuiSliderFlags_Logarithmic);
