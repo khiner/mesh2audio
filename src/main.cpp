@@ -147,7 +147,7 @@ int main(int, char **) {
     static const glm::vec3 floor_half_extents = {10, 1, 10};
     Floor = std::make_unique<Mesh>(Cuboid{floor_half_extents});
     Floor->Generate();
-    Floor->SetTransform(glm::translate(Identity, {0, floor_y - floor_half_extents.y, 0}));
+    Floor->SetTransform(glm::translate(I, {0, floor_y - floor_half_extents.y, 0}));
     MainScene->AddMesh(Floor.get());
 
     glEnable(GL_DEPTH_TEST);

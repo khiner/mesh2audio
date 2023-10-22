@@ -64,10 +64,10 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
 void InteractiveMesh::Save(fs::path file_path) const { ActiveGeometry().Save(file_path); }
 
 mat4 InteractiveMesh::GetTransform() const {
-    const mat4 rot_x = glm::rotate(Identity, glm::radians(RotationAngles.x), {1, 0, 0});
-    const mat4 rot_y = glm::rotate(Identity, glm::radians(RotationAngles.y), {0, 1, 0});
-    const mat4 rot_z = glm::rotate(Identity, glm::radians(RotationAngles.z), {0, 0, 1});
-    return glm::scale(glm::translate(Identity, Translation) * rot_z * rot_y * rot_x, Scale);
+    const mat4 rot_x = glm::rotate(I, glm::radians(RotationAngles.x), {1, 0, 0});
+    const mat4 rot_y = glm::rotate(I, glm::radians(RotationAngles.y), {0, 1, 0});
+    const mat4 rot_z = glm::rotate(I, glm::radians(RotationAngles.z), {0, 0, 1});
+    return glm::scale(glm::translate(I, Translation) * rot_z * rot_y * rot_x, Scale);
 }
 
 void InteractiveMesh::ApplyTransform() {
@@ -129,9 +129,9 @@ void InteractiveMesh::UpdateExcitableVertices() {
 
     // Point arrows at each excitable vertex.
     float scale_factor = 0.1f * glm::distance(InitialBounds.first, InitialBounds.second);
-    mat4 scale = glm::scale(Identity, vec3{scale_factor});
+    mat4 scale = glm::scale(I, vec3{scale_factor});
     for (auto vertex_index : ExcitableVertexIndices) {
-        mat4 translate = glm::translate(Identity, Tets.GetVertex(vertex_index));
+        mat4 translate = glm::translate(I, Tets.GetVertex(vertex_index));
         mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(Tets.GetVertexNormal(vertex_index))));
         transforms.push_back({translate * rotate * scale});
         colors.push_back({1, 1, 1, 1});
@@ -267,7 +267,7 @@ void InteractiveMesh::UpdateHoveredVertex() {
     if (HoveredVertexIndex >= 0 && HoveredVertexIndex < int(NumVertices())) {
         // Point the arrow at the hovered vertex.
         // Note that we use local coordinates here, since the arrow is a child.
-        mat4 translate = glm::translate(Identity, GetLocalVertex(HoveredVertexIndex));
+        mat4 translate = glm::translate(I, GetLocalVertex(HoveredVertexIndex));
         mat4 rotate = glm::mat4_cast(glm::rotation(Up, GetVertexNormal(HoveredVertexIndex)));
         HoveredVertexArrow.AddInstance(glm::scale(translate * rotate, vec3{0.1f * glm::distance(InitialBounds.first, InitialBounds.second)}), {1, 0, 0, 1});
     }
@@ -457,7 +457,7 @@ void InteractiveMesh::RenderConfig() {
                 std::vector<mat4> transforms;
                 std::vector<vec4> colors;
                 for (size_t i = 0; i < num_points; i++) {
-                    transforms.push_back(glm::translate(Identity, RealImpact->ListenerPoint(i)));
+                    transforms.push_back(glm::translate(I, RealImpact->ListenerPoint(i)));
                     colors.push_back({1, 1, 1, 1});
                 }
                 RealImpactListenerPoints.SetTransforms(std::move(transforms));

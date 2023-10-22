@@ -225,6 +225,8 @@ void Scene::RenderGizmoDebug() {
 }
 
 void Scene::UpdateNormalIndicators() {
+    static const float ScaleFactor = 0.025;
+
     NormalIndicator->ClearInstances();
     if (NormalMode == NormalIndicatorMode::None) return;
 
@@ -232,23 +234,13 @@ void Scene::UpdateNormalIndicators() {
         if (mesh->NumInstances() == 0) continue;
 
         const auto [min, max] = mesh->ComputeBounds();
-        float scale_factor = 0.025f * glm::distance(min, max);
-        if (NormalMode == NormalIndicatorMode::Vertex) {
-            for (uint i = 0; i < mesh->NumVertices(); i++) {
-                glm::mat4 translate = glm::translate(Identity, mesh->GetVertex(i));
-                glm::mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(mesh->GetVertexNormal(i))));
-                glm::vec3 scale = glm::vec3{0.25, NormalIndicatorLength, 0.25} * scale_factor;
-                glm::mat4 transform = translate * rotate * glm::scale(Identity, scale);
-                NormalIndicator->AddInstance(transform, NormalIndicatorColor);
-            }
-        } else { // Face normals
-            for (uint i = 0; i < mesh->NumFaces(); i++) {
-                glm::mat4 translate = glm::translate(Identity, mesh->GetFaceCenter(i));
-                glm::mat4 rotate = glm::mat4_cast(glm::rotation(Up, glm::normalize(mesh->GetFaceNormal(i))));
-                glm::vec3 scale = glm::vec3{0.15, NormalIndicatorLength, 0.15} * scale_factor;
-                glm::mat4 transform = translate * rotate * glm::scale(Identity, scale);
-                NormalIndicator->AddInstance(transform, NormalIndicatorColor);
-            }
+        const glm::vec3 scale = glm::vec3{ScaleFactor, NormalIndicatorLength, ScaleFactor} * glm::distance(min, max) * ScaleFactor;
+        const uint num_points = NormalMode == NormalIndicatorMode::Vertex ? mesh->NumVertices() : mesh->NumFaces();
+        for (uint i = 0; i < num_points; i++) {
+            const glm::vec3 point = NormalMode == NormalIndicatorMode::Vertex ? mesh->GetVertex(i) : mesh->GetFaceCenter(i);
+            const glm::vec3 normal = NormalMode == NormalIndicatorMode::Vertex ? mesh->GetVertexNormal(i) : mesh->GetFaceNormal(i);
+            const glm::mat4 transform = glm::scale(glm::translate(I, point) * glm::mat4_cast(glm::rotation(Up, normal)), scale);
+            NormalIndicator->AddInstance(transform, NormalIndicatorColor);
         }
     }
 }

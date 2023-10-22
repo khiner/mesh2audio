@@ -20,7 +20,7 @@ struct GLBuffer {
     uint Id = 0;
 };
 
-inline static const glm::mat4 Identity(1.f);
+inline static const glm::mat4 I(1.f);
 inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 // todo use OpenMesh as the main mesh data structure, and derive all fields from it.
