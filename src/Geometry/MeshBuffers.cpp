@@ -17,9 +17,45 @@ uint MeshBuffers::FindVertextNearestTo(const glm::vec3 point) const {
     return nearest_index;
 }
 
+std::vector<uint> MeshBuffers::GenerateTriangleIndices() const {
+    auto triangulated_mesh = Mesh; // `triangulate` is in-place, so we need to make a copy.
+    triangulated_mesh.triangulate();
+    std::vector<uint> indices;
+    for (const auto &fh : triangulated_mesh.faces()) {
+        auto v_it = triangulated_mesh.cfv_iter(fh);
+        indices.insert(indices.end(), {uint(v_it->idx()), uint((++v_it)->idx()), uint((++v_it)->idx())});
+    }
+    return indices;
+}
+
+std::vector<uint> MeshBuffers::GenerateTriangulatedFaceIndices() const {
+    std::vector<uint> indices;
+    uint index = 0;
+    for (const auto &fh : Mesh.faces()) {
+        auto valence = Mesh.valence(fh);
+        for (uint i = 0; i < valence - 2; ++i) {
+            indices.insert(indices.end(), {index, index + i + 1, index + i + 2});
+        }
+        index += valence;
+    }
+    return indices;
+}
+
+std::vector<uint> MeshBuffers::GenerateLineIndices() const {
+    std::vector<uint> indices;
+    indices.reserve(Mesh.n_edges() * 2);
+    for (const auto &eh : Mesh.edges()) {
+        const auto heh = Mesh.halfedge_handle(eh, 0);
+        indices.push_back(Mesh.from_vertex_handle(heh).idx());
+        indices.push_back(Mesh.to_vertex_handle(heh).idx());
+    }
+    return indices;
+}
+
 std::vector<uint> MeshBuffers::GenerateSilhouetteIndices() const {
     std::vector<EH> silhouette_edges = FindSilhouetteEdges(Mesh, LastTransform, LastCameraPosition);
     std::vector<uint> indices;
+    indices.reserve(silhouette_edges.size() * 2);
     for (const auto &eh : silhouette_edges) {
         const auto heh = Mesh.halfedge_handle(eh, 0);
         indices.push_back(Mesh.from_vertex_handle(heh).idx());

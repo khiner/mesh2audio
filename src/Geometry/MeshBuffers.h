@@ -20,6 +20,8 @@ enum class RenderMode {
     Silhouette,
 };
 
+inline static glm::vec3 ToGlm(const OpenMesh::Vec3f &v) { return {v[0], v[1], v[2]}; }
+
 struct MeshBuffers {
     using MeshType = OpenMesh::PolyMesh_ArrayKernelT<>;
     using VH = OpenMesh::VertexHandle;
@@ -61,63 +63,18 @@ struct MeshBuffers {
     inline uint NumFaces() const { return Mesh.n_faces(); }
     inline uint NumIndices() const { return Indices.size(); }
 
-    inline const float *GetVertices() const { return (float *)Mesh.points(); }
-    inline glm::vec3 GetVertex(uint index) const {
-        const auto &p = Mesh.point(VH(index));
-        return {p[0], p[1], p[2]};
-    }
-
-    inline glm::vec3 GetVertexNormal(uint index) const {
-        const auto &n = Mesh.normal(VH(index));
-        return {n[0], n[1], n[2]};
-    }
-    inline glm::vec3 GetFaceNormal(uint index) const {
-        const auto &n = Mesh.normal(FH(index));
-        return {n[0], n[1], n[2]};
-    }
-    inline glm::vec3 GetFaceCenter(uint index) const {
-        const auto &fh = FH(index);
-        const auto &p = Mesh.calc_face_centroid(fh);
-        return {p[0], p[1], p[2]};
-    }
+    inline const float *GetVertices() const { return (const float *)Mesh.points(); }
+    inline glm::vec3 GetVertex(uint index) const { return ToGlm(Mesh.point(VH(index))); }
+    inline glm::vec3 GetVertexNormal(uint index) const { return ToGlm(Mesh.normal(VH(index))); }
+    inline glm::vec3 GetFaceNormal(uint index) const { return ToGlm(Mesh.normal(FH(index))); }
+    inline glm::vec3 GetFaceCenter(uint index) const { return ToGlm(Mesh.calc_face_centroid(FH(index))); }
 
     uint FindVertextNearestTo(const glm::vec3 point) const;
     inline bool Empty() const { return Vertices.empty(); }
 
-    std::vector<uint> GenerateTriangleIndices() const {
-        auto triangulated_mesh = Mesh; // `triangulate` is in-place, so we need to make a copy.
-        triangulated_mesh.triangulate();
-        std::vector<uint> indices;
-        for (const auto &fh : triangulated_mesh.faces()) {
-            auto v_it = triangulated_mesh.cfv_iter(fh);
-            indices.insert(indices.end(), {uint(v_it->idx()), uint((++v_it)->idx()), uint((++v_it)->idx())});
-        }
-        return indices;
-    }
-
-    std::vector<uint> GenerateTriangulatedFaceIndices() const {
-        std::vector<uint> indices;
-        uint index = 0;
-        for (const auto &fh : Mesh.faces()) {
-            auto valence = Mesh.valence(fh);
-            for (uint i = 0; i < valence - 2; ++i) {
-                indices.insert(indices.end(), {index, index + i + 1, index + i + 2});
-            }
-            index += valence;
-        }
-        return indices;
-    }
-
-    std::vector<uint> GenerateLineIndices() const {
-        std::vector<uint> indices;
-        for (const auto &eh : Mesh.edges()) {
-            const auto heh = Mesh.halfedge_handle(eh, 0);
-            indices.push_back(Mesh.from_vertex_handle(heh).idx());
-            indices.push_back(Mesh.to_vertex_handle(heh).idx());
-        }
-        return indices;
-    }
-
+    std::vector<uint> GenerateTriangleIndices() const;
+    std::vector<uint> GenerateTriangulatedFaceIndices() const;
+    std::vector<uint> GenerateLineIndices() const;
     std::vector<uint> GenerateSilhouetteIndices() const;
 
     bool Load(const fs::path &file_path) {
