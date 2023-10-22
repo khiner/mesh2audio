@@ -60,7 +60,7 @@ struct Scene {
 private:
     void UpdateNormalIndicators();
 
-    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, GridLinesShaderProgram;
+    std::unique_ptr<ShaderProgram> MainShaderProgram, LinesShaderProgram, SilhouetteShaderProgram, GridLinesShaderProgram;
     ShaderProgram *CurrShaderProgram = nullptr;
     std::unordered_map<uint, std::unique_ptr<Mesh>> LightPoints; // For visualizing light positions. Key is `Lights` index.
 
@@ -70,6 +70,8 @@ private:
     glm::vec4 NormalIndicatorColor = {0, 0, 1, 1};
     float NormalIndicatorLength = 1.f; // This is normalized by a factor based on the mesh's bounding box diagonal length.
 
+    glm::vec4 SilhouetteColor = {1, 0.5, 0, 1};
+
     enum class NormalIndicatorMode {
         None,
         Vertex,
@@ -77,6 +79,4 @@ private:
     };
 
     NormalIndicatorMode NormalMode = NormalIndicatorMode::None;
-
-    std::unique_ptr<Mesh> Outline;
 };

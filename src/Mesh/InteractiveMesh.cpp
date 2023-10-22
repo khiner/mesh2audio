@@ -281,14 +281,6 @@ void InteractiveMesh::PrepareRender(RenderMode mode) {
     UpdateExcitableVertexColors();
 }
 
-void InteractiveMesh::PrepareRender(RenderMode mode, const glm::vec3 &camera_position) {
-    Mesh::PrepareRender(mode, camera_position);
-
-    if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) SetGeometryMode(GeometryMode_Triangular);
-    UpdateHoveredVertex();
-    UpdateExcitableVertexColors();
-}
-
 void InteractiveMesh::TriggerVertex(uint vertex_index, float amount) {
     if (ExcitableVertexIndices.empty() || !Audio::FaustState::IsRunning()) return;
 

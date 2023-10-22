@@ -10,7 +10,7 @@ uniform vec4 ambient_color, diffuse_color, specular_color;
 uniform float shininess_factor;
 
 const int max_num_lights = 5; // Must be a constant. (Can't be a uniform.)
-layout (std140) uniform LightBlock {
+layout(std140) uniform LightBlock {
     Light lights[max_num_lights];
 };
 

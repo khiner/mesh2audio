@@ -49,13 +49,6 @@ struct MeshBuffers {
         ActiveRenderMode = mode;
         UpdateBuffersFromMesh();
     }
-    virtual void PrepareRender(RenderMode mode, const glm::mat4 &transform, const glm::vec3 &camera_position) {
-        if (ActiveRenderMode == mode && (ActiveRenderMode != RenderMode::Silhouette || (camera_position == LastCameraPosition && transform == LastTransform))) return;
-        ActiveRenderMode = mode;
-        LastTransform = transform;
-        LastCameraPosition = camera_position;
-        UpdateBuffersFromMesh();
-    }
 
     inline const MeshType &GetMesh() const { return Mesh; }
 
@@ -75,7 +68,6 @@ struct MeshBuffers {
     std::vector<uint> GenerateTriangleIndices() const;
     std::vector<uint> GenerateTriangulatedFaceIndices() const;
     std::vector<uint> GenerateLineIndices() const;
-    std::vector<uint> GenerateSilhouetteIndices() const;
 
     bool Load(const fs::path &file_path) {
         OpenMesh::IO::Options read_options; // No options used yet, but keeping this here for future use.
@@ -116,17 +108,18 @@ struct MeshBuffers {
 
     // Centers the actual points to the center of gravity, not just a transform.
     void Center() {
-        auto points = OpenMesh::getPointsProperty(Mesh);
-        auto cog = Mesh.vertices().avg(points);
-        for (const auto &vh : Mesh.vertices()) {
-            const auto &point = Mesh.point(vh);
-            Mesh.set_point(vh, point - cog);
-        }
-        UpdateVertices(); // Normals/indices are not affected.
+        const auto points = OpenMesh::getPointsProperty(Mesh);
+        const auto cog = Mesh.vertices().avg(points);
+        for (const auto &vh : Mesh.vertices()) Mesh.set_point(vh, Mesh.point(vh) - cog);
+        // Normals/indices are not affected.
+        UpdateVertices();
+        UpdateFaces();
     }
 
     void SetOpenMesh(const MeshType &mesh) {
         Clear();
+        Mesh.release_vertex_normals();
+        Mesh.release_face_normals();
         Mesh = mesh;
         Mesh.request_face_normals();
         Mesh.request_vertex_normals();
@@ -140,6 +133,10 @@ struct MeshBuffers {
         Vertices.clear();
         Normals.clear();
         Indices.clear();
+
+        FaceNormals.clear();
+        FaceCenters.clear();
+
         Dirty = true;
     }
 
@@ -147,41 +144,35 @@ protected:
     MeshType Mesh;
     RenderMode ActiveRenderMode{RenderMode::Flat};
     mutable bool Dirty{true};
-    // Only used for silhouette rendering.
-    // TODO these won't be needed when we do this in the shader.
-    glm::vec3 LastCameraPosition{0, 0, 0};
-    glm::mat4 LastTransform{1};
 
     void UpdateBuffersFromMesh() {
         UpdateVertices();
         UpdateNormals();
         UpdateIndices();
+
+        UpdateFaces();
+        UpdateEdgeToFaces();
     }
 
     void UpdateVertices() {
         Vertices.clear();
         if (ActiveRenderMode == RenderMode::Flat) {
             for (const auto &fh : Mesh.faces()) {
-                for (const auto &vh : Mesh.fv_range(fh)) {
-                    const auto &p = Mesh.point(vh);
-                    Vertices.emplace_back(p[0], p[1], p[2]);
-                }
+                for (const auto &vh : Mesh.fv_range(fh)) Vertices.emplace_back(ToGlm(Mesh.point(vh)));
             }
         } else {
-            for (const auto &vh : Mesh.vertices()) {
-                const auto &p = Mesh.point(vh);
-                Vertices.emplace_back(p[0], p[1], p[2]);
-            }
+            for (const auto &vh : Mesh.vertices()) Vertices.emplace_back(ToGlm(Mesh.point(vh)));
         }
         Dirty = true;
     }
 
     void UpdateIndices() {
         Indices =
-            ActiveRenderMode == RenderMode::Lines      ? GenerateLineIndices() :
-            ActiveRenderMode == RenderMode::Flat       ? GenerateTriangulatedFaceIndices() :
-            ActiveRenderMode == RenderMode::Silhouette ? GenerateSilhouetteIndices() :
-                                                         GenerateTriangleIndices();
+            ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette ?
+            GenerateLineIndices() :
+            ActiveRenderMode == RenderMode::Flat ?
+            GenerateTriangulatedFaceIndices() :
+            GenerateTriangleIndices();
         Dirty = true;
     }
 
@@ -191,19 +182,39 @@ protected:
         Mesh.update_normals();
         if (ActiveRenderMode == RenderMode::Flat) {
             for (const auto &fh : Mesh.faces()) {
-                const auto &n = Mesh.normal(fh);
                 // Duplicate the normal for each vertex.
-                for (size_t i = 0; i < Mesh.valence(fh); ++i) {
-                    Normals.emplace_back(n[0], n[1], n[2]);
-                }
+                const auto n = ToGlm(Mesh.normal(fh));
+                for (size_t i = 0; i < Mesh.valence(fh); ++i) Normals.emplace_back(n);
             }
         } else {
-            for (const auto &vh : Mesh.vertices()) {
-                const auto &n = Mesh.normal(vh);
-                Normals.emplace_back(n[0], n[1], n[2]);
-            }
+            for (const auto &vh : Mesh.vertices()) Normals.emplace_back(ToGlm(Mesh.normal(vh)));
         }
 
+        Dirty = true;
+    }
+
+    void UpdateFaces() {
+        FaceNormals.clear();
+        FaceCenters.clear();
+        for (const auto &fh : Mesh.faces()) {
+            FaceNormals.emplace_back(ToGlm(Mesh.normal(fh)));
+            FaceCenters.emplace_back(ToGlm(Mesh.calc_face_centroid(fh)));
+        }
+        Dirty = true;
+    }
+
+    void UpdateEdgeToFaces() {
+        EdgeToFaces.clear();
+        for (const auto &eh : Mesh.edges()) {
+            if (Mesh.is_boundary(eh)) {
+                EdgeToFaces.push_back(glm::ivec2(-1));
+            } else {
+                const auto &heh = Mesh.halfedge_handle(eh, 0);
+                const auto &fh1 = Mesh.face_handle(heh);
+                const auto &fh2 = Mesh.opposite_face_handle(heh);
+                EdgeToFaces.push_back(glm::ivec2(fh1.idx(), fh2.idx()));
+            }
+        }
         Dirty = true;
     }
 
@@ -211,4 +222,9 @@ protected:
     std::vector<glm::vec3> Vertices;
     std::vector<glm::vec3> Normals;
     std::vector<uint> Indices;
+
+    // Currently only used for silhouette rendering.
+    std::vector<glm::vec3> FaceNormals;
+    std::vector<glm::vec3> FaceCenters;
+    std::vector<glm::ivec2> EdgeToFaces; // Maps edge index to its bordering face indices (or -1,-1 if boundary).
 };

@@ -44,5 +44,10 @@ private:
     GLBuffer<glm::vec3, GL_ARRAY_BUFFER> NormalBuffer;
     GLBuffer<uint, GL_ELEMENT_ARRAY_BUFFER> IndexBuffer;
 
+    // Currently used for silhouette rendering.
+    GLBuffer<glm::vec3, GL_SHADER_STORAGE_BUFFER> FaceNormalBuffer;
+    GLBuffer<glm::vec3, GL_SHADER_STORAGE_BUFFER> FaceCenterBuffer;
+    GLBuffer<glm::ivec2, GL_SHADER_STORAGE_BUFFER> EdgeToFacesBuffer;
+
     mutable RenderMode LastBoundRenderMode = RenderMode::Smooth;
 };

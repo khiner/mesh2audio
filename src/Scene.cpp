@@ -13,6 +13,7 @@
 
 namespace UniformName {
 inline static const std::string
+    // Main/shared.
     NumLights = "num_lights",
     AmbientColor = "ambient_color",
     DiffuseColor = "diffuse_color",
@@ -20,8 +21,13 @@ inline static const std::string
     ShininessFactor = "shininess_factor",
     Projection = "projection",
     CameraView = "camera_view",
+    // Lines.
     LineWidth = "line_width",
-    GridLinesColor = "grid_lines_color";
+    // Grid lines.
+    GridLinesColor = "grid_lines_color",
+    // Silhouette.
+    LineColor = "line_color";
+
 } // namespace UniformName
 
 Scene::Scene() {
@@ -65,11 +71,15 @@ Scene::Scene() {
         TransformVertexLinesShader{GL_VERTEX_SHADER, ShaderDir / "transform_vertex_lines.glsl", {un::Projection, un::CameraView}},
         LinesGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "lines_geom.glsl", {un::LineWidth}},
         FragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "fragment.glsl", {un::NumLights, un::AmbientColor, un::DiffuseColor, un::SpecularColor, un::ShininessFactor}},
+        SilhouetteVertexShader{GL_VERTEX_SHADER, ShaderDir / "silhouette_vertex.glsl", {un::Projection, un::CameraView}},
+        SilhouetteGeometryShader{GL_GEOMETRY_SHADER, ShaderDir / "silhouette_geom.glsl", {un::LineWidth, un::CameraView}},
+        SilhouetteFragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "silhouette_fragment.glsl", {un::LineColor}},
         GridLinesVertexShader{GL_VERTEX_SHADER, ShaderDir / "grid_lines_vertex.glsl", {un::Projection, un::CameraView}},
         GridLinesFragmentShader{GL_FRAGMENT_SHADER, ShaderDir / "grid_lines_fragment.glsl", {}};
 
     MainShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexShader, &FragmentShader});
     LinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&TransformVertexLinesShader, &LinesGeometryShader, &FragmentShader});
+    SilhouetteShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&SilhouetteVertexShader, &SilhouetteGeometryShader, &SilhouetteFragmentShader});
     GridLinesShaderProgram = std::make_unique<ShaderProgram>(std::vector<const Shader *>{&GridLinesVertexShader, &GridLinesFragmentShader});
 
     CurrShaderProgram = MainShaderProgram.get();
@@ -79,7 +89,7 @@ Scene::Scene() {
     glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
 
-    GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
+    const GLuint light_block_index = glGetUniformBlockIndex(CurrShaderProgram->Id, "LightBlock");
     glBindBufferBase(GL_UNIFORM_BUFFER, light_block_index, LightBufferId);
 }
 
@@ -129,20 +139,26 @@ void Scene::Render() {
     CurrShaderProgram->Use();
 
     namespace un = UniformName;
+
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::Projection), 1, GL_FALSE, &CameraProjection[0][0]);
     glUniformMatrix4fv(CurrShaderProgram->GetUniform(un::CameraView), 1, GL_FALSE, &CameraView[0][0]);
-    glUniform1i(CurrShaderProgram->GetUniform(un::NumLights), Lights.size());
-    glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
-    glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
-    glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
 
+    if (ActiveRenderMode != RenderMode::Silhouette) {
+        glUniform1i(CurrShaderProgram->GetUniform(un::NumLights), Lights.size());
+        glUniform4fv(CurrShaderProgram->GetUniform(un::AmbientColor), 1, &AmbientColor[0]);
+        glUniform4fv(CurrShaderProgram->GetUniform(un::DiffuseColor), 1, &DiffusionColor[0]);
+        glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
+        glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
+    }
     if (ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
+    if (ActiveRenderMode == RenderMode::Silhouette) {
+        glUniform4fv(CurrShaderProgram->GetUniform(un::LineColor), 1, &SilhouetteColor[0]);
+    }
 
-    const glm::vec3 camera_position = glm::inverse(CameraView)[3];
-    for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode, camera_position);
+    // const glm::vec3 camera_position = glm::inverse(CameraView)[3];
+    for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode::Points) glPointSize(PointRadius);
@@ -277,9 +293,9 @@ void Scene::RenderConfig() {
             if (render_mode_changed) {
                 ActiveRenderMode = RenderMode(render_mode);
                 CurrShaderProgram =
-                    ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette ?
-                    LinesShaderProgram.get() :
-                    MainShaderProgram.get();
+                    ActiveRenderMode == RenderMode::Lines      ? LinesShaderProgram.get() :
+                    ActiveRenderMode == RenderMode::Silhouette ? SilhouetteShaderProgram.get() :
+                                                                 MainShaderProgram.get();
             }
             if (ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.1f, "%.4f", ImGuiSliderFlags_Logarithmic);

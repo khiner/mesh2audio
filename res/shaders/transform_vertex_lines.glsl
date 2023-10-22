@@ -6,10 +6,10 @@
 uniform mat4 camera_view;
 uniform mat4 projection;
 
-layout (location = 0) in vec3 Pos;
-layout (location = 1) in vec3 Normal;
-layout (location = 2) in vec4 Color;
-layout (location = 3) in mat4 Transform;
+layout(location = 0) in vec3 Pos;
+layout(location = 1) in vec3 Normal;
+layout(location = 2) in vec4 Color;
+layout(location = 3) in mat4 Transform;
 
 out vec4 vertex_position;
 out vec3 vertex_normal;
