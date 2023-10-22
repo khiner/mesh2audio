@@ -77,4 +77,6 @@ private:
     };
 
     NormalIndicatorMode NormalMode = NormalIndicatorMode::None;
+
+    std::unique_ptr<Mesh> Outline;
 };

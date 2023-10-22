@@ -39,6 +39,7 @@ struct Mesh {
     void EnableVertexAttributes() const;
 
     virtual void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
+    virtual void PrepareRender(RenderMode mode, const glm::vec3 &camera_pos) { ActiveGeometry().PrepareRender(mode, Transforms[0], camera_pos); }
     void Render(RenderMode mode) const;
     virtual void PostRender(RenderMode) {}
 

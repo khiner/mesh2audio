@@ -4,6 +4,7 @@
 
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/PolyMesh_ArrayKernelT.hh>
+#include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -16,6 +17,7 @@ enum class RenderMode {
     Smooth,
     Lines,
     Points,
+    Silhouette,
 };
 
 struct MeshBuffers {
@@ -40,9 +42,16 @@ struct MeshBuffers {
         Mesh.release_face_normals();
     }
 
-    void PrepareRender(RenderMode mode) {
+    virtual void PrepareRender(RenderMode mode) {
         if (ActiveRenderMode == mode) return;
         ActiveRenderMode = mode;
+        UpdateBuffersFromMesh();
+    }
+    virtual void PrepareRender(RenderMode mode, const glm::mat4 &transform, const glm::vec3 &camera_position) {
+        if (ActiveRenderMode == mode && (ActiveRenderMode != RenderMode::Silhouette || (camera_position == LastCameraPosition && transform == LastTransform))) return;
+        ActiveRenderMode = mode;
+        LastTransform = transform;
+        LastCameraPosition = camera_position;
         UpdateBuffersFromMesh();
     }
 
@@ -75,7 +84,7 @@ struct MeshBuffers {
     uint FindVertextNearestTo(const glm::vec3 point) const;
     inline bool Empty() const { return Vertices.empty(); }
 
-    std::vector<uint> GenerateTriangleIndices() {
+    std::vector<uint> GenerateTriangleIndices() const {
         auto triangulated_mesh = Mesh; // `triangulate` is in-place, so we need to make a copy.
         triangulated_mesh.triangulate();
         std::vector<uint> indices;
@@ -86,7 +95,7 @@ struct MeshBuffers {
         return indices;
     }
 
-    std::vector<uint> GenerateTriangulatedFaceIndices() {
+    std::vector<uint> GenerateTriangulatedFaceIndices() const {
         std::vector<uint> indices;
         uint index = 0;
         for (const auto &fh : Mesh.faces()) {
@@ -99,7 +108,7 @@ struct MeshBuffers {
         return indices;
     }
 
-    std::vector<uint> GenerateLineIndices() {
+    std::vector<uint> GenerateLineIndices() const {
         std::vector<uint> indices;
         for (const auto &eh : Mesh.edges()) {
             const auto heh = Mesh.halfedge_handle(eh, 0);
@@ -108,6 +117,8 @@ struct MeshBuffers {
         }
         return indices;
     }
+
+    std::vector<uint> GenerateSilhouetteIndices() const;
 
     bool Load(const fs::path &file_path) {
         OpenMesh::IO::Options read_options; // No options used yet, but keeping this here for future use.
@@ -179,6 +190,10 @@ protected:
     MeshType Mesh;
     RenderMode ActiveRenderMode{RenderMode::Flat};
     mutable bool Dirty{true};
+    // Only used for silhouette rendering.
+    // TODO these won't be needed when we do this in the shader.
+    glm::vec3 LastCameraPosition{0, 0, 0};
+    glm::mat4 LastTransform{1};
 
     void UpdateBuffersFromMesh() {
         UpdateVertices();
@@ -206,9 +221,10 @@ protected:
 
     void UpdateIndices() {
         Indices =
-            ActiveRenderMode == RenderMode::Lines ? GenerateLineIndices() :
-            ActiveRenderMode == RenderMode::Flat  ? GenerateTriangulatedFaceIndices() :
-                                                    GenerateTriangleIndices();
+            ActiveRenderMode == RenderMode::Lines      ? GenerateLineIndices() :
+            ActiveRenderMode == RenderMode::Flat       ? GenerateTriangulatedFaceIndices() :
+            ActiveRenderMode == RenderMode::Silhouette ? GenerateSilhouetteIndices() :
+                                                         GenerateTriangleIndices();
         Dirty = true;
     }
 

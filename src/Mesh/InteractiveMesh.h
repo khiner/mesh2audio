@@ -35,6 +35,7 @@ struct InteractiveMesh : Mesh {
     const Geometry &GetTets() const { return Tets; }
 
     void PrepareRender(RenderMode) override;
+    void PrepareRender(RenderMode, const glm::vec3 &) override;
     void PostRender(RenderMode) override;
 
     // Trigger the nearest excitation vertex nearest to the provided vertex.

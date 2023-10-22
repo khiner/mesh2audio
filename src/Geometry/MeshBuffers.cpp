@@ -2,6 +2,8 @@
 
 #include <glm/geometric.hpp>
 
+#include "Geometry/Silhouette.h"
+
 uint MeshBuffers::FindVertextNearestTo(const glm::vec3 point) const {
     uint nearest_index = 0;
     float nearest_distance = std::numeric_limits<float>::max();
@@ -13,6 +15,17 @@ uint MeshBuffers::FindVertextNearestTo(const glm::vec3 point) const {
         }
     }
     return nearest_index;
+}
+
+std::vector<uint> MeshBuffers::GenerateSilhouetteIndices() const {
+    std::vector<EH> silhouette_edges = FindSilhouetteEdges(Mesh, LastTransform, LastCameraPosition);
+    std::vector<uint> indices;
+    for (const auto &eh : silhouette_edges) {
+        const auto heh = Mesh.halfedge_handle(eh, 0);
+        indices.push_back(Mesh.from_vertex_handle(heh).idx());
+        indices.push_back(Mesh.to_vertex_handle(heh).idx());
+    }
+    return indices;
 }
 
 void MeshBuffers::ExtrudeProfile(const std::vector<glm::vec2> &profile_vertices, uint slices, bool closed) {

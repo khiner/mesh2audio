@@ -64,7 +64,7 @@ void Mesh::Render(RenderMode mode) const {
     VertexArray.Bind();
 
     GLenum polygon_mode = mode == RenderMode::Points ? GL_POINT : GL_FILL;
-    GLenum primitive_type = mode == RenderMode::Lines ? GL_LINES : GL_TRIANGLES;
+    GLenum primitive_type = mode == RenderMode::Lines || mode == RenderMode::Silhouette ? GL_LINES : GL_TRIANGLES;
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
 
     uint num_indices = ActiveGeometry().NumIndices();
