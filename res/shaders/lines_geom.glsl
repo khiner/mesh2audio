@@ -3,8 +3,6 @@
 // Emits a quad around each line.
 
 uniform float line_width;
-uniform mat4 camera_view;
-uniform mat4 projection;
 
 layout (lines) in;
 layout (triangle_strip, max_vertices = 4) out;
@@ -26,10 +24,8 @@ void EmitWithAttributes(int i, vec4 offset) {
 }
 
 void main() {
-    // Transform vertices to screen space and compute line direction and perpendicular vector.
-    vec4 screen_pos0 = projection * camera_view * vertex_position[0];
-    vec4 screen_pos1 = projection * camera_view * vertex_position[1];
-    vec2 dir = screen_pos1.xy / screen_pos1.w - screen_pos0.xy / screen_pos0.w;
+    // Compute line direction and perpendicular vector in screen space.
+    vec2 dir = gl_in[1].gl_Position.xy / gl_in[1].gl_Position.w - gl_in[0].gl_Position.xy / gl_in[0].gl_Position.w;
     vec4 offset = normalize(vec4(-dir.y, dir.x, 0.0, 0.0)) * line_width * 0.5;
 
     EmitWithAttributes(0, offset);
