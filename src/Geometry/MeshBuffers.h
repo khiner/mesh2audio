@@ -17,7 +17,6 @@ enum class RenderMode {
     Smooth,
     Lines,
     Points,
-    Silhouette,
 };
 
 inline static glm::vec3 ToGlm(const OpenMesh::Vec3f &v) { return {v[0], v[1], v[2]}; }
@@ -49,13 +48,6 @@ struct MeshBuffers {
         ActiveRenderMode = mode;
         UpdateBuffersFromMesh();
     }
-    virtual void PrepareRender(RenderMode mode, const glm::mat4 &transform, const glm::vec3 &camera_position) {
-        if (ActiveRenderMode == mode && (ActiveRenderMode != RenderMode::Silhouette || (camera_position == LastCameraPosition && transform == LastTransform))) return;
-        ActiveRenderMode = mode;
-        LastTransform = transform;
-        LastCameraPosition = camera_position;
-        UpdateBuffersFromMesh();
-    }
 
     inline const MeshType &GetMesh() const { return Mesh; }
 
@@ -75,7 +67,6 @@ struct MeshBuffers {
     std::vector<uint> GenerateTriangleIndices() const;
     std::vector<uint> GenerateTriangulatedFaceIndices() const;
     std::vector<uint> GenerateLineIndices() const;
-    std::vector<uint> GenerateSilhouetteIndices() const;
 
     bool Load(const fs::path &file_path) {
         OpenMesh::IO::Options read_options; // No options used yet, but keeping this here for future use.
@@ -147,10 +138,6 @@ protected:
     MeshType Mesh;
     RenderMode ActiveRenderMode{RenderMode::Flat};
     mutable bool Dirty{true};
-    // Only used for silhouette rendering.
-    // TODO these won't be needed when we do this in the shader.
-    glm::vec3 LastCameraPosition{0, 0, 0};
-    glm::mat4 LastTransform{1};
 
     void UpdateBuffersFromMesh() {
         UpdateVertices();
@@ -178,10 +165,9 @@ protected:
 
     void UpdateIndices() {
         Indices =
-            ActiveRenderMode == RenderMode::Lines      ? GenerateLineIndices() :
-            ActiveRenderMode == RenderMode::Flat       ? GenerateTriangulatedFaceIndices() :
-            ActiveRenderMode == RenderMode::Silhouette ? GenerateSilhouetteIndices() :
-                                                         GenerateTriangleIndices();
+            ActiveRenderMode == RenderMode::Lines ? GenerateLineIndices() :
+            ActiveRenderMode == RenderMode::Flat  ? GenerateTriangulatedFaceIndices() :
+                                                    GenerateTriangleIndices();
         Dirty = true;
     }
 

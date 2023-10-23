@@ -137,12 +137,11 @@ void Scene::Render() {
     glUniform4fv(CurrShaderProgram->GetUniform(un::SpecularColor), 1, &SpecularColor[0]);
     glUniform1f(CurrShaderProgram->GetUniform(un::ShininessFactor), Shininess);
 
-    if (ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette) {
+    if (ActiveRenderMode == RenderMode::Lines) {
         glUniform1f(CurrShaderProgram->GetUniform(un::LineWidth), LineWidth);
     }
 
-    const glm::vec3 camera_position = glm::inverse(CameraView)[3];
-    for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode, camera_position);
+    for (auto *mesh : Meshes) mesh->PrepareRender(ActiveRenderMode);
 
     // auto start_time = std::chrono::high_resolution_clock::now();
     if (ActiveRenderMode == RenderMode::Points) glPointSize(PointRadius);
@@ -272,16 +271,14 @@ void Scene::RenderConfig() {
             render_mode_changed |= RadioButton("Lines", &render_mode, int(RenderMode::Lines));
             SameLine();
             render_mode_changed |= RadioButton("Point cloud", &render_mode, int(RenderMode::Points));
-            SameLine();
-            render_mode_changed |= RadioButton("Silhouette", &render_mode, int(RenderMode::Silhouette));
             if (render_mode_changed) {
                 ActiveRenderMode = RenderMode(render_mode);
                 CurrShaderProgram =
-                    ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette ?
+                    ActiveRenderMode == RenderMode::Lines ?
                     LinesShaderProgram.get() :
                     MainShaderProgram.get();
             }
-            if (ActiveRenderMode == RenderMode::Lines || ActiveRenderMode == RenderMode::Silhouette) {
+            if (ActiveRenderMode == RenderMode::Lines) {
                 SliderFloat("Line width", &LineWidth, 0.0001f, 0.1f, "%.4f", ImGuiSliderFlags_Logarithmic);
             }
             if (ActiveRenderMode == RenderMode::Points) {
