@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Geometry.h"
+#include "Geometry/MeshBuffers.h"
 
-struct Arrow : Geometry {
+struct Arrow : MeshBuffers {
     Arrow(float length, float base_radius, float tip_radius, float tip_length, uint slices = 16);
 };

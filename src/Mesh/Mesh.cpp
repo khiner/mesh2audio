@@ -1,25 +1,23 @@
 #include "Mesh.h"
 
 void Mesh::Generate() {
+    Geometry::Generate();
     VertexArray.Generate();
     ColorBuffer.Generate();
     TransformBuffer.Generate();
-    for (const auto *geom : static_cast<const Mesh *>(this)->AllGeometries()) {
-        const_cast<Geometry *>(geom)->Generate();
-    }
     EnableVertexAttributes();
 }
 
 void Mesh::Delete() const {
+    Geometry::Delete();
     VertexArray.Delete();
     TransformBuffer.Delete();
     ColorBuffer.Delete();
-    for (const auto *geom : AllGeometries()) geom->Delete();
 }
 
 void Mesh::EnableVertexAttributes() const {
     VertexArray.Bind();
-    ActiveGeometry().EnableVertexAttributes();
+    Geometry::EnableVertexAttributes();
 
     ColorBuffer.Bind();
     static const GLuint ColorSlot = 2;
@@ -40,7 +38,7 @@ void Mesh::EnableVertexAttributes() const {
 
 void Mesh::BindData(RenderMode render_mode) const {
     VertexArray.Bind();
-    ActiveGeometry().BindData(render_mode);
+    BindData(render_mode);
 
     if (Dirty) {
         if (Parent) {
@@ -67,10 +65,9 @@ void Mesh::Render(RenderMode mode) const {
     GLenum primitive_type = mode == RenderMode::Lines ? GL_LINES : GL_TRIANGLES;
     glPolygonMode(GL_FRONT_AND_BACK, polygon_mode);
 
-    uint num_indices = ActiveGeometry().NumIndices();
     if (Transforms.size() == 1) {
-        glDrawElements(primitive_type, num_indices, GL_UNSIGNED_INT, 0);
+        glDrawElements(primitive_type, NumIndices(), GL_UNSIGNED_INT, 0);
     } else {
-        glDrawElementsInstanced(primitive_type, num_indices, GL_UNSIGNED_INT, 0, Transforms.size());
+        glDrawElementsInstanced(primitive_type, NumIndices(), GL_UNSIGNED_INT, 0, Transforms.size());
     }
 }

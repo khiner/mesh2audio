@@ -1,6 +1,6 @@
 #include "Arrow.h"
 
-Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length, uint slices) : Geometry() {
+Arrow::Arrow(float length, float base_radius, float tip_radius, float tip_length, uint slices) : MeshBuffers() {
     // Add all vertices and group handles.
     std::vector<VH> base_bottom_face, base_top_face, tip_face;
     for (uint i = 0; i < slices; i++) {

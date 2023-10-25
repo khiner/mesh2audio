@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Geometry/Geometry.h"
+#include "Geometry/MeshBuffers.h"
 
-struct Cuboid : Geometry {
+struct Cuboid : MeshBuffers {
     Cuboid(glm::vec3 half_extents = {1, 1, 1});
 };

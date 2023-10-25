@@ -26,6 +26,7 @@ inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 // todo use OpenMesh as the main mesh data structure, and derive all fields from it.
 struct Geometry : MeshBuffers {
     Geometry() : MeshBuffers() {}
+    Geometry(MeshBuffers &&mesh_buffers) : MeshBuffers(std::move(mesh_buffers)) {}
     Geometry(const fs::path &file_path) : MeshBuffers() {
         Load(file_path);
         Center();
@@ -33,9 +34,9 @@ struct Geometry : MeshBuffers {
 
     virtual ~Geometry() = default;
 
-    void EnableVertexAttributes() const;
-    void Generate();
-    void Delete() const;
+    virtual void EnableVertexAttributes() const;
+    virtual void Generate();
+    virtual void Delete() const;
 
     void BindData(RenderMode) const; // Only rebinds the data if it has changed.
 

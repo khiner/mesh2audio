@@ -33,6 +33,10 @@ struct MeshBuffers {
         Mesh.request_face_normals();
         Mesh.request_vertex_normals();
     }
+    MeshBuffers(MeshBuffers &&other) noexcept : Mesh(std::move(other.Mesh)), ActiveRenderMode(other.ActiveRenderMode) {
+        UpdateBuffersFromMesh();
+    }
+
     MeshBuffers(const fs::path &file_path) {
         Mesh.request_face_normals();
         Mesh.request_vertex_normals();

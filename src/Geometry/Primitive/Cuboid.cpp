@@ -1,6 +1,6 @@
 #include "Cuboid.h"
 
-Cuboid::Cuboid(glm::vec3 half_extents) : Geometry() {
+Cuboid::Cuboid(glm::vec3 half_extents) : MeshBuffers() {
     const auto &he = half_extents;
     std::vector<Point> vertices = {
         {-he.x, -he.y, -he.z},

@@ -61,8 +61,6 @@ void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
     EnableVertexAttributes();
 }
 
-void InteractiveMesh::Save(fs::path file_path) const { ActiveGeometry().Save(file_path); }
-
 mat4 InteractiveMesh::GetTransform() const {
     const mat4 rot_x = glm::rotate(I, glm::radians(RotationAngles.x), {1, 0, 0});
     const mat4 rot_y = glm::rotate(I, glm::radians(RotationAngles.y), {0, 1, 0});
