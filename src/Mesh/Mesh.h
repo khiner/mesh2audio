@@ -14,7 +14,7 @@ struct GLVertexArray {
 struct Mesh {
     Mesh() {}
     // If `parent` is provided, the mesh will be rendered relative to the parent's transform.
-    Mesh(GLGeometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
+    Mesh(Geometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
     virtual ~Mesh() {}
 
     virtual const GLGeometry &ActiveGeometry() const { return Triangles; }

@@ -25,6 +25,7 @@ inline static const glm::vec3 Origin{0.f}, Up{0.f, 1.f, 0.f};
 
 struct GLGeometry : Geometry {
     GLGeometry() : Geometry() {}
+    GLGeometry(Geometry &&geometry) : Geometry(std::move(geometry)) {}
     GLGeometry(const fs::path &file_path) : Geometry() {
         Load(file_path);
         Center();

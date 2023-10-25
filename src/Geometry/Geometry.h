@@ -33,6 +33,9 @@ struct Geometry {
         Mesh.request_face_normals();
         Mesh.request_vertex_normals();
     }
+    Geometry(Geometry &&geometry) : Mesh(std::move(geometry.Mesh)), ActiveRenderMode(geometry.ActiveRenderMode) {
+        UpdateBuffersFromMesh();
+    }
     Geometry(const fs::path &file_path) {
         Mesh.request_face_normals();
         Mesh.request_vertex_normals();

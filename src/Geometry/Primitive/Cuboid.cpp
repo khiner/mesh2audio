@@ -1,6 +1,6 @@
 #include "Cuboid.h"
 
-Cuboid::Cuboid(glm::vec3 half_extents) : GLGeometry() {
+Cuboid::Cuboid(glm::vec3 half_extents) : Geometry() {
     const auto &he = half_extents;
     std::vector<Point> vertices = {
         {-he.x, -he.y, -he.z},

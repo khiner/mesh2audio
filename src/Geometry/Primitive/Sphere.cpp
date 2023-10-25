@@ -16,7 +16,7 @@ uint GetMidIndex(uint p1, uint p2, std::vector<glm::vec3> &vertices, std::unorde
     return cache[key];
 }
 
-Sphere::Sphere(float radius, int recursion_level) : GLGeometry() {
+Sphere::Sphere(float radius, int recursion_level) : Geometry() {
     static const float t = (1.0f + sqrt(5.0f)) / 2.0f;
     // Initial icosahedron vertices and face indices.
     // clang-format off

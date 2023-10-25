@@ -1,6 +1,6 @@
 #include "Cylinder.h"
 
-Cylinder::Cylinder(float radius, float height, uint slices) : GLGeometry() {
+Cylinder::Cylinder(float radius, float height, uint slices) : Geometry() {
     // Add all vertices and group handles.
     std::vector<VH> bottom_face, top_face;
     for (uint i = 0; i < slices; i++) {
