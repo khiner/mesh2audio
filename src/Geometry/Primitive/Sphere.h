@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Geometry/Geometry.h"
+#include "Geometry/GLGeometry.h"
 
 // Icosphere.
-struct Sphere : Geometry {
+struct Sphere : GLGeometry {
     Sphere(float radius = 1, int recursion_level = 3);
 };

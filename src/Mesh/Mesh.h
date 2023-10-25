@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Geometry/Geometry.h"
+#include "Geometry/GLGeometry.h"
 
 struct GLVertexArray {
     void Generate() { glGenVertexArrays(1, &Id); }
@@ -14,18 +14,18 @@ struct GLVertexArray {
 struct Mesh {
     Mesh() {}
     // If `parent` is provided, the mesh will be rendered relative to the parent's transform.
-    Mesh(Geometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
+    Mesh(GLGeometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
     virtual ~Mesh() {}
 
-    virtual const Geometry &ActiveGeometry() const { return Triangles; }
-    inline Geometry &ActiveGeometry() { return const_cast<Geometry &>(static_cast<const Mesh *>(this)->ActiveGeometry()); }
+    virtual const GLGeometry &ActiveGeometry() const { return Triangles; }
+    inline GLGeometry &ActiveGeometry() { return const_cast<GLGeometry &>(static_cast<const Mesh *>(this)->ActiveGeometry()); }
 
-    virtual std::vector<const Geometry *> AllGeometries() const { return {&Triangles}; }
+    virtual std::vector<const GLGeometry *> AllGeometries() const { return {&Triangles}; }
 
     uint NumInstances() const { return Transforms.size(); }
     uint NumVertices() const { return ActiveGeometry().NumVertices(); }
     uint NumFaces() const { return ActiveGeometry().NumFaces(); }
-    const Geometry &GetTriangles() const { return Triangles; }
+    const GLGeometry &GetTriangles() const { return Triangles; }
     const glm::mat4 &GetTransform() const { return Transforms[0]; }
     const glm::vec3 GetLocalVertex(uint vi) const { return ActiveGeometry().GetVertex(vi); }
     const glm::vec3 GetVertex(uint vi, uint instance = 0) const { return Transforms[instance] * glm::vec4(GetLocalVertex(vi), 1); }
@@ -96,7 +96,7 @@ struct Mesh {
     }
 
 protected:
-    Geometry Triangles;
+    GLGeometry Triangles;
     Mesh *Parent{nullptr};
 
     std::vector<glm::vec4> Colors{{1, 1, 1, 1}};

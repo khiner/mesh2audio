@@ -5,7 +5,7 @@ void Mesh::Generate() {
     ColorBuffer.Generate();
     TransformBuffer.Generate();
     for (const auto *geom : static_cast<const Mesh *>(this)->AllGeometries()) {
-        const_cast<Geometry *>(geom)->Generate();
+        const_cast<GLGeometry *>(geom)->Generate();
     }
     EnableVertexAttributes();
 }

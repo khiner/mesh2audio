@@ -5,7 +5,7 @@
 
 static rp3d::PhysicsCommon pc{};
 
-using MeshType = MeshBuffers::MeshType;
+using MeshType = Geometry::MeshType;
 
 static MeshType ToOpenMesh(const quickhull::ConvexHull<float> &hull) {
     MeshType mesh; // Return value.
@@ -48,7 +48,7 @@ static MeshType ConvexMeshToOpenMesh(reactphysics3d::ConvexMesh *mesh) {
         const auto &face = half_edge.getFace(i);
         if (face.faceVertices.size() < 3) throw std::runtime_error("Invalid face with less than 3 vertices.");
 
-        std::vector<MeshBuffers::VH> open_mesh_face(face.faceVertices.size());
+        std::vector<Geometry::VH> open_mesh_face(face.faceVertices.size());
         for (size_t j = 0; j < face.faceVertices.size(); ++j) {
             const auto &vertex = face.faceVertices[j];
             open_mesh_face[j] = open_mesh.vertex_handle(vertex);

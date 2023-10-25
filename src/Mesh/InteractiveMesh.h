@@ -22,7 +22,7 @@ struct InteractiveMesh : Mesh {
     InteractiveMesh(::Scene &, fs::path file_path);
     ~InteractiveMesh();
 
-    inline const Geometry &ActiveGeometry() const override {
+    inline const GLGeometry &ActiveGeometry() const override {
         switch (ActiveGeometryMode) {
             case GeometryMode_Triangular: return Triangles;
             case GeometryMode_Tetrahedral: return Tets;
@@ -30,9 +30,9 @@ struct InteractiveMesh : Mesh {
         }
     }
 
-    std::vector<const Geometry *> AllGeometries() const override { return {&Triangles, &Tets, &ConvexHull}; }
+    std::vector<const GLGeometry *> AllGeometries() const override { return {&Triangles, &Tets, &ConvexHull}; }
 
-    const Geometry &GetTets() const { return Tets; }
+    const GLGeometry &GetTets() const { return Tets; }
 
     void PrepareRender(RenderMode) override;
     void PostRender(RenderMode) override;
@@ -80,7 +80,7 @@ private:
 
     Scene &Scene;
 
-    Geometry Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
+    GLGeometry Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
 
     // Bounds of original loaded mesh, before any transformations.
     // Used to determine initial camera distance and scale of auto-generated geometries.

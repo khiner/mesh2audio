@@ -83,7 +83,7 @@ Physics::~Physics() {
     PhysicsCommon.destroyPhysicsWorld(World);
 }
 
-rp3d::ConvexMesh *OpenMeshToConvexMesh(const MeshBuffers::MeshType &mesh) {
+rp3d::ConvexMesh *OpenMeshToConvexMesh(const Geometry::MeshType &mesh) {
     // Copy the OpenMesh indices. (Points can be directly copied.)
     std::vector<uint> indices;
     std::vector<rp3d::PolygonVertexArray::PolygonFace> poly_faces;
