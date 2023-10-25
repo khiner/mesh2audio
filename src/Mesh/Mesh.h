@@ -14,31 +14,29 @@ struct GLVertexArray {
 struct Mesh {
     Mesh() {}
     // If `parent` is provided, the mesh will be rendered relative to the parent's transform.
-    Mesh(Geometry &&triangles, Mesh *parent = nullptr) : Triangles(std::move(triangles)), Parent(parent) {}
+    Mesh(Geometry &&geometry, Mesh *parent = nullptr) : Polyhedron(std::move(geometry)), Parent(parent) {}
     virtual ~Mesh() {}
 
-    virtual const GLGeometry &ActiveGeometry() const { return Triangles; }
-    inline GLGeometry &ActiveGeometry() { return const_cast<GLGeometry &>(static_cast<const Mesh *>(this)->ActiveGeometry()); }
-
-    virtual std::vector<const GLGeometry *> AllGeometries() const { return {&Triangles}; }
+    virtual const GLGeometry &GetGeometry() const { return Polyhedron; }
+    inline GLGeometry &GetGeometry() { return const_cast<GLGeometry &>(static_cast<const Mesh *>(this)->GetGeometry()); }
 
     uint NumInstances() const { return Transforms.size(); }
-    uint NumVertices() const { return ActiveGeometry().NumVertices(); }
-    uint NumFaces() const { return ActiveGeometry().NumFaces(); }
-    const GLGeometry &GetTriangles() const { return Triangles; }
+    uint NumVertices() const { return GetGeometry().NumVertices(); }
+    uint NumFaces() const { return GetGeometry().NumFaces(); }
+    const GLGeometry &GetPolyhedron() const { return Polyhedron; }
     const glm::mat4 &GetTransform() const { return Transforms[0]; }
-    const glm::vec3 GetLocalVertex(uint vi) const { return ActiveGeometry().GetVertex(vi); }
+    const glm::vec3 GetLocalVertex(uint vi) const { return GetGeometry().GetVertex(vi); }
     const glm::vec3 GetVertex(uint vi, uint instance = 0) const { return Transforms[instance] * glm::vec4(GetLocalVertex(vi), 1); }
-    const glm::vec3 GetFaceCenter(uint fi, uint instance = 0) const { return Transforms[instance] * glm::vec4(ActiveGeometry().GetFaceCenter(fi), 1); }
-    const glm::vec3 GetVertexNormal(uint vi) const { return ActiveGeometry().GetVertexNormal(vi); }
-    const glm::vec3 GetFaceNormal(uint fi) const { return ActiveGeometry().GetFaceNormal(fi); }
-    std::pair<glm::vec3, glm::vec3> ComputeBounds() const { return ActiveGeometry().ComputeBounds(); }
+    const glm::vec3 GetFaceCenter(uint fi, uint instance = 0) const { return Transforms[instance] * glm::vec4(GetGeometry().GetFaceCenter(fi), 1); }
+    const glm::vec3 GetVertexNormal(uint vi) const { return GetGeometry().GetVertexNormal(vi); }
+    const glm::vec3 GetFaceNormal(uint fi) const { return GetGeometry().GetFaceNormal(fi); }
+    std::pair<glm::vec3, glm::vec3> ComputeBounds() const { return GetGeometry().ComputeBounds(); }
 
-    void Generate();
-    void Delete() const;
-    void EnableVertexAttributes() const;
+    virtual void Generate();
+    virtual void Delete() const;
+    virtual void EnableVertexAttributes() const;
 
-    virtual void PrepareRender(RenderMode mode) { ActiveGeometry().PrepareRender(mode); }
+    virtual void PrepareRender(RenderMode mode) { GetGeometry().PrepareRender(mode); }
     void Render(RenderMode mode) const;
     virtual void PostRender(RenderMode) {}
 
@@ -96,7 +94,7 @@ struct Mesh {
     }
 
 protected:
-    GLGeometry Triangles;
+    GLGeometry Polyhedron;
     Mesh *Parent{nullptr};
 
     std::vector<glm::vec4> Colors{{1, 1, 1, 1}};

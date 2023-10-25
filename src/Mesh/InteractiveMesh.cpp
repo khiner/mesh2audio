@@ -24,15 +24,15 @@ InteractiveMesh::InteractiveMesh(::Scene &scene, fs::path file_path) : Mesh(), S
     FilePath = file_path; // Store the most recent file path.
     if (is_svg) {
         Profile = std::make_unique<MeshProfile>(FilePath);
-        Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
+        Polyhedron.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
     } else {
-        Triangles.Load(FilePath);
-        Triangles.Center();
+        Polyhedron.Load(FilePath);
+        Polyhedron.Center();
     }
 
     HoveredVertexArrow.SetColor({1, 0, 0, 1});
     UpdateExcitableVertices();
-    InitialBounds = Triangles.ComputeBounds();
+    InitialBounds = Polyhedron.ComputeBounds();
 
     Scene.AddMesh(this);
     Scene.AddMesh(&ExcitableVertexArrows);
@@ -49,19 +49,31 @@ InteractiveMesh::~InteractiveMesh() {
     HoveredVertexArrow.Delete();
 }
 
+void InteractiveMesh::Generate() {
+    Tets.Generate();
+    ConvexHull.Generate();
+    Mesh::Generate();
+}
+
+void InteractiveMesh::Delete() const {
+    Tets.Delete();
+    ConvexHull.Delete();
+    Mesh::Delete();
+}
+
 void InteractiveMesh::SetGeometryMode(GeometryMode mode) {
     if (ActiveGeometryMode == mode) return;
 
     ActiveGeometryMode = mode;
     if (ActiveGeometryMode == GeometryMode_ConvexHull && !HasConvexHull()) {
-        ConvexHull.SetOpenMesh(ConvexHull::Generate(Triangles.GetVertices(), Triangles.NumVertices(), ConvexHull::Mode::RP3D));
-    } else if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) {
+        ConvexHull.SetOpenMesh(ConvexHull::Generate(Polyhedron.GetVertices(), Polyhedron.NumVertices(), ConvexHull::Mode::RP3D));
+    } else if (ActiveGeometryMode == GeometryMode_Tets && !HasTets()) {
         TetGenerator.Launch();
     }
     EnableVertexAttributes();
 }
 
-void InteractiveMesh::Save(fs::path file_path) const { ActiveGeometry().Save(file_path); }
+void InteractiveMesh::Save(fs::path file_path) const { GetGeometry().Save(file_path); }
 
 mat4 InteractiveMesh::GetTransform() const {
     const mat4 rot_x = glm::rotate(I, glm::radians(RotationAngles.x), {1, 0, 0});
@@ -82,8 +94,8 @@ void InteractiveMesh::ExtrudeProfile() {
     HoveredVertexIndex = CameraTargetVertexIndex = -1;
     Tets.Clear();
     UpdateExcitableVertices();
-    Triangles.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
-    SetGeometryMode(GeometryMode_Triangular);
+    Polyhedron.ExtrudeProfile(Profile->GetVertices(), Profile->NumRadialSlices, Profile->ClosePath);
+    SetGeometryMode(GeometryMode_Poly);
 }
 
 static vec4 Interpolate(const vec4 &a, const vec4 &b, float interpolation) {
@@ -91,7 +103,7 @@ static vec4 Interpolate(const vec4 &a, const vec4 &b, float interpolation) {
 }
 
 void InteractiveMesh::UpdateExcitableVertexColors() {
-    if (ActiveGeometryMode != GeometryMode_Tetrahedral || !ShowExcitableVertices || ExcitableVertexIndices.empty()) return;
+    if (ActiveGeometryMode != GeometryMode_Tets || !ShowExcitableVertices || ExcitableVertexIndices.empty()) return;
 
     for (size_t i = 0; i < ExcitableVertexIndices.size(); i++) {
         static const vec4 DisabledExcitableVertexColor = {0.3, 0.3, 0.3, 1}; // For when DSP has not been initialized.
@@ -146,7 +158,7 @@ void InteractiveMesh::LoadRealImpact() {
 }
 
 void InteractiveMesh::UpdateTets() {
-    if (ActiveGeometryMode == GeometryMode_Tetrahedral) HoveredVertexIndex = CameraTargetVertexIndex = -1;
+    if (ActiveGeometryMode == GeometryMode_Tets) HoveredVertexIndex = CameraTargetVertexIndex = -1;
 
     Tets.Clear();
 
@@ -170,9 +182,9 @@ void InteractiveMesh::UpdateTets() {
 void InteractiveMesh::GenerateTets() {
     tetgenio in;
     in.firstnumber = 0;
-    const float *vertices = Triangles.GetVertices();
-    const auto &triangle_indices = Triangles.GenerateTriangleIndices();
-    in.numberofpoints = Triangles.NumVertices();
+    const float *vertices = Polyhedron.GetVertices();
+    const auto &triangle_indices = Polyhedron.GenerateTriangleIndices();
+    in.numberofpoints = Polyhedron.NumVertices();
     in.pointlist = new REAL[in.numberofpoints * 3];
     for (uint i = 0; i < uint(in.numberofpoints); ++i) {
         in.pointlist[i * 3] = vertices[i * 3];
@@ -276,7 +288,7 @@ void InteractiveMesh::UpdateHoveredVertex() {
 void InteractiveMesh::PrepareRender(RenderMode mode) {
     Mesh::PrepareRender(mode);
 
-    if (ActiveGeometryMode == GeometryMode_Tetrahedral && !HasTets()) SetGeometryMode(GeometryMode_Triangular);
+    if (ActiveGeometryMode == GeometryMode_Tets && !HasTets()) SetGeometryMode(GeometryMode_Poly);
     UpdateHoveredVertex();
     UpdateExcitableVertexColors();
 }
@@ -348,14 +360,14 @@ void InteractiveMesh::RenderConfig() {
 
             TextUnformatted("View mode");
             int geometry_mode = int(ActiveGeometryMode);
-            bool geometry_mode_changed = RadioButton("Triangular", &geometry_mode, GeometryMode_Triangular);
+            bool geometry_mode_changed = RadioButton("Polyhedral", &geometry_mode, GeometryMode_Poly);
             SameLine();
-            geometry_mode_changed |= RadioButton("Tetrahedral", &geometry_mode, GeometryMode_Tetrahedral);
+            geometry_mode_changed |= RadioButton("Tetrahedral", &geometry_mode, GeometryMode_Tets);
             SameLine();
             geometry_mode_changed |= RadioButton("Convex hull", &geometry_mode, GeometryMode_ConvexHull);
             if (geometry_mode_changed) SetGeometryMode(GeometryMode(geometry_mode));
 
-            if (ActiveGeometryMode == GeometryMode_Tetrahedral) {
+            if (ActiveGeometryMode == GeometryMode_Tets) {
                 const bool can_generate_tet_mesh = !MeshProfile::ClosePath;
                 if (HasTets()) {
                     Checkbox("Show excitable vertices", &ShowExcitableVertices);
@@ -386,7 +398,7 @@ void InteractiveMesh::RenderConfig() {
             if (TetGenerator.Render()) {
                 // Tet generation completed.
                 UpdateTets();
-                SetGeometryMode(GeometryMode_Tetrahedral); // Automatically switch to tetrahedral view.
+                SetGeometryMode(GeometryMode_Tets); // Automatically switch to tetrahedral view.
             }
             SeparatorText("Transform");
             if (Checkbox("Gizmo##Transform", &Scene.ShowGizmo)) {

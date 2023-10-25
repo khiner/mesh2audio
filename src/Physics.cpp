@@ -115,7 +115,7 @@ rp3d::ConvexMesh *OpenMeshToConvexMesh(const Geometry::MeshType &mesh) {
 
 void Physics::AddRigidBody(Mesh *mesh, BodyType body_type, bool is_concave) {
     // todo this is not working well. meshes can tunnel through ground in certain (symmetric) positions, and errors for many meshes.
-    rp3d::ConvexMesh *convex_mesh = is_concave ? ConvexHull::GenerateConvexMesh(mesh->GetTriangles().GetVertices(), mesh->GetTriangles().NumVertices()) : OpenMeshToConvexMesh(mesh->GetTriangles().GetMesh());
+    rp3d::ConvexMesh *convex_mesh = is_concave ? ConvexHull::GenerateConvexMesh(mesh->GetPolyhedron().GetVertices(), mesh->GetPolyhedron().NumVertices()) : OpenMeshToConvexMesh(mesh->GetPolyhedron().GetMesh());
     auto *shape = PhysicsCommon.createConvexMeshShape(convex_mesh);
 
     // Uncomment to use bounding box for collisions.

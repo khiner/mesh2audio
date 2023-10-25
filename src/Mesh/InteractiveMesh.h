@@ -13,26 +13,27 @@ struct tetgenio;
 
 struct InteractiveMesh : Mesh {
     enum GeometryMode {
-        GeometryMode_Triangular,
-        GeometryMode_Tetrahedral,
-        GeometryMode_ConvexHull,
+        GeometryMode_Poly, // The base polyhedral mesh.
+        GeometryMode_Tets, // Tetrahedral mesh, generated from the polyhedral mesh.
+        GeometryMode_ConvexHull, // Convex hull of the polyhedral mesh.
     };
 
     // Load a 3D mesh from a .obj file, or a 2D profile from a .svg file.
     InteractiveMesh(::Scene &, fs::path file_path);
     ~InteractiveMesh();
 
-    inline const GLGeometry &ActiveGeometry() const override {
+    inline const GLGeometry &GetGeometry() const override {
         switch (ActiveGeometryMode) {
-            case GeometryMode_Triangular: return Triangles;
-            case GeometryMode_Tetrahedral: return Tets;
+            case GeometryMode_Poly: return Polyhedron;
+            case GeometryMode_Tets: return Tets;
             case GeometryMode_ConvexHull: return ConvexHull;
         }
     }
 
-    std::vector<const GLGeometry *> AllGeometries() const override { return {&Triangles, &Tets, &ConvexHull}; }
-
     const GLGeometry &GetTets() const { return Tets; }
+
+    void Generate() override;
+    void Delete() const override;
 
     void PrepareRender(RenderMode) override;
     void PostRender(RenderMode) override;
@@ -80,7 +81,7 @@ private:
 
     Scene &Scene;
 
-    GLGeometry Tets, ConvexHull; // `ConvexHull` is the convex hull of `Triangles`.
+    GLGeometry Tets, ConvexHull;
 
     // Bounds of original loaded mesh, before any transformations.
     // Used to determine initial camera distance and scale of auto-generated geometries.
@@ -88,7 +89,7 @@ private:
 
     glm::vec3 Translation{0.f}, Scale{1.f}, RotationAngles{0.0f};
 
-    GeometryMode ActiveGeometryMode = GeometryMode_Triangular;
+    GeometryMode ActiveGeometryMode = GeometryMode_Poly;
 
     std::unique_ptr<tetgenio> TetGenResult;
     std::unique_ptr<MeshProfile> Profile;
