@@ -14,6 +14,6 @@ struct WindowsState {
     Window Scene{"Scene"};
     Window MeshProfile{"Mesh profile"};
     // By default, these demo windows are docked, but not visible.
-    Window ImGuiDemo{"Dear ImGui demo", false};
-    Window ImPlotDemo{"ImPlot demo", false};
+    Window ImGuiDemo{"Dear ImGui Demo", false};
+    Window ImPlotDemo{"ImPlot Demo", false};
 };

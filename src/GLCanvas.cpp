@@ -43,7 +43,7 @@ static void CreateRenderbuffer(unsigned int &id, GLenum format, uint samples, ui
     }
 }
 
-void GLCanvas::PrepareRender(uint width, uint height, float r, float g, float b, float a) {
+void GLCanvas::PrepareRender(uint width, uint height, const glm::vec4 &bg_color) {
     if (width != Width || height != Height) {
         Destroy();
         Width = width;
@@ -73,7 +73,7 @@ void GLCanvas::PrepareRender(uint width, uint height, float r, float g, float b,
 
     glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferId);
     glViewport(0, 0, Width, Height);
-    glClearColor(r, g, b, a);
+    glClearColor(bg_color.r, bg_color.g, bg_color.b, bg_color.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 

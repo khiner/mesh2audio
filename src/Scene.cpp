@@ -121,7 +121,7 @@ void Scene::Render() {
     if (content_region.x <= 0 && content_region.y <= 0) return;
 
     const auto bg = GetStyleColorVec4(ImGuiCol_WindowBg);
-    Canvas->PrepareRender(content_region.x, content_region.y, bg.x, bg.y, bg.z, bg.w);
+    Canvas->PrepareRender(content_region.x, content_region.y, {bg.x, bg.y, bg.z, bg.w});
 
     glBindBuffer(GL_UNIFORM_BUFFER, LightBufferId);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * Lights.size(), Lights.data(), GL_STATIC_DRAW);
