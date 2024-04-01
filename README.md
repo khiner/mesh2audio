@@ -66,16 +66,16 @@ $ ./mesh2audio
 ## Stack
 
 - [ImGui](https://github.com/ocornut/imgui) + [SDL3](https://github.comlibsdl-org/SDL): Immediate-mode UI/UX.
-- [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audiograph, with real-time interactive vertex excitation.
-- [miniaudio](https://github.com/mackron/miniaudio): Continuously render themodal physical model of the input 3D volumetric mesh to audio.
+- [Faust](https://github.com/grame-cncm/faust): Render the mesh to an audio graph, with real-time interactive vertex excitation.
+- [miniaudio](https://github.com/mackron/miniaudio): Continuously render the modal physical model of the input 3D volumetric mesh to audio.
 - [glm](https://github.com/g-truc/glm): Graphics math.
-- [OpenMesh](https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh): Mainpolyhedral mesh representation data structure.
-- [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D surfacemeshes into tetrahedral meshes.
+- [OpenMesh](https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh): Main polyhedral mesh representation data structure.
+- [tetgen](https://github.com/libigl/tetgen): Convert triangular 3D surface meshes into tetrahedral meshes.
 - 3D FEM: [VegaFEM](https://github.com/grame-cncm/faust/tree/master-dev/tools/physicalModeling/mesh2faust/vega) for generating mass/stiffness matrices + [Spectra](https://github.com/yixuan/spectra) for finding eigenvalues/vectors.
 - [ReactPhysics3D](https://github.com/DanielChappuis/reactphysics3d/treedevelop): Collision detection and physics.
 - [nativefiledialog-extended](https://github.com/btzynativefiledialog-extended): Native file dialogs.
-- [nanosvg](https://github.com/memononen/nanosvg): Read path vertices fromSVG files.
+- [nanosvg](https://github.com/memononen/nanosvg): Read path vertices from SVG files.
 - [ImPlot](https://github.com/epezent/implot): Plotting.
-- [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform andcamera rotation gizmos.
-- [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loadingspinners for ImGui.
+- [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo): Mesh transform and camera rotation gizmos.
+- [ImSpinner](https://github.com/dalerank/imspinner): Wicked cool loading spinners for ImGui.
 - [libnpy](https://github.com/llohse/libnpy): Read `.npy` files (used in WIP [RealImpact](https://github.com/samuel-clarke/RealImpact) explorer).
