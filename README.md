@@ -2,14 +2,16 @@
 
 Import or generate 3D models and transform them into real-time playable physical audio models!
 
-The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer or by using an audio input device (such as a microphone) to excite the vertices.
+The generated audio model can be played in real-time by "striking" (clicking) on mesh vertices in the 3D mesh viewer or by exciting them with an audio input device (such as a microphone).
 
 - Project video: https://youtu.be/RwxgOHVBDvc
 - Example audio output is in the [sound_samples](sound_samples/) directory.
 
 This project started as the final project for Karl Hiner and Ben Wilfong for GA Tech CSE-6730 Modeling & Simulation, Spring 2023.
 _The code as it was at the end of the school project is [here](https://github.com/GATech-CSE-6730-Spring-2023-Project/mesh2audio)._
-_This original repo also supports low-fidelity axissymmetric audio model generation._
+_This original repo also supports 2D axisymmetric audio model generation with lower fidelity due to only having two degrees of freedom._
+
+**_Work on this project continues [here](https://github.com/khiner/MeshEditor), including a full Vulkan rewrite and many new features._**
 
 ## Build app
 
@@ -52,7 +54,7 @@ $ cd mesh2audio
   - Debug build (default): `./script/Build`
   - Release build: `./script/Build -r [--release]`
 
-Debug build is generated in the `./build` directory relative to project (repo) root.
+Debug build is generated in the `./build` directory relative to the project (repo) root.
 Release build is generated in `./build-release`.
 
 To run the freshly built application:
