@@ -346,7 +346,7 @@ int main(int, char **) {
                     if (has_tetrahedral_mesh || has_profile) {
                         SeparatorText("Material properties");
                         // Presets
-                        static std::string selected_preset = "Bell";
+                        static std::string selected_preset = "Steel";
                         if (BeginCombo("Presets", selected_preset.c_str())) {
                             for (const auto &[preset_name, material] : MaterialPresets) {
                                 const bool is_selected = (preset_name == selected_preset);
@@ -364,6 +364,9 @@ int main(int, char **) {
                         InputDouble("##Poisson's ratio", &Material.PoissonRatio, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                         Text("Density (kg/m^3)");
                         InputDouble("##Density", &Material.Density, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        Text("Rayleigh damping alpha/beta");
+                        InputDouble("##Rayleigh damping alpha", &Material.Alpha, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
+                        InputDouble("##Rayleigh damping beta", &Material.Beta, 0.0f, 0.0f, "%.3f", ImGuiInputTextFlags_EnterReturnsTrue);
                     }
                     EndTabItem();
                 }

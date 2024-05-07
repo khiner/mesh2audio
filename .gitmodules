@@ -37,9 +37,6 @@
 [submodule "lib/libnpy"]
 	path = lib/libnpy
 	url = git@github.com:llohse/libnpy.git
-[submodule "lib/libnpy"]
-	path = lib/libnpy
-	url = git@github.com:llohse/libnpy.git
 [submodule "lib/tetgen"]
 	path = lib/tetgen
 	url = git@github.com:libigl/tetgen.git

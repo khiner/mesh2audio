@@ -2,6 +2,7 @@
 
 #include "date.h"
 #include "mesh2faust.h"
+#include "tetMesh.h" // Vega
 #include "tetgen.h"
 #include <glm/gtx/quaternion.hpp>
 
@@ -197,6 +198,7 @@ void InteractiveMesh::GenerateTets() {
 
     for (uint i = 0; i < uint(in.numberoffacets); ++i) {
         tetgenio::facet &f = in.facetlist[i];
+        tetgenio::init(&f);
         f.numberofpolygons = 1;
         f.polygonlist = new tetgenio::polygon[f.numberofpolygons];
         f.polygonlist[0].numberofvertices = 3;
@@ -227,19 +229,31 @@ std::string InteractiveMesh::GenerateDsp() const {
     // Convert the tetrahedral mesh into a VegaFEM Tets.
     TetMesh volumetric_mesh{
         TetGenResult->numberofpoints, TetGenResult->pointlist, TetGenResult->numberoftetrahedra * 3, tet_indices.data(),
-        Material.YoungModulus, Material.PoissonRatio, Material.Density};
-
-    m2f::CommonArguments args{
-        "modalModel",
-        true, // freq control activated
-        20, // lowest mode freq
-        10000, // highest mode freq
-        40, // number of synthesized modes (default is 20)
-        80, // number of modes to be computed for the finite element analysis (default is 100)
-        ExcitableVertexIndices, // specific excitation positions
-        int(ExcitableVertexIndices.size()), // number of excitation positions (default is max: -1)
+        Material.YoungModulus, Material.PoissonRatio, Material.Density
     };
-    return m2f::mesh2faust(&volumetric_mesh, args);
+
+    const auto m2f_result = m2f::mesh2faust(
+        &volumetric_mesh,
+        m2f::MaterialProperties{
+            .youngModulus = Material.YoungModulus,
+            .poissonRatio = Material.PoissonRatio,
+            .density = Material.Density,
+            .alpha = Material.Alpha,
+            .beta = Material.Beta
+        },
+        m2f::CommonArguments{
+            .modelName = "modalModel",
+            .freqControl = true,
+            .modesMinFreq = 20,
+            .modesMaxFreq = 20000,
+            .targetNModes = 40, // number of synthesized modes, starting with the lowest frequency in the provided min/max range
+            .femNModes = 80, // number of modes to be computed for the finite element analysis
+            .exPos = ExcitableVertexIndices,
+            .nExPos = int(ExcitableVertexIndices.size()),
+            .debugMode = false,
+        }
+    );
+    return m2f_result.modelDsp;
 }
 
 static constexpr float VertexHoverRadius = 5.f;
